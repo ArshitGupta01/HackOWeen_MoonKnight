@@ -17,5 +17,7 @@ import com.example.theekhai.navigation.Route
 expect fun PlatformAppScaffold(
     navigator: AppNavigator,
     currentRoute: Route,
+    darkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
     content: @Composable () -> Unit
 )

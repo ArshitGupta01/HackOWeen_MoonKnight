@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,6 +28,8 @@ import kotlinx.coroutines.launch
 actual fun PlatformAppScaffold(
     navigator: AppNavigator,
     currentRoute: Route,
+    darkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
     content: @Composable () -> Unit
 ) {
     val ext = LocalTheekHaiColors.current
@@ -42,6 +45,8 @@ actual fun PlatformAppScaffold(
             ) {
                 AndroidDrawerContent(
                     currentRoute = currentRoute,
+                    darkMode = darkMode,
+                    onToggleDarkMode = onToggleDarkMode,
                     onNavigate = { route ->
                         navigator.navigateTo(route)
                         coroutineScope.launch { drawerState.close() }
@@ -127,7 +132,7 @@ private fun AndroidTopBar(
                             Route.Login -> "→ Sign in"
                             Route.Signup -> "→ Create account"
                             is Route.CaseDetail -> "→ Case #${currentRoute.caseId.take(8)}"
-                            else -> ""
+                            Route.Home -> ""
                         }
                         if (subtitle.isNotEmpty()) {
                             Text(
@@ -286,8 +291,8 @@ private fun AndroidReportCenterTab(
     modifier: Modifier = Modifier
 ) {
     val ext = LocalTheekHaiColors.current
-    val pillBg = if (isSelected) Color(0xFFDCE2D6) else Color(0xFFE8ECE3)
-    val pillBorder = if (isSelected) ext.green else Color(0xFFCCD4C6)
+    val pillBg = if (isSelected) ext.greenSurface else ext.sidebarBg
+    val pillBorder = if (isSelected) ext.green else ext.line
 
     Surface(
         modifier = modifier
@@ -326,6 +331,8 @@ private fun AndroidReportCenterTab(
 @Composable
 private fun AndroidDrawerContent(
     currentRoute: Route,
+    darkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
     onNavigate: (Route) -> Unit
 ) {
     val ext = LocalTheekHaiColors.current
@@ -370,7 +377,7 @@ private fun AndroidDrawerContent(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         DotIndicator()
-                        Text("Live", style = MaterialTheme.typography.labelSmall, color = TheekHaiColors.Green)
+                        Text("Pilot", style = MaterialTheme.typography.labelSmall, color = TheekHaiColors.Green)
                     }
                 }
             }
@@ -418,6 +425,15 @@ private fun AndroidDrawerContent(
                 onClick = { onNavigate(Route.Account) }
             )
 
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Dark mode", style = MaterialTheme.typography.labelMedium, color = ext.ink)
+                Switch(checked = darkMode, onCheckedChange = { onToggleDarkMode() })
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             TheekHaiDivider()
             Spacer(modifier = Modifier.height(14.dp))
@@ -439,7 +455,7 @@ private fun AndroidDrawerContent(
             )
         }
 
-        // Drawer Bottom: User profile & Switch
+        // Drawer Bottom: Account entry
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -454,13 +470,13 @@ private fun AndroidDrawerContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                AvatarCircle(initials = "PS", size = 32.dp, bgColor = ext.green)
+                AvatarCircle(initials = "?", size = 32.dp, bgColor = ext.green)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Priya Sharma", style = MaterialTheme.typography.labelMedium, color = ext.ink, fontWeight = FontWeight.Bold)
-                    Text("Ward 4 Resident", style = MaterialTheme.typography.bodySmall, color = ext.muted, fontSize = 11.sp)
+                    Text("Account preview", style = MaterialTheme.typography.labelMedium, color = ext.ink, fontWeight = FontWeight.Bold)
+                    Text("Sign-in not connected", style = MaterialTheme.typography.bodySmall, color = ext.muted, fontSize = 11.sp)
                 }
                 Icon(
-                    imageVector = Icons.Default.ExitToApp,
+                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
                     contentDescription = "Account",
                     tint = ext.muted,
                     modifier = Modifier.size(16.dp)

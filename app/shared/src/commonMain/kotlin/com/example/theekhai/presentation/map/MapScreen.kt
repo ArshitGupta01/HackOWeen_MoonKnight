@@ -41,6 +41,7 @@ import com.example.theekhai.ui.components.Eyebrow
 import com.example.theekhai.ui.components.StatusChip
 import com.example.theekhai.ui.components.TheekHaiButton
 import com.example.theekhai.ui.components.TheekHaiDivider
+import com.example.theekhai.ui.localization.t
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
 import org.jetbrains.compose.resources.painterResource
@@ -134,7 +135,7 @@ fun MapScreen() {
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
-                                text = "28 Active",
+                                text = t("Sample map", "नमूना मानचित्र"),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = ext.green,
                                 fontWeight = FontWeight.Bold
@@ -142,6 +143,15 @@ fun MapScreen() {
                         }
                     }
                 }
+
+                Text(
+                    text = t(
+                        "Illustrative preview only. Pins and counts are sample data, not live civic reports.",
+                        "यह केवल उदाहरण है। पिन और संख्या नमूना डेटा हैं, लाइव नागरिक रिपोर्ट नहीं।"
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ext.muted
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -592,7 +602,7 @@ fun MapScreen() {
                                     ) {
                                         StatusChip(label = pin.status)
                                         Text(
-                                            text = "👥 ${pin.reportsCount} verified",
+                                            text = t("${pin.reportsCount} sample reports", "${pin.reportsCount} नमूना रिपोर्ट"),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = ext.muted
@@ -655,11 +665,12 @@ fun MapScreen() {
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    TheekHaiButton(
-                                        text = "View Case Details ↗",
-                                        onClick = { navigator.navigateTo(Route.CaseDetail(pin.id)) },
-                                        modifier = Modifier.weight(1.3f)
-                                    )
+                                    OutlinedButton(
+                                        onClick = {},
+                                        enabled = false,
+                                        modifier = Modifier.weight(1.3f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) { Text(t("Sample only", "केवल नमूना"), fontSize = 12.sp, color = ext.muted) }
                                     OutlinedButton(
                                         onClick = { navigator.navigateTo(Route.Report) },
                                         modifier = Modifier.weight(1f),

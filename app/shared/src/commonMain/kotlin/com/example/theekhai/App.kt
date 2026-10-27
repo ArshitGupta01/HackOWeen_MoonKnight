@@ -1,6 +1,8 @@
 package com.example.theekhai
 
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.example.theekhai.navigation.AppNavigator
 import com.example.theekhai.navigation.LocalNavigator
 import com.example.theekhai.navigation.Route
@@ -24,12 +26,17 @@ import org.koin.compose.viewmodel.koinViewModel
 fun App() {
     val navigator = remember { AppNavigator() }
     val currentRoute by navigator.currentRoute.collectAsState()
+    val systemDark = isSystemInDarkTheme()
+    var darkOverride by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    val darkMode = darkOverride ?: systemDark
 
-    TheekHaiTheme {
+    TheekHaiTheme(useDarkTheme = darkMode) {
         CompositionLocalProvider(LocalNavigator provides navigator) {
             PlatformAppScaffold(
                 navigator = navigator,
-                currentRoute = currentRoute
+                currentRoute = currentRoute,
+                darkMode = darkMode,
+                onToggleDarkMode = { darkOverride = !darkMode }
             ) {
                 AppContent(currentRoute)
             }

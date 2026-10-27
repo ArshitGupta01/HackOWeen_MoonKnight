@@ -38,6 +38,8 @@ import com.example.theekhai.ui.theme.TheekHaiColors
 actual fun PlatformAppScaffold(
     navigator: AppNavigator,
     currentRoute: Route,
+    darkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
     content: @Composable () -> Unit
 ) {
     val ext = LocalTheekHaiColors.current
@@ -47,7 +49,7 @@ actual fun PlatformAppScaffold(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .background(TheekHaiColors.Background)
+                .background(ext.paper)
         ) {
             // ── 1. Web-Mirroring Persistent Sidebar (230px) ──
             DesktopSidebar(
@@ -65,17 +67,18 @@ actual fun PlatformAppScaffold(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .background(TheekHaiColors.Background)
+                    .background(ext.paper)
             ) {
-                // Web-mirroring Topbar with functional Hindi-English toggle
+                // Web-mirroring Topbar with functional Hindi-English toggle & dark mode
                 DesktopTopBar(
                     language = currentLanguage,
+                    darkMode = darkMode,
                     onToggleLanguage = {
                         currentLanguage = if (currentLanguage == AppLanguage.EN) AppLanguage.HI else AppLanguage.EN
                     },
+                    onToggleDarkMode = onToggleDarkMode,
                     onReportClick = { navigator.navigateTo(Route.Report) },
-                    onAccountClick = { navigator.navigateTo(Route.Account) },
-                    onSignOutClick = { navigator.navigateTo(Route.Login) }
+                    onAccountClick = { navigator.navigateTo(Route.Account) }
                 )
 
                 TheekHaiDivider()
@@ -92,9 +95,7 @@ actual fun PlatformAppScaffold(
                 TheekHaiDivider()
 
                 // Web-mirroring Footer
-                DesktopFooter(
-                    onNavigate = { navigator.navigateTo(it) }
-                )
+                DesktopFooter()
             }
         }
     }
@@ -111,7 +112,7 @@ private fun DesktopSidebar(
 
     Column(
         modifier = modifier
-            .background(TheekHaiColors.SidebarBg)
+            .background(ext.sidebarBg)
             .verticalScroll(scrollState)
             .padding(top = 36.dp, start = 24.dp, end = 24.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.SpaceBetween
@@ -235,7 +236,7 @@ private fun DesktopSidebar(
             ) {
                 DotIndicator()
                 Text(
-                    text = t("Civic pilot · Supabase RLS", "नागरिक पायलट · सुपाबेस RLS"),
+                    text = t("Community civic pilot", "समुदाय-केंद्रित नागरिक पायलट"),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = ext.ink,
@@ -276,7 +277,7 @@ private fun WebSidebarNavItem(
             .fillMaxWidth()
             .padding(vertical = 3.dp)
             .clickable(onClick = onClick),
-        color = if (isActive) TheekHaiColors.Green else Color.Transparent,
+        color = if (isActive) ext.navActive else Color.Transparent,
         shape = RoundedCornerShape(5.dp)
     ) {
         Row(
@@ -288,13 +289,13 @@ private fun WebSidebarNavItem(
                 text = number,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium,
-                color = if (isActive) Color(0xFFE8EDE2).copy(alpha = 0.7f) else ext.muted
+                color = if (isActive) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f) else ext.muted
             )
             Text(
                 text = label,
                 fontSize = 13.sp,
                 fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (isActive) Color(0xFFFCFBF6) else Color(0xFF5B6B61)
+                color = if (isActive) MaterialTheme.colorScheme.onPrimary else ext.navText
             )
         }
     }
@@ -303,10 +304,11 @@ private fun WebSidebarNavItem(
 @Composable
 private fun DesktopTopBar(
     language: AppLanguage,
+    darkMode: Boolean,
     onToggleLanguage: () -> Unit,
+    onToggleDarkMode: () -> Unit,
     onReportClick: () -> Unit,
-    onAccountClick: () -> Unit,
-    onSignOutClick: () -> Unit
+    onAccountClick: () -> Unit
 ) {
     val ext = LocalTheekHaiColors.current
 
@@ -314,7 +316,7 @@ private fun DesktopTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(72.dp)
-            .background(TheekHaiColors.Background)
+            .background(ext.paper)
             .padding(horizontal = 48.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -327,7 +329,7 @@ private fun DesktopTopBar(
                 letterSpacing = 1.6.sp,
                 fontWeight = FontWeight.SemiBold
             ),
-            color = Color(0xFF6C796D)
+            color = ext.muted
         )
 
         // Header Tools (matching .header-tools in web/src/style.css: gap 24px)
@@ -335,6 +337,15 @@ private fun DesktopTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            OutlinedButton(
+                onClick = onToggleDarkMode,
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Text(if (darkMode) t("☀ Light", "☀ हल्का") else t("☾ Dark", "☾ गहरा"), fontSize = 12.sp, color = ext.ink)
+            }
+
             // Language Button (borderless quiet button matching web .language)
             TextButton(
                 onClick = onToggleLanguage,
@@ -353,23 +364,23 @@ private fun DesktopTopBar(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
                     .clickable(onClick = onAccountClick),
-                color = Color(0xFFE8ECE1),
+                color = ext.sidebarBg,
                 shape = RoundedCornerShape(999.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCFD7C7))
+                border = androidx.compose.foundation.BorderStroke(1.dp, ext.line)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AvatarCircle(initials = "PS", size = 24.dp, bgColor = TheekHaiColors.Green)
-                    Text(t("Priya Sharma", "प्रिया शर्मा"), fontSize = 12.sp, color = ext.ink, fontWeight = FontWeight.Medium)
+                    AvatarCircle(initials = "?", size = 24.dp, bgColor = ext.green)
+                    Text(t("Account preview", "खाता पूर्वावलोकन"), fontSize = 12.sp, color = ext.ink, fontWeight = FontWeight.Medium)
                     Surface(
-                        color = Color(0xFFD6DFD0),
+                        color = ext.greenSurface,
                         shape = RoundedCornerShape(3.dp)
                     ) {
                         Text(
-                            text = t("resident", "नागरिक"),
+                            text = t("Preview", "पूर्वावलोकन"),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.7.sp,
@@ -378,18 +389,6 @@ private fun DesktopTopBar(
                         )
                     }
                 }
-            }
-
-            // Sign Out quiet button
-            TextButton(
-                onClick = onSignOutClick,
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = t("Sign out", "साइन आउट"),
-                    fontSize = 12.sp,
-                    color = ext.muted
-                )
             }
 
             // Quick Report CTA Button (matching .button.small in web/src/style.css)
@@ -414,16 +413,14 @@ private fun DesktopTopBar(
 }
 
 @Composable
-private fun DesktopFooter(
-    onNavigate: (Route) -> Unit
-) {
+private fun DesktopFooter() {
     val ext = LocalTheekHaiColors.current
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(52.dp)
-            .background(TheekHaiColors.Background)
+            .background(ext.paper)
             .padding(horizontal = 48.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -436,18 +433,6 @@ private fun DesktopFooter(
                 text = t("TheekHai · Civic pilot", "ठीकहै · नागरिक पायलट"),
                 fontSize = 11.sp,
                 color = ext.muted
-            )
-            Text(
-                text = t("Privacy", "गोपनीयता"),
-                fontSize = 11.sp,
-                color = ext.green,
-                modifier = Modifier.clickable { onNavigate(Route.Library) }
-            )
-            Text(
-                text = t("Terms", "शर्तें"),
-                fontSize = 11.sp,
-                color = ext.green,
-                modifier = Modifier.clickable { onNavigate(Route.Library) }
             )
         }
 

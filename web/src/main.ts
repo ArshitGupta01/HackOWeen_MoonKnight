@@ -1,6 +1,6 @@
 import './style.css';
 import {identity,loadIdentity,signOut} from './api';
-import {el,link,button,t,switchLanguage,language} from './ui';
+import {el,link,button,t,switchLanguage,language,theme,switchTheme} from './ui';
 import {home,report,workspace,detail,login,signup,account,library,information} from './screens';
 
 function initialsForUser(name?: string | null, email?: string | null): string {
@@ -30,9 +30,10 @@ export async function render() {
   }
   for(const [path,num,label] of links) { const item=link('',path,`nav-item ${route===path?'active':''}`); item.append(el('span','nav-number',num),el('span','',label)); if(route===path)item.setAttribute('aria-current','page'); nav.append(item); }
   sidebar.append(nav);
-  const sideFoot=el('div','side-foot');sideFoot.append(el('span','pilot-dot'),el('strong','',t('Civic pilot · Supabase RLS','नागरिक पायलट · सुपाबेस RLS')),el('p','',t('City-neutral. Community-focused.','हर शहर के लिए। समुदाय के साथ।')),link(t('Help & permissions','सहायता और अनुमतियाँ'),'/help'));sidebar.append(sideFoot);
+  const sideFoot=el('div','side-foot');sideFoot.append(el('span','pilot-dot'),el('strong','',t('Community civic pilot','समुदाय-केंद्रित नागरिक पायलट')),el('p','',t('City-neutral. Community-focused.','हर शहर के लिए। समुदाय के साथ।')),link(t('Help & permissions','सहायता और अनुमतियाँ'),'/help'));sidebar.append(sideFoot);
   const page=el('div','page');const header=el('header','topbar');header.append(el('span','location-label',t('YOUR NEIGHBOURHOOD, BETTER TOGETHER','आपका पड़ोस, मिलकर बेहतर')));
-  const tools=el('div','header-tools');tools.append(button(language==='en'?'हिन्दी':'English',()=>{switchLanguage();void render()},'language'));
+  const tools=el('div','header-tools');
+  const themeButton=button(theme==='dark'?t('☀ Light mode','☀ हल्का मोड'):t('☾ Dark mode','☾ डार्क मोड'),()=>{switchTheme();void render()},'language theme-toggle');themeButton.setAttribute('aria-label',theme==='dark'?t('Switch to light mode','लाइट मोड चालू करें'):t('Switch to dark mode','डार्क मोड चालू करें'));themeButton.setAttribute('aria-pressed',String(theme==='dark'));tools.append(themeButton,button(language==='en'?'हिन्दी':'English',()=>{switchLanguage();void render()},'language'));
   if(identity) {
     const accountChip = link('', '/account', 'account-chip');
     accountChip.append(

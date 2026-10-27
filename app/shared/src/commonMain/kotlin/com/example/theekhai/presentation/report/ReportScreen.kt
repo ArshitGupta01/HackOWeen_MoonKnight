@@ -13,7 +13,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -193,7 +193,7 @@ fun ReportScreen() {
                         isError = false
                         navigator.navigateTo(Route.Workspace)
                     },
-                    icon = { Icon(Icons.Default.Send, contentDescription = "Submit") },
+                    icon = { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Submit") },
                     text = { Text("Submit Report", fontWeight = FontWeight.Bold) },
                     containerColor = ext.green,
                     contentColor = Color.White,

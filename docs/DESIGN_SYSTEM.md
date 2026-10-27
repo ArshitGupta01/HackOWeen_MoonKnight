@@ -1,6 +1,6 @@
 # Web design quality gate
 
-The browser-native website is planned; no web source currently exists. Design for citizens reporting local problems and staff resolving them. Use a premium civic direction with warm neutral surfaces, deep teal, restrained amber, readable editorial typography, and clear status semantics. Establish actual tokens, type scale, spacing, and components when the web implementation begins.
+The browser-native website is implemented in `web/`. Design for citizens reporting local problems and staff resolving them. Keep the civic direction: warm neutral light surfaces, deep teal, restrained amber, readable editorial typography, and clear status semantics. Dark mode must preserve these semantic colors, maintain readable contrast, follow the system preference until the user chooses a theme, and provide a persistent, accessible toggle. Shared colors belong in CSS tokens where practical.
 
 - Make the real case workflow the product demonstration: reporting, duplicate suggestions, task ownership, due dates, evidence, review, and timeline. Do not use fake testimonials, fabricated counters, or decorative dashboard statistics.
 - Avoid generic purple/black templates, glowing orbs, aggressive gradients, emoji icons, repetitive feature cards, heavy glass effects, and stock SaaS copy. Use animation only when it clarifies action or feedback; honor reduced-motion preferences.

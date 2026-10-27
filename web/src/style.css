@@ -44,3 +44,46 @@
 .stats-4{grid-template-columns:repeat(4,1fr)}
 @media(max-width:850px){.stats-4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:580px){.stats,.stats-4{grid-template-columns:1fr}.stats>div+div{border-left:0;border-top:1px solid var(--line)}}
+
+/* Dark mode keeps the civic palette while lifting text and surfaces for contrast. */
+:root[data-theme="dark"]{color-scheme:dark;--green:#72c3a5;--ink:#e4ece6;--muted:#a9b8ad;--line:#3a4a43;--paper:#202a26;--amber:#e9b66d;color:var(--ink);background:#151c19}
+:root[data-theme="dark"] body{background:#151c19;color:var(--ink)}
+:root[data-theme="dark"] .sidebar{background:#1b2420;border-color:var(--line)}
+:root[data-theme="dark"] .nav-item{color:#c0ccc3}
+:root[data-theme="dark"] .nav-item:hover,:root[data-theme="dark"] .case-row:hover{background:#293630}
+:root[data-theme="dark"] .side-foot,:root[data-theme="dark"] .location-label{color:#a9b8ad}
+:root[data-theme="dark"] .topbar,:root[data-theme="dark"] .footer,:root[data-theme="dark"] .promise-strip{border-color:var(--line)}
+:root[data-theme="dark"] .button{background:#23614e;border-color:#36775f;color:#f2fff8}
+:root[data-theme="dark"] .button:hover{background:#2c755e}
+:root[data-theme="dark"] .button.secondary{background:transparent;color:#b9e8d3;border-color:#53685c}
+:root[data-theme="dark"] .button.secondary:hover,:root[data-theme="dark"] .password-toggle-btn:hover{background:#293a32}
+:root[data-theme="dark"] .language,:root[data-theme="dark"] .quiet,:root[data-theme="dark"] .text-link{color:#b9e8d3}
+:root[data-theme="dark"] .hero-description,:root[data-theme="dark"] .subtitle,:root[data-theme="dark"] .microcopy,:root[data-theme="dark"] .eyebrow,:root[data-theme="dark"] .case-row p,:root[data-theme="dark"] .case-meta small,:root[data-theme="dark"] .form-aside p:not(.eyebrow){color:var(--muted)}
+:root[data-theme="dark"] em{color:#9dd0b2}
+:root[data-theme="dark"] .city-art{background:#293630;border-color:#3a4a43}
+:root[data-theme="dark"] .map-caption{background:#202a26ed;border-color:#44534b}
+:root[data-theme="dark"] .editorial-panel,:root[data-theme="dark"] .auth-aside{background:#222d27;border-color:#3a4a43}
+:root[data-theme="dark"] input:not([type=checkbox]),:root[data-theme="dark"] select,:root[data-theme="dark"] textarea{background:#19221e;color:var(--ink);border-color:#4b5b51}
+:root[data-theme="dark"] input::placeholder,:root[data-theme="dark"] textarea::placeholder{color:#9eaca1}
+:root[data-theme="dark"] .audio-panel,:root[data-theme="dark"] .demo-credential-card{background:#222d27;border-color:#3a4a43}
+:root[data-theme="dark"] .demo-role-btn{background:#202a26;border-color:#46574d;color:var(--ink)}
+:root[data-theme="dark"] .demo-role-btn:hover{background:#293630}
+:root[data-theme="dark"] .demo-role-btn strong,:root[data-theme="dark"] .demo-role-btn small{color:var(--ink)}
+:root[data-theme="dark"] .account-chip{background:#26342d;border-color:#45564c;color:var(--ink)}
+:root[data-theme="dark"] .account-chip:hover{background:#304238}
+:root[data-theme="dark"] .role-pill{background:#34483d;color:#d8e9dc}
+:root[data-theme="dark"] .status{background:#293a31;color:#c7e5cf}
+:root[data-theme="dark"] .status-pending_verification,:root[data-theme="dark"] .status-reopened{background:#493b27;color:#f0ce92}
+:root[data-theme="dark"] .status-closed{background:#244332;color:#bfe6c7}
+:root[data-theme="dark"] .notice{background:#26392d;border-color:#47634d;color:#d6ead8}
+:root[data-theme="dark"] .notice.error{background:#402a24;border-color:#714638;color:#ffd6c3}
+:root[data-theme="dark"] .empty-state{background:#202a26;border-color:#46574d}
+:root[data-theme="dark"] .timeline-event{border-color:#46574d}
+:root[data-theme="dark"] .timeline-event:before{background:#86b795}
+:root[data-theme="dark"] .source-card-foot,:root[data-theme="dark"] .task-row,:root[data-theme="dark"] .account-header{border-color:var(--line)}
+:root[data-theme="dark"] .strength-bar{background:#3b4941}
+:root[data-theme="dark"] .strength-bar.active-2{background:#7fac70}
+:root[data-theme="dark"] .strength-bar.active-3{background:#65b794}
+:root[data-theme="dark"] .skip{background:#23614e}
+:root[data-theme="dark"] button:focus-visible,:root[data-theme="dark"] a:focus-visible,:root[data-theme="dark"] input:focus-visible,:root[data-theme="dark"] select:focus-visible,:root[data-theme="dark"] textarea:focus-visible{outline-color:#e9b66d}
+@media(max-width:850px){:root[data-theme="dark"] .sidebar{border-bottom-color:var(--line)}}
