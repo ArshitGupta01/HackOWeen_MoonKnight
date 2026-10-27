@@ -55,6 +55,15 @@ export interface LegalSource { id:string; title:string; url:string; jurisdiction
 export interface LegalAnswer { answer:string; citations:LegalSource[]; mode:string; limitation:string }
 export interface LegalMonitor { id:string; remoteMonitorId:string|null; name:string; monitorType:string; target:string; jurisdiction:string; language:string; scheduleCron:string; status:string; lastCheckedAt:number|null; lastStatus:string|null }
 export interface MonitorRunResult { monitor:LegalMonitor; queuedSources:LegalSource[]; providerMode:string }
+export interface TriageSuggestion {
+  suggestedTitle: string;
+  suggestedCategory: string;
+  suggestedPriority: string;
+  suggestedDepartment: string;
+  duplicateCaseIds: string[];
+  summary: string;
+  provider: string;
+}
 
 export let identity: Identity | null = null;
 
@@ -155,4 +164,11 @@ export async function saveSourceBookmark(input: { title: string; sourceUrl: stri
 
 export async function removeSavedSource(id: string) {
   return api<{ status: string }>(`/saved-sources/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function triageComplaint(input: { title: string; description: string; address: string; language: string }) {
+  return api<TriageSuggestion>('/complaints/triage', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }

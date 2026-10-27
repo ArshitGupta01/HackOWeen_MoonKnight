@@ -64,7 +64,20 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     suspend fun identity(call: ApplicationCall): Actor = testIdentity?.invoke(call) ?: auth.authenticate(call)
     routing {
         get("/") { call.respondText("THEEKHAI Smart Cities Backend Server") }
-        get("/health") { call.respond(mapOf("status" to "HEALTHY", "version" to "pilot", "supabaseConfigured" to auth.config().configured.toString())) }
+        get("/health") {
+            val ps = legal.providerStatus(auth.config().configured)
+            call.respond(
+                mapOf(
+                    "status" to "HEALTHY",
+                    "version" to "pilot",
+                    "supabaseConfigured" to ps.supabaseConfigured.toString(),
+                    "tinyFishConfigured" to ps.tinyFishConfigured.toString(),
+                    "tavilyConfigured" to ps.tavilyConfigured.toString(),
+                    "openRouterConfigured" to ps.openRouterConfigured.toString(),
+                )
+            )
+        }
+        get("/api/v1/providers") { safe(call) { call.respond(legal.providerStatus(auth.config().configured)) } }
         get("/api/v1/auth/config") { safe(call) { call.respond(auth.config()) } }
         post("/api/v1/auth/login") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)
@@ -104,6 +117,11 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
             val actor = identity(call); val offset = call.request.queryParameters["offset"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
             val all = synchronized(workflow) { workflow.list(actor) }
             call.respond(CasePageDto(all.drop(offset).take(50).map { it.dto() },all.size,offset))
+        } }
+        post("/api/v1/complaints/triage") { safe(call) {
+            val req = call.receive<TriageAssistRequestDto>()
+            val existing = synchronized(workflow) { workflow.list(Actor("system-triage", Role.ADMIN)) }
+            call.respond(legal.triageAssist(req, existing))
         } }
         post("/api/v1/complaints") { safe(call) {
             val actor = identity(call); val input = call.receive<ReportDto>(); val key = call.request.header("Idempotency-Key") ?: ""

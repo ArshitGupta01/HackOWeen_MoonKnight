@@ -9,6 +9,7 @@ import {
   getSavedSources,
   saveSourceBookmark,
   removeSavedSource,
+  triageComplaint,
   CaseRecord,
   CaseDetail,
   LegalAnswer,
@@ -81,7 +82,37 @@ export function report(parent:HTMLElement):()=>void {
   const transcribe=button(t('Transcribe','लिखित रूप लें'),()=>{void(async()=>{if(!audio)return;transcribe.disabled=true;try{const dataUrl=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=reject;reader.readAsDataURL(audio!)});const result=await api<{text:string}>('/voice/transcribe',{method:'POST',body:JSON.stringify({audioBase64:dataUrl.split(',')[1],mimeType:audio.type})});description.value=result.text;notice(alert,t('Review and edit the transcript before submitting.','भेजने से पहले लिखित रूप जाँचें और सुधारें।'))}catch(error){notice(alert,errorMessage(error),true)}finally{transcribe.disabled=false}})()},'quiet');transcribe.disabled=true;audioPanel.append(record,transcribe,audioStatus);
   const submit=el('button','button',t('Review & submit report  ↗','जाँचें और रिपोर्ट भेजें  ↗'));submit.type='submit';const draft=button(t('Save draft on this device','इस डिवाइस पर ड्राफ्ट सहेजें'),()=>{localStorage.setItem('theekhai-draft',JSON.stringify({title:title.input.value,description:description.value,address:address.input.value,category:category.value}));notice(alert,t('Draft saved on this device. It has not been submitted.','ड्राफ्ट इस डिवाइस पर सहेजा गया। अभी भेजा नहीं गया है।'))},'quiet');
   try{const saved=JSON.parse(localStorage.getItem('theekhai-draft')??'null');if(saved){title.input.value=saved.title??'';description.value=saved.description??'';address.input.value=saved.address??'';category.value=saved.category??'ROADS'}}catch{localStorage.removeItem('theekhai-draft')}
-  const actions=el('div','actions');actions.append(submit,draft);form.append(title.wrapper,categoryLabel,descriptionLabel,audioPanel,address.wrapper,geo,geoText,consent,alert,actions);
+  const triageBox=el('div');
+  const aiTriageBtn=button(t('AI Triage & Check Duplicates (OpenRouter)','AI विश्लेषण और डुप्लीकेट जाँच (OpenRouter)'),()=>{
+    if(description.value.trim().length<5){notice(alert,t('Describe the issue first (at least 5 characters) to run OpenRouter AI triage.','ओपनराउटर AI विश्लेषण चलाने के लिए पहले समस्या का विवरण लिखें।'),true);description.focus();return}
+    aiTriageBtn.disabled=true;
+    notice(triageBox,t('Analyzing issue & checking neighbourhood duplicates via OpenRouter AI…','OpenRouter AI के माध्यम से समस्या और डुप्लीकेट मामलों की जाँच की जा रही है…'));
+    void triageComplaint({title:title.input.value,description:description.value,address:address.input.value,language:document.documentElement.lang||'en'})
+      .then(res=>{
+        if(!title.input.value.trim()&&res.suggestedTitle)title.input.value=res.suggestedTitle;
+        if(res.suggestedCategory)category.value=res.suggestedCategory;
+        triageBox.replaceChildren();
+        const card=el('div','demo-credential-card');
+        card.append(
+          el('span','label',`${res.provider} · ${res.suggestedCategory} · ${res.suggestedPriority}`),
+          el('p','microcopy',`${t('Suggested Lead Department:','सुझाया गया विभाग:')} ${res.suggestedDepartment}`),
+          el('p','microcopy',res.summary),
+        );
+        if(res.duplicateCaseIds.length){
+          const dupRow=el('p','microcopy');
+          dupRow.append(document.createTextNode(t('Potential existing neighbourhood reports: ','संभावित मौजूदा पड़ोस की रिपोर्ट: ')));
+          res.duplicateCaseIds.forEach((dupId,idx)=>{
+            if(idx>0)dupRow.append(document.createTextNode(', '));
+            dupRow.append(link(dupId,`/cases/${dupId}`,'text-link'));
+          });
+          card.append(dupRow);
+        }
+        triageBox.append(card);
+      })
+      .catch(err=>notice(triageBox,errorMessage(err),true))
+      .finally(()=>{aiTriageBtn.disabled=false});
+  },'button secondary');
+  const actions=el('div','actions');actions.append(submit,aiTriageBtn,draft);form.append(title.wrapper,categoryLabel,descriptionLabel,audioPanel,address.wrapper,geo,geoText,triageBox,consent,alert,actions);
   const submissionKey=crypto.randomUUID();form.addEventListener('submit',event=>{event.preventDefault();if(!identity){notice(alert,t('Save your draft, then sign in to submit.','ड्राफ्ट सहेजें, फिर भेजने के लिए साइन इन करें।'),true);return}void(async()=>{submit.disabled=true;try{const record=await api<CaseRecord>('/complaints',{method:'POST',headers:{'Idempotency-Key':submissionKey},body:JSON.stringify({title:title.input.value,description:description.value,category:category.value,address:address.input.value,latitude:coords?.latitude??null,longitude:coords?.longitude??null,consent:check.checked})});localStorage.removeItem('theekhai-draft');navigate(`/cases/${record.id}`)}catch(error){notice(alert,errorMessage(error),true)}finally{submit.disabled=false}})()});
   aside.append(el('p','eyebrow',t('WHAT HAPPENS NEXT','इसके बाद क्या होगा')),el('h2','',t('A report with\na way forward.','एक रिपोर्ट,\nआगे का रास्ता।')),el('p','',t('Your report goes to an accountable department. You can follow tasks, due dates and the final review from your workspace.','आपकी रिपोर्ट जिम्मेदार विभाग तक जाती है। कार्यक्षेत्र में काम, समय-सीमा और अंतिम समीक्षा देखें।')),el('div','aside-note',t('This is a civic pilot. It is not an emergency service.','यह नागरिक पायलट है। यह आपातकालीन सेवा नहीं है।')),link(t('How we use your information','आपकी जानकारी का उपयोग'),'/privacy','text-link'));
   layout.append(form,aside);parent.append(layout);return()=>{if(media?.state==='recording')media.stop();stream?.getTracks().forEach(track=>track.stop())};
@@ -444,7 +475,7 @@ export async function detail(parent:HTMLElement,id:string) {
 }
 
 export function library(parent:HTMLElement){
-  heading(parent,t('THE REFERENCE LIBRARY','संदर्भ लाइब्रेरी'),t('Know your next step.','अपना अगला कदम जानें।'),t('Approved civic guidance powered by TinyFish Agent & Monitor, Tavily discovery, and local source backup fallback.','टाइनीफिश एजेंट और मॉनिटर, टैविली खोज तथा स्थानीय स्वीकृत स्रोत बैकअप के साथ नागरिक मार्गदर्शन।'));
+  heading(parent,t('THE REFERENCE LIBRARY','संदर्भ लाइब्रेरी'),t('Know your next step.','अपना अगला कदम जानें।'),t('Approved civic guidance powered by TinyFish Agent & Monitor, OpenRouter grounded synthesis, Tavily official-domain discovery, and local source backup fallback.','टाइनीफिश एजेंट और मॉनिटर, टैविली खोज तथा स्थानीय स्वीकृत स्रोत बैकअप के साथ नागरिक मार्गदर्शन।'));
   const form=el('form','panel library-form'),query=field(t('What would you like to understand?','आप क्या समझना चाहते हैं?'),'question');query.input.placeholder=t('e.g. How does the Haryana Auto Appeal System (AAS) handle overdue services?','जैसे हरियाणा ऑटो अपील सिस्टम (AAS) समय-सीमा पार होने पर कैसे काम करता है?');query.input.minLength=3;query.input.maxLength=1000;const jurisdiction=el('select');jurisdiction.setAttribute('aria-label',t('Jurisdiction','क्षेत्राधिकार'));for(const [value,label] of [['CENTRAL',t('Central guidance','केंद्रीय मार्गदर्शन')],['HARYANA',t('Haryana + central guidance','हरियाणा और केंद्रीय मार्गदर्शन')]]){const option=el('option','',label);option.value=value;jurisdiction.append(option)}const search=el('button','button',t('Find guidance','मार्गदर्शन खोजें'));search.type='submit';const answer=el('div','legal-results');form.append(query.wrapper,jurisdiction,search,el('p','microcopy',t('Uses TinyFish Agent Mode on approved official sources, with Tavily official-domain fallback and deterministic local excerpt backup (SOURCES_ONLY).','स्वीकृत आधिकारिक स्रोतों पर टाइनीफिश एजेंट मोड का उपयोग करता है, टैविली फ़ॉलबैक और स्थानीय अंश बैकअप (SOURCES_ONLY) के साथ।')));parent.append(form,answer);
   function sources(items:LegalSource[]){for(const source of items){const card=el('article','panel source-card');const a=link(source.title,source.url,'text-link');a.target='_blank';a.rel='noopener noreferrer';const foot=el('div','source-card-foot');foot.append(el('small','microcopy',t('Retrieved ','प्राप्त ')+date(source.retrievedAt)));if(identity){const saveBtn=button(t('Save to account','खाते में सहेजें'),()=>{saveBtn.disabled=true;void saveSourceBookmark({title:source.title,sourceUrl:source.url,jurisdiction:source.jurisdiction,snippet:source.content.slice(0,400)}).then(()=>{saveBtn.textContent=t('Saved ✓','सहेजा गया ✓')}).catch(()=>{saveBtn.disabled=false})},'quiet');foot.append(saveBtn)}card.append(el('span','label',source.jurisdiction+' · '+source.language),a,el('p','',source.content.slice(0,700)),foot);answer.append(card)}}
   form.addEventListener('submit',event=>{event.preventDefault();search.disabled=true;notice(answer,t('Searching approved sources via TinyFish Agent / fallback…','टाइनीफिश एजेंट / फ़ॉलबैक के माध्यम से स्वीकृत स्रोत खोजे जा रहे हैं…'));void(async()=>{try{if(identity){const result=await api<LegalAnswer>('/legal/ask',{method:'POST',body:JSON.stringify({question:query.input.value,jurisdiction:jurisdiction.value})});const badge=el('span','label',`Mode: ${result.mode}`);answer.replaceChildren(badge,el('p','legal-answer',result.answer),el('p','microcopy',result.limitation));sources(result.citations)}else{const result=await api<LegalSource[]>(`/legal/sources?q=${encodeURIComponent(query.input.value)}&jurisdiction=${jurisdiction.value}`);answer.replaceChildren();if(!result.length)notice(answer,t('No approved matching sources are installed yet.','अभी कोई संबंधित स्वीकृत स्रोत स्थापित नहीं है।'));sources(result)}}catch(error){notice(answer,errorMessage(error),true)}finally{search.disabled=false}})()});

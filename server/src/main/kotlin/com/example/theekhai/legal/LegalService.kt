@@ -3,6 +3,7 @@ package com.example.theekhai.legal
 import com.example.theekhai.auth.EnvConfig
 import com.example.theekhai.contract.*
 import com.example.theekhai.data.db.AppDatabase
+import com.example.theekhai.domain.workflow.CaseRecord
 import com.example.theekhai.domain.workflow.WorkflowFailure
 import io.ktor.client.HttpClient
 import io.ktor.client.request.*
@@ -17,19 +18,23 @@ import java.security.MessageDigest
 import java.util.UUID
 
 /**
- * Legal reference, discovery, and question-answering service powered by:
+ * Legal reference, discovery, question-answering, and AI triage service powered by:
  * 1. TinyFish Agent Mode (`/v1/automation/run`) for source-grounded extraction and synthesis.
  * 2. TinyFish Monitor Mode (`/v1/monitors` & `/v1/monitors/{id}/runs`) for scheduled source tracking.
  * 3. Tavily Search (`/search`) restricted to allowlisted official domains for discovery and secondary fallback.
- * 4. Deterministic local SQLite approved-source backup fallback (`SOURCES_ONLY`) when external providers are unconfigured or unreachable.
+ * 4. OpenRouter (`/chat/completions`) for source-grounded legal synthesis and civic complaint intake triage & duplicate detection.
+ * 5. Deterministic local SQLite approved-source backup fallback (`SOURCES_ONLY`) when external providers are unconfigured or unreachable.
  */
 class LegalService(
     private val db: AppDatabase,
     private val client: HttpClient,
     private val tinyFishApiKey: String = EnvConfig.get("TINYFISH_API_KEY"),
     private val tavilyApiKey: String = EnvConfig.get("TAVILY_API_KEY"),
+    private val openRouterApiKey: String = EnvConfig.get("OPENROUTER_API_KEY"),
     private val tinyFishBaseUrl: String = EnvConfig.get("TINYFISH_BASE_URL", "https://agent.tinyfish.ai").trimEnd('/'),
     private val tavilyBaseUrl: String = EnvConfig.get("TAVILY_BASE_URL", "https://api.tavily.com").trimEnd('/'),
+    private val openRouterBaseUrl: String = EnvConfig.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").trimEnd('/'),
+    private val openRouterModel: String = EnvConfig.get("OPENROUTER_MODEL", "openrouter/auto"),
 ) {
     private val agentSemaphore = Semaphore(1)
     private val json = Json { ignoreUnknownKeys = true }
@@ -55,6 +60,13 @@ class LegalService(
     init {
         seedDefaultApprovedPackIfEmpty()
     }
+
+    fun providerStatus(supabaseConfigured: Boolean): ProviderStatusDto = ProviderStatusDto(
+        supabaseConfigured = supabaseConfigured,
+        tinyFishConfigured = tinyFishApiKey.isNotBlank(),
+        tavilyConfigured = tavilyApiKey.isNotBlank(),
+        openRouterConfigured = openRouterApiKey.isNotBlank(),
+    )
 
     private fun seedDefaultApprovedPackIfEmpty() {
         if (db.pilotQueries.legalSources().executeAsList().isNotEmpty()) return
@@ -178,7 +190,7 @@ class LegalService(
     /**
      * Answers a legal/civic question using:
      * 1. TinyFish Agent Mode (`POST /v1/automation/run`) grounded in approved sources.
-     * 2. Tavily Search (`POST /search` on allowlisted domains) as secondary fallback.
+     * 2. Tavily Search (`POST /search` on allowlisted domains) + OpenRouter grounded synthesis (`POST /chat/completions`).
      * 3. Approved local SQLite source excerpts (`SOURCES_ONLY`) as deterministic backup fallback.
      */
     suspend fun ask(input: LegalQuestionDto): LegalAnswerDto {
@@ -209,17 +221,37 @@ class LegalService(
             }
         }
 
-        // 2. Secondary fallback: Tavily Search restricted to allowlisted domains + grounded in approved sources
-        if (tavilyApiKey.isNotBlank()) {
-            val tavilyAnswer = runTavilyQuestionFallback(input.question, sources, excerpt)
-            if (tavilyAnswer != null) {
+        // 2. Secondary fallback: Tavily Search restricted to allowlisted domains (+ OpenRouter synthesis when configured)
+        val tavilyAnswer = if (tavilyApiKey.isNotBlank()) {
+            runTavilyQuestionFallback(input.question, sources, excerpt)
+        } else null
+
+        if (openRouterApiKey.isNotBlank()) {
+            val openRouterAnswer = runOpenRouterQuestionSynthesis(
+                question = input.question,
+                jurisdiction = input.jurisdiction,
+                sources = sources,
+                excerpt = excerpt,
+                tavilyContext = tavilyAnswer,
+            )
+            if (openRouterAnswer != null) {
+                val mode = if (tavilyAnswer != null) "TAVILY_AND_OPENROUTER" else "OPENROUTER_SYNTHESIS"
                 return LegalAnswerDto(
-                    tavilyAnswer,
+                    openRouterAnswer,
                     sources,
-                    "TAVILY_FALLBACK",
-                    "TinyFish Agent was unavailable; answered via Tavily official-domain fallback grounded in approved ${input.jurisdiction} sources.",
+                    mode,
+                    "Synthesized via OpenRouter${if (tavilyAnswer != null) " + Tavily official-domain search" else ""} and grounded strictly in approved ${input.jurisdiction} sources; not formal legal representation.",
                 )
             }
+        }
+
+        if (tavilyAnswer != null) {
+            return LegalAnswerDto(
+                tavilyAnswer,
+                sources,
+                "TAVILY_FALLBACK",
+                "TinyFish Agent was unavailable; answered via Tavily official-domain fallback grounded in approved ${input.jurisdiction} sources.",
+            )
         }
 
         // 3. Ultimate backup fallback: deterministic approved source excerpts from SQLite
@@ -228,6 +260,74 @@ class LegalService(
             sources,
             "SOURCES_ONLY",
             "Backup fallback active: showing approved stored excerpts directly from the local reference pack.",
+        )
+    }
+
+    /**
+     * AI Complaint Intake Triage & Duplicate Detection powered by OpenRouter (`POST /chat/completions`),
+     * with deterministic local rule + keyword similarity fallback when OpenRouter is unreachable.
+     */
+    suspend fun triageAssist(
+        input: TriageAssistRequestDto,
+        existingCases: List<CaseRecord>,
+    ): TriageAssistResponseDto {
+        val cleanDesc = input.description.trim()
+        if (cleanDesc.length !in 5..5000) {
+            throw WorkflowFailure("INVALID_INPUT", "Provide a description of at least 5 characters to analyze.")
+        }
+        val cleanTitle = input.title.trim()
+        val cleanAddr = input.address.trim()
+        val activeCases = existingCases.filter { it.status.name != "CLOSED" }.take(20)
+
+        // Find candidate duplicates deterministically by token overlap
+        val inputWords = ("$cleanTitle $cleanDesc $cleanAddr").lowercase()
+            .split(Regex("[\\s,.;:()\\[\\]\"']+"))
+            .filter { it.length >= 4 }
+            .toSet()
+        val localDuplicates = activeCases.filter { c ->
+            val caseWords = ("${c.title} ${c.description} ${c.address}").lowercase()
+                .split(Regex("[\\s,.;:()\\[\\]\"']+"))
+                .filter { it.length >= 4 }
+                .toSet()
+            inputWords.intersect(caseWords).size >= 2
+        }.map { it.id }.take(3)
+
+        if (openRouterApiKey.isNotBlank()) {
+            val aiResult = runOpenRouterTriage(cleanTitle, cleanDesc, cleanAddr, input.language, activeCases, localDuplicates)
+            if (aiResult != null) return aiResult
+        }
+
+        // Deterministic local fallback
+        val lower = "$cleanTitle $cleanDesc".lowercase()
+        val category = when {
+            lower.contains("pothole") || lower.contains("road") || lower.contains("kerb") || lower.contains("footpath") || lower.contains("सड़क") -> "ROADS"
+            lower.contains("water") || lower.contains("drain") || lower.contains("sewage") || lower.contains("pipe") || lower.contains("पानी") || lower.contains("नाली") -> "WATER"
+            lower.contains("garbage") || lower.contains("waste") || lower.contains("trash") || lower.contains("sanitation") || lower.contains("कचरा") -> "WASTE"
+            lower.contains("light") || lower.contains("pole") || lower.contains("lamp") || lower.contains("wire") || lower.contains("लाइट") -> "LIGHTING"
+            else -> "OTHER"
+        }
+        val deptMap = mapOf(
+            "ROADS" to "Public works",
+            "WATER" to "Water services",
+            "WASTE" to "Sanitation",
+            "LIGHTING" to "Electrical services",
+            "OTHER" to "Civic triage",
+        )
+        val priority = when {
+            lower.contains("danger") || lower.contains("accident") || lower.contains("spark") || lower.contains("open manhole") || lower.contains("school") -> "HIGH"
+            lower.contains("pothole") || lower.contains("overflow") || lower.contains("dark") || lower.contains("leak") -> "MEDIUM"
+            else -> "LOW"
+        }
+        val suggestedTitle = if (cleanTitle.length >= 5) cleanTitle else cleanDesc.take(72).trim()
+        val dept = deptMap.getValue(category)
+        return TriageAssistResponseDto(
+            suggestedTitle = suggestedTitle,
+            suggestedCategory = category,
+            suggestedPriority = priority,
+            suggestedDepartment = dept,
+            duplicateCaseIds = localDuplicates,
+            summary = "Routed to $dept ($priority priority) based on issue keywords.${if (localDuplicates.isNotEmpty()) " Found ${localDuplicates.size} similar active case(s) in your area." else ""}",
+            provider = "LOCAL_RULE_FALLBACK",
         )
     }
 
@@ -438,6 +538,161 @@ class LegalService(
         }
     }
 
+    private suspend fun runOpenRouterQuestionSynthesis(
+        question: String,
+        jurisdiction: String,
+        sources: List<LegalSourceDto>,
+        excerpt: String,
+        tavilyContext: String?,
+    ): String? {
+        return try {
+            val prompt = buildString {
+                appendLine("You are TheekHai's source-grounded civic & legal reference assistant for jurisdiction: $jurisdiction.")
+                appendLine("Answer the citizen/staff question concisely in the same language as the question using ONLY the approved reference passages below.")
+                appendLine("Do not invent statutes, deadlines, or court filing rules. If the passages are insufficient, output INSUFFICIENT.")
+                appendLine()
+                appendLine("Question: $question")
+                appendLine()
+                appendLine("Approved Reference Passages:")
+                appendLine(excerpt)
+                if (!tavilyContext.isNullOrBlank()) {
+                    appendLine()
+                    appendLine("Additional Official Domain Context (Tavily):")
+                    appendLine(tavilyContext.take(1000))
+                }
+            }
+            val response = client.post("$openRouterBaseUrl/chat/completions") {
+                header(HttpHeaders.Authorization, "Bearer $openRouterApiKey")
+                header("HTTP-Referer", "https://theekhai.in")
+                header("X-Title", "TheekHai Civic Pilot")
+                contentType(ContentType.Application.Json)
+                setBody(
+                    buildJsonObject {
+                        put("model", openRouterModel)
+                        put("temperature", 0.1)
+                        put("max_tokens", 380)
+                        put(
+                            "messages",
+                            buildJsonArray {
+                                add(
+                                    buildJsonObject {
+                                        put("role", "user")
+                                        put("content", prompt)
+                                    },
+                                )
+                            },
+                        )
+                    }.toString(),
+                )
+            }
+            if (!response.status.isSuccess()) return null
+            val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val candidate = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+                ?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull?.trim()
+                ?: return null
+            if (candidate.length < 20 || candidate.equals("INSUFFICIENT", ignoreCase = true)) return null
+            if (!isGroundedInSources(candidate, sources)) return null
+            candidate
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private suspend fun runOpenRouterTriage(
+        title: String,
+        description: String,
+        address: String,
+        language: String,
+        activeCases: List<CaseRecord>,
+        fallbackDuplicates: List<String>,
+    ): TriageAssistResponseDto? {
+        return try {
+            val activeCasesSummary = if (activeCases.isEmpty()) "None" else activeCases.joinToString("\n") {
+                "- ID=${it.id} | Category=${it.category} | Title=${it.title} | Address=${it.address}"
+            }
+            val prompt = """
+                You are TheekHai's municipal complaint intake & duplicate detection assistant.
+                Analyze the citizen report below and respond with ONLY valid JSON (no markdown fences) containing:
+                - "suggestedTitle": concise 5-90 character title (in ${if (language == "hi") "Hindi" else "English"})
+                - "suggestedCategory": strictly one of "ROADS", "WATER", "WASTE", "LIGHTING", "OTHER"
+                - "suggestedPriority": strictly one of "CRITICAL", "HIGH", "MEDIUM", "LOW"
+                - "suggestedDepartment": strictly one of "Public works", "Water services", "Sanitation", "Electrical services", "Civic triage"
+                - "duplicateCaseIds": array of matching case IDs from Active Cases if this describes the same neighbourhood issue, else []
+                - "summary": 1-2 sentence explanation for the citizen (in ${if (language == "hi") "Hindi" else "English"})
+
+                Citizen Input:
+                Title: $title
+                Description: $description
+                Address: $address
+
+                Active Cases in Neighbourhood:
+                $activeCasesSummary
+            """.trimIndent()
+
+            val response = client.post("$openRouterBaseUrl/chat/completions") {
+                header(HttpHeaders.Authorization, "Bearer $openRouterApiKey")
+                header("HTTP-Referer", "https://theekhai.in")
+                header("X-Title", "TheekHai Civic Pilot")
+                contentType(ContentType.Application.Json)
+                setBody(
+                    buildJsonObject {
+                        put("model", openRouterModel)
+                        put("temperature", 0.1)
+                        put("max_tokens", 350)
+                        put(
+                            "messages",
+                            buildJsonArray {
+                                add(
+                                    buildJsonObject {
+                                        put("role", "user")
+                                        put("content", prompt)
+                                    },
+                                )
+                            },
+                        )
+                    }.toString(),
+                )
+            }
+            if (!response.status.isSuccess()) return null
+            val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val actualModel = root["model"]?.jsonPrimitive?.contentOrNull ?: openRouterModel
+            val rawContent = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+                ?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull?.trim()
+                ?: return null
+            val cleanJson = rawContent.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+            val jsonSubstring = cleanJson.substringAfter('{', "").let { if (it.isNotEmpty()) "{${it.substringBeforeLast('}', "")}}" else cleanJson }
+            val obj = json.parseToJsonElement(jsonSubstring).jsonObject
+            val validCategories = setOf("ROADS", "WATER", "WASTE", "LIGHTING", "OTHER")
+            val validPriorities = setOf("CRITICAL", "HIGH", "MEDIUM", "LOW")
+            val cat = obj["suggestedCategory"]?.jsonPrimitive?.contentOrNull?.uppercase()?.takeIf { it in validCategories } ?: "ROADS"
+            val prio = obj["suggestedPriority"]?.jsonPrimitive?.contentOrNull?.uppercase()?.takeIf { it in validPriorities } ?: "MEDIUM"
+            val dept = obj["suggestedDepartment"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "Public works"
+            val sugTitle = obj["suggestedTitle"]?.jsonPrimitive?.contentOrNull?.takeIf { it.length >= 5 }
+                ?: if (title.length >= 5) title else description.take(72).trim()
+            val aiDups = (obj["duplicateCaseIds"] as? JsonArray)
+                ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                ?.filter { id -> activeCases.any { it.id == id } }
+                ?: fallbackDuplicates
+            val summary = obj["summary"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: "Triaged via OpenRouter AI ($cat · $prio)."
+            TriageAssistResponseDto(
+                suggestedTitle = sugTitle.take(120),
+                suggestedCategory = cat,
+                suggestedPriority = prio,
+                suggestedDepartment = dept,
+                duplicateCaseIds = (aiDups + fallbackDuplicates).distinct().take(3),
+                summary = summary,
+                provider = "OPENROUTER ($actualModel)",
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private suspend fun extractViaTinyFishAgent(url: String, goal: String): Pair<String, String>? {
         if (tinyFishApiKey.isBlank()) return null
         return agentSemaphore.withPermit {
@@ -542,6 +797,7 @@ class LegalService(
                 contentType(ContentType.Application.Json)
                 setBody(
                     buildJsonObject {
+                        put("api_key", tavilyApiKey)
                         put("query", question)
                         put("search_depth", "basic")
                         put("max_results", 3)
@@ -555,6 +811,12 @@ class LegalService(
             val answer = obj["answer"]?.jsonPrimitive?.contentOrNull?.trim()
             if (!answer.isNullOrBlank() && answer.length >= 20 && isGroundedInSources(answer, sources)) {
                 return "$answer\n\nApproved Reference Excerpt:\n$excerpt"
+            }
+            val topResultSnippet = (obj["results"] as? JsonArray)
+                ?.mapNotNull { (it as? JsonObject)?.get("content")?.jsonPrimitive?.contentOrNull?.trim() }
+                ?.firstOrNull { it.length >= 20 && isGroundedInSources(it, sources) }
+            if (topResultSnippet != null) {
+                return "$topResultSnippet\n\nApproved Reference Excerpt:\n$excerpt"
             }
             null
         } catch (e: CancellationException) {
@@ -572,6 +834,7 @@ class LegalService(
                 contentType(ContentType.Application.Json)
                 setBody(
                     buildJsonObject {
+                        put("api_key", tavilyApiKey)
                         put("query", query)
                         put("search_depth", "advanced")
                         put("max_results", 5)

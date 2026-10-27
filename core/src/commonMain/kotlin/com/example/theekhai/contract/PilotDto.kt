@@ -29,3 +29,6 @@ import kotlinx.serialization.Serializable
 @Serializable data class MonitorRunResultDto(val monitor: LegalMonitorDto, val queuedSources: List<LegalSourceDto>, val providerMode: String)
 @Serializable data class TranscribeRequestDto(val audioBase64: String, val mimeType: String = "audio/webm")
 @Serializable data class TranscribeResponseDto(val text: String)
+@Serializable data class TriageAssistRequestDto(val title: String = "", val description: String, val address: String = "", val language: String = "en")
+@Serializable data class TriageAssistResponseDto(val suggestedTitle: String, val suggestedCategory: String, val suggestedPriority: String, val suggestedDepartment: String, val duplicateCaseIds: List<String> = emptyList(), val summary: String, val provider: String)
+@Serializable data class ProviderStatusDto(val supabaseConfigured: Boolean, val tinyFishConfigured: Boolean, val tavilyConfigured: Boolean, val openRouterConfigured: Boolean)
