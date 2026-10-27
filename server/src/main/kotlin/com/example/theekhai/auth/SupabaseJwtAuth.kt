@@ -74,6 +74,15 @@ class SupabaseJwtAuth(
 
     private val sessions = ConcurrentHashMap<String, Session>()
 
+    fun config(): AuthConfigDto {
+        val configured = url.startsWith("https://") && key.length > 15
+        return AuthConfigDto(
+            configured = configured,
+            supabaseUrl = if (configured) url else "",
+            publishableKey = if (configured) key else "",
+        )
+    }
+
     suspend fun login(input: LoginDto): Pair<String, Session> {
         if (url.isBlank() || key.isBlank()) throw WorkflowFailure("UNAVAILABLE", "Sign-in is not configured on this server.")
         val cleanEmail = input.email.trim()

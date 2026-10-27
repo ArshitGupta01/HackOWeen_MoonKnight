@@ -61,6 +61,13 @@ class LegalService(
         seedDefaultApprovedPackIfEmpty()
     }
 
+    fun providerStatus(supabaseConfigured: Boolean): ProviderStatusDto = ProviderStatusDto(
+        supabaseConfigured = supabaseConfigured,
+        tinyFishConfigured = tinyFishApiKey.isNotBlank(),
+        tavilyConfigured = tavilyApiKey.isNotBlank(),
+        openRouterConfigured = openRouterApiKey.isNotBlank(),
+    )
+
     private fun seedDefaultApprovedPackIfEmpty() {
         if (db.pilotQueries.legalSources().executeAsList().isNotEmpty()) return
         val now = System.currentTimeMillis()

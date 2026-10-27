@@ -360,7 +360,7 @@ private fun DetailInspector(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("🌐 Verify with official sources", fontSize = 12.sp)
+                    Text("🌐 TinyFish Web Verify", fontSize = 12.sp)
                 }
 
                 Button(

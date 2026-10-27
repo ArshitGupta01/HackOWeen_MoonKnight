@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class CaseDetailDto(val case: CaseDto, val tasks: List<TaskDto>, val events: List<EventDto>)
 @Serializable data class CasePageDto(val items: List<CaseDto>, val total: Int, val offset: Int)
 @Serializable data class IdentityDto(val id: String, val role: String, val department: String?, val csrf: String? = null, val email: String = "", val fullName: String = "", val organization: String = "", val ward: String = "Ward 1", val preferredLanguage: String = "en")
+@Serializable data class AuthConfigDto(val configured: Boolean, val supabaseUrl: String, val publishableKey: String)
 @Serializable data class LoginDto(val email: String, val password: String)
 @Serializable data class RegisterDto(val email: String, val password: String, val fullName: String, val organization: String = "Citizen Resident", val ward: String = "Ward 1", val preferredLanguage: String = "en")
 @Serializable data class RecoverPasswordDto(val email: String)
@@ -31,3 +32,4 @@ import kotlinx.serialization.Serializable
 @Serializable data class ReverseGeocodeResponseDto(val latitude: Double, val longitude: Double, val address: String, val ward: String = "Ward 4", val landmark: String = "", val source: String = "NOMINATIM_OSM")
 @Serializable data class TriageAssistRequestDto(val title: String = "", val description: String, val address: String = "", val language: String = "en")
 @Serializable data class TriageAssistResponseDto(val suggestedTitle: String, val suggestedCategory: String, val suggestedPriority: String, val suggestedDepartment: String, val duplicateCaseIds: List<String> = emptyList(), val summary: String, val provider: String)
+@Serializable data class ProviderStatusDto(val supabaseConfigured: Boolean, val tinyFishConfigured: Boolean, val tavilyConfigured: Boolean, val openRouterConfigured: Boolean)

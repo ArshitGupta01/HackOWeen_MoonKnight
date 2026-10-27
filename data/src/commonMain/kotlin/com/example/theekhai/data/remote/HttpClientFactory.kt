@@ -11,13 +11,14 @@ import kotlinx.serialization.json.Json
 /** The engine (OkHttp / Darwin) is picked per platform from the classpath. */
 fun createHttpClient(token: (() -> String?)? = null): HttpClient = HttpClient {
     defaultRequest {
+        header("ngrok-skip-browser-warning", "true")
         token?.invoke()?.let { header(io.ktor.http.HttpHeaders.Authorization, "Bearer $it") }
     }
     install(ContentNegotiation) {
         json(Json { ignoreUnknownKeys = true })
     }
     install(HttpTimeout) {
-        requestTimeoutMillis = 5_000
-        connectTimeoutMillis = 3_000
+        requestTimeoutMillis = 15_000
+        connectTimeoutMillis = 10_000
     }
 }

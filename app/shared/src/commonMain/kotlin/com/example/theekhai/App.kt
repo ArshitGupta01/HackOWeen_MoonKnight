@@ -51,8 +51,18 @@ fun AppContent(route: Route) {
         Route.Login -> LoginScreen()
         Route.Signup -> SignupScreen()
         Route.Report -> ReportScreen()
-        Route.Workspace -> { val vm = koinViewModel<CommandCenterViewModel>(); val st by vm.uiState.collectAsState(); WorkspaceScreen(complaints = st.filteredComplaints) }
-        Route.Map -> MapScreen()
+        Route.Workspace -> {
+            val vm = koinViewModel<NativeConnectViewModel>()
+            val st by vm.state.collectAsState()
+            LaunchedEffect(vm) { vm.loadCases() }
+            WorkspaceScreen(complaints = st.cases, isLoading = st.isLoading, error = st.error, onRetry = vm::loadCases)
+        }
+        Route.Map -> {
+            val vm = koinViewModel<NativeConnectViewModel>()
+            val st by vm.state.collectAsState()
+            LaunchedEffect(vm) { vm.loadCases() }
+            MapScreen(st.cases)
+        }
         is Route.CaseDetail -> CaseDetailScreen(caseId = route.caseId)
         Route.Account -> AccountScreen()
         Route.Library -> LibraryScreen()

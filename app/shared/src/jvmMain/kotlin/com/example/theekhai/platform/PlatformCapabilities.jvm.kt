@@ -96,10 +96,14 @@ actual fun rememberVoiceRecorder(
                             }
 
                             val b64 = Base64.getEncoder().encodeToString(wavBytes)
-                            val conn = (URI("http://localhost:8080/api/v1/voice/transcribe").toURL().openConnection() as HttpURLConnection).apply {
+                            val backendUrl = (System.getProperty("THEEKHAI_BACKEND_URL")
+                                ?: System.getenv("THEEKHAI_BACKEND_URL")
+                                ?: "https://bless-stinger-plow.ngrok-free.dev").trimEnd('/')
+                            val conn = (URI("$backendUrl/api/v1/voice/transcribe").toURL().openConnection() as HttpURLConnection).apply {
                                 requestMethod = "POST"
                                 doOutput = true
                                 setRequestProperty("Content-Type", "application/json")
+                                setRequestProperty("ngrok-skip-browser-warning", "true")
                                 connectTimeout = 10000
                                 readTimeout = 15000
                             }

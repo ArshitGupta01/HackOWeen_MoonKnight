@@ -1,6 +1,6 @@
 # TheekHai Full-Stack Ngrok Deployment Script
 # Exposes BOTH the Web Frontend (Vite on 5173) AND the Ktor Backend (/api/v1 & /health on 8080)
-# through a single unified HTTPS ngrok URL!
+# through a single unified HTTPS ngrok URL using the official @ngrok/ngrok SDK!
 
 param(
     [string]$AuthToken = $env:NGROK_AUTHTOKEN,
@@ -19,23 +19,12 @@ if (-not $AuthToken -and (Test-Path ".env")) {
     }
 }
 
-# 2. Locate ngrok executable (supports PATH or WinGet package folder)
-$ngrokCmd = Get-Command ngrok -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
-if (-not $ngrokCmd) {
-    $ngrokCmd = Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Filter "ngrok.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-}
-if (-not $ngrokCmd) {
-    Write-Host "Installing ngrok via WinGet..." -ForegroundColor Yellow
-    winget install Ngrok.Ngrok --accept-source-agreements --accept-package-agreements
-    $ngrokCmd = Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Filter "ngrok.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-}
-
 if ($AuthToken) {
-    Write-Host "Configuring ngrok authtoken..." -ForegroundColor Cyan
-    & $ngrokCmd config add-authtoken $AuthToken | Out-Null
+    $env:NGROK_AUTHTOKEN = $AuthToken
 }
+$env:NGROK_PORT = "$Port"
 
-# 3. Verify Ktor Backend (port 8080) is running
+# 2. Verify Ktor Backend (port 8080) is running
 $backendAlive = $false
 try {
     $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8080/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
@@ -55,7 +44,7 @@ if (-not $backendAlive) {
     }
 }
 
-# 4. Verify Vite Web Server (port 5173, which proxies /api and /health -> 8080) is running
+# 3. Verify Vite Web Server (port 5173, which proxies /api and /health -> 8080) is running
 $webAlive = $false
 try {
     $respWeb = Invoke-WebRequest -Uri "http://127.0.0.1:5173" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
@@ -68,14 +57,6 @@ if (-not $webAlive) {
     Start-Sleep -Seconds 3
 }
 
-Write-Host ""
-Write-Host "==================================================================" -ForegroundColor Green
-Write-Host "  TheekHai Unified Ngrok Deployment Ready!" -ForegroundColor Green
-Write-Host "  - Web App       : https://<your-ngrok-domain>/" -ForegroundColor Green
-Write-Host "  - Backend API   : https://<your-ngrok-domain>/api/v1" -ForegroundColor Green
-Write-Host "  - Health Check  : https://<your-ngrok-domain>/health" -ForegroundColor Green
-Write-Host "  - Ngrok Web UI  : http://127.0.0.1:4040" -ForegroundColor Green
-Write-Host "==================================================================" -ForegroundColor Green
-Write-Host ""
-
-& $ngrokCmd http $Port
+# 4. Launch @ngrok/ngrok tunnel via web/ngrok-tunnel.mjs
+Set-Location "$RepoRoot\web"
+node ngrok-tunnel.mjs

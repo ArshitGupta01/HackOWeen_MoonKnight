@@ -456,7 +456,7 @@ private fun ReportForm(
                             Text(
                                 text = when {
                                     isRecording -> t("Speak clearly — AI will structure your title, category & description.", "स्पष्ट बोलें — AI स्वतः शीर्षक, श्रेणी और विवरण तैयार करेगा।")
-                                    hasRecording -> t("Transcript added • Tap mic to record again", "लिखित विवरण जोड़ा गया • फिर रिकॉर्ड करने के लिए माइक दबाएँ")
+                                    hasRecording -> t("Transcribed via ${voiceProviderLabel ?: "Speech-to-Text"} • Tap mic to record again", "${voiceProviderLabel ?: "स्पीच-टू-टेक्स्ट"} द्वारा तैयार • फिर रिकॉर्ड करने के लिए माइक दबाएँ")
                                     else -> t("Tap the microphone to dictate your issue hands-free.", "माइक्रोफोन दबाकर अपनी समस्या बोलें।")
                                 },
                                 fontSize = 11.sp,

@@ -154,11 +154,11 @@ export function report(parent:HTMLElement):()=>void {
   geoSection.append(geoControls,geoText,mapPickerWrap);
   const consent=el('label','consent'),check=el('input');check.type='checkbox';check.required=true;consent.append(check,el('span','',t('I agree to share these details with the teams handling this report.','मैं यह विवरण रिपोर्ट पर काम करने वाली टीमों के साथ साझा करने के लिए सहमत हूँ।')));
   let media:MediaRecorder|null=null,stream:MediaStream|null=null,speechRec:any=null,timerInterval:number|null=null,secondsRecorded=0,liveSpeechTranscript='';let chunks:BlobPart[]=[];let audio:Blob|null=null;
-  const audioPanel=el('div','audio-panel'),audioTopRow=el('div','audio-top-row'),audioPlayerWrap=el('div','audio-player-wrap hidden'),audioStatus=el('p','microcopy',t('Speak in English or Hindi to add an editable transcript to your report.','अंग्रेज़ी या हिन्दी में बोलें और अपनी रिपोर्ट में लिखित विवरण जोड़ें।'));
+  const audioPanel=el('div','audio-panel'),audioTopRow=el('div','audio-top-row'),audioPlayerWrap=el('div','audio-player-wrap hidden'),audioStatus=el('p','microcopy',t('Speak in English or Hindi — live speech-to-text & OpenRouter AI will transcribe and structure your report.','अंग्रेज़ी या हिन्दी में बोलें — लाइव स्पीच-टू-टेक्स्ट और OpenRouter AI आपकी रिपोर्ट तैयार करेंगे।'));
   const runTranscription=async()=>{
     if(!audio&&!liveSpeechTranscript.trim())return;
     transcribe.disabled=true;
-    audioStatus.textContent=t('Transcribing your voice note…','आपकी आवाज़ को लिखित रूप दिया जा रहा है…');
+    audioStatus.textContent=t('Transcribing & structuring voice note via OpenRouter AI…','OpenRouter AI के माध्यम से आवाज़ को लिखित रूप दिया जा रहा है…');
     try{
       let b64='';
       let mime='audio/webm';
@@ -177,7 +177,7 @@ export function report(parent:HTMLElement):()=>void {
       if(result.suggestedCategory){
         category.value=result.suggestedCategory;
       }
-      audioStatus.textContent=`✓ ${t('Voice note transcribed. Review the text before submitting.','आवाज़ का लिखित रूप तैयार है। भेजने से पहले इसे जाँचें।')}`;
+      audioStatus.textContent=`✓ ${t('Voice note transcribed','आवाज़ का लिखित रूप तैयार')} (${result.provider||'OPENROUTER_AI'}).`;
       notice(alert,t('Voice note transcribed into the form! Review and edit before submitting.','आवाज़ का लिखित रूप फॉर्म में भर दिया गया है! भेजने से पहले जाँच लें।'));
     }catch(error){
       if(liveSpeechTranscript.trim()){
@@ -195,10 +195,10 @@ export function report(parent:HTMLElement):()=>void {
   const submit=el('button','button',t('Review & submit report  ↗','जाँचें और रिपोर्ट भेजें  ↗'));submit.type='submit';const draft=button(t('Save draft on this device','इस डिवाइस पर ड्राफ्ट सहेजें'),()=>{try{localStorage.setItem('theekhai-draft',JSON.stringify({title:title.input.value,description:description.value,address:address.input.value,category:category.value}));notice(alert,t('Draft saved on this device. It has not been submitted.','ड्राफ्ट इस डिवाइस पर सहेजा गया। अभी भेजा नहीं गया है。'))}catch{notice(alert,t('This browser could not save the draft. Copy your text before leaving.','यह ब्राउज़र ड्राफ़्ट नहीं सहेज सका। जाने से पहले अपना पाठ कॉपी करें।'),true)}},'quiet');
   try{const saved=JSON.parse(localStorage.getItem('theekhai-draft')??'null');if(saved){title.input.value=saved.title??'';description.value=saved.description??'';address.input.value=saved.address??'';category.value=saved.category??'ROADS'}}catch{try{localStorage.removeItem('theekhai-draft')}catch{/* Storage may be disabled. */}}
   const triageBox=el('div');
-  const aiTriageBtn=button(t('Review issue & check similar reports','समस्या का विश्लेषण और मिलती-जुलती रिपोर्ट जाँचें'),()=>{
-    if(description.value.trim().length<5){notice(alert,t('Describe the issue first (at least 5 characters) before running the review.','विश्लेषण से पहले समस्या का विवरण लिखें (कम से कम 5 अक्षर)।'),true);description.focus();return}
+  const aiTriageBtn=button(t('AI Triage & Check Duplicates (OpenRouter)','AI विश्लेषण और डुप्लीकेट जाँच (OpenRouter)'),()=>{
+    if(description.value.trim().length<5){notice(alert,t('Describe the issue first (at least 5 characters) to run OpenRouter AI triage.','ओपनराउटर AI विश्लेषण चलाने के लिए पहले समस्या का विवरण लिखें।'),true);description.focus();return}
     aiTriageBtn.disabled=true;
-    notice(triageBox,t('Reviewing the issue and checking for similar neighbourhood reports…','समस्या का विश्लेषण और पड़ोस की मिलती-जुलती रिपोर्ट जाँची जा रही हैं…'));
+    notice(triageBox,t('Analyzing issue & checking neighbourhood duplicates via OpenRouter AI…','OpenRouter AI के माध्यम से समस्या और डुप्लीकेट मामलों की जाँच की जा रही है…'));
     void triageComplaint({title:title.input.value,description:description.value,address:address.input.value,language:document.documentElement.lang||'en'})
       .then(res=>{
         if(!title.input.value.trim()&&res.suggestedTitle)title.input.value=res.suggestedTitle;
@@ -206,7 +206,7 @@ export function report(parent:HTMLElement):()=>void {
         triageBox.replaceChildren();
         const card=el('div','demo-credential-card');
         card.append(
-          el('span','label',`${t('Suggested review','सुझाया गया विश्लेषण')} · ${res.suggestedCategory} · ${res.suggestedPriority}`),
+          el('span','label',`${res.provider} · ${res.suggestedCategory} · ${res.suggestedPriority}`),
           el('p','microcopy',`${t('Suggested Lead Department:','सुझाया गया विभाग:')} ${res.suggestedDepartment}`),
           el('p','microcopy',res.summary),
         );
@@ -237,7 +237,7 @@ export function report(parent:HTMLElement):()=>void {
 export function login(parent:HTMLElement) {
   heading(
     parent,
-    t('SECURE CIVIC ACCOUNT ACCESS', 'सुरक्षित नागरिक खाता पहुँच'),
+    t('CIVIC ACCOUNT ACCESS · SUPABASE RLS', 'नागरिक खाता पहुँच · सुपाबेस RLS'),
     t('Keep the conversation going.', 'बात आगे बढ़ाएँ।'),
     t('Sign in with your verified account or use a 1-click shared pilot role below.', 'अपने सत्यापित खाते से साइन इन करें या नीचे दिए गए पायलट रोल का उपयोग करें।'),
   );
@@ -260,13 +260,13 @@ export function login(parent:HTMLElement) {
       }
       forgotBtn.disabled = true;
       void requestPasswordReset(email.input.value.trim())
-        .then(() => notice(alert, t('If this account exists, a password reset link has been sent.', 'यदि यह खाता मौजूद है, तो पासवर्ड रीसेट लिंक भेज दिया गया है।')))
+        .then(() => notice(alert, t('Password recovery email requested via Supabase Auth.', 'सुपाबेस ऑथ के माध्यम से पासवर्ड रीसेट ईमेल भेजा गया।')))
         .catch(err => notice(alert, errorMessage(err), true))
         .finally(() => { forgotBtn.disabled = false; });
     },
     'quiet',
   );
-  metaRow.append(el('span', 'microcopy', t('Your account details stay private.', 'आपके खाते का विवरण निजी रहता है.')), forgotBtn);
+  metaRow.append(el('span', 'microcopy', t('HttpOnly session + PostgreSQL RLS', 'HttpOnly सत्र + PostgreSQL RLS')), forgotBtn);
 
   const submit = el('button', 'button', t('Sign in to workspace  →', 'कार्यक्षेत्र में साइन इन करें  →'));
   submit.type = 'submit';
@@ -318,13 +318,13 @@ export function login(parent:HTMLElement) {
 
   const aside = el('aside', 'panel auth-aside');
   aside.append(
-    el('span', 'label', t('ACCOUNT SAFETY', 'खाता सुरक्षा')),
-    el('h2', '', t('Your account,\nkept private.', 'आपका खाता,\nनिजी और सुरक्षित।')),
-    el('p', '', t('Your account and saved references are protected and visible only to you.', 'आपका खाता और सहेजे गए संदर्भ सुरक्षित हैं और केवल आपको दिखाई देते हैं।')),
+    el('span', 'label', t('TENDERLENS-INSPIRED SECURITY ARCHITECTURE', 'टेंडरलेंस-प्रेरित सुरक्षा संरचना')),
+    el('h2', '', t('Identity backed by\nSupabase PostgreSQL.', 'सुपाबेस PostgreSQL द्वारा\nसुरक्षित पहचान।')),
+    el('p', '', t('Every account is authenticated against Supabase Auth and synced with Row-Level Security (RLS) protected tables.', 'प्रत्येक खाता सुपाबेस ऑथ द्वारा सत्यापित होता है और RLS-सुरक्षित तालिकाओं के साथ सिंक रहता है।')),
   );
   const pillars = el('div', 'trust-pillars');
   for (const [title, desc] of [
-    [t('Private account access', 'निजी खाता पहुँच'), t('Your profile and saved references are available only to your signed-in account.', 'आपकी प्रोफ़ाइल और सहेजे गए संदर्भ केवल आपके खाते को उपलब्ध हैं।')],
+    [t('PostgreSQL Row-Level Security', 'PostgreSQL रो-लेवल सुरक्षा (RLS)'), t('Profiles and saved legal references enforce `(select auth.uid()) = user_id` at the database layer.', 'प्रोफ़ाइल और सहेजे गए कानूनी संदर्भ डेटाबेस स्तर पर `(select auth.uid()) = user_id` लागू करते हैं।')],
     [t('Separation of Duties', 'जिम्मेदारियों का पृथक्करण'), t('Department staff can request closure, but only an independent reviewer can approve or reopen a case.', 'विभागीय कर्मचारी बंद करने का अनुरोध कर सकते हैं, लेकिन केवल स्वतंत्र समीक्षक ही स्वीकृति दे सकता है।')],
     [t('HttpOnly Session + CSRF Protection', 'HttpOnly सत्र + CSRF सुरक्षा'), t('Browser sessions stay in strict HttpOnly cookies rather than exposing tokens to scripts.', 'ब्राउज़र सत्र सुरक्षित HttpOnly कुकीज़ में रहते हैं।')],
   ]) {
@@ -342,7 +342,7 @@ export function signup(parent:HTMLElement) {
     parent,
     t('CREATE YOUR CIVIC ACCOUNT', 'अपना नागरिक खाता बनाएँ'),
     t('Join your neighbourhood workspace.', 'अपने पड़ोस के कार्यक्षेत्र से जुड़ें।'),
-    t('Create a citizen account with secure profile storage.', 'सुरक्षित प्रोफ़ाइल के साथ अपना नागरिक खाता बनाएँ।'),
+    t('Create a verified citizen account backed by Supabase Auth and RLS-protected profile storage.', 'सुपाबेस ऑथ और RLS-सुरक्षित प्रोफ़ाइल के साथ अपना नागरिक खाता बनाएँ।'),
   );
   const shell = el('div', 'auth-shell');
   const form = el('form', 'panel login-form');
@@ -438,15 +438,15 @@ export function signup(parent:HTMLElement) {
 export async function account(parent:HTMLElement) {
   heading(
     parent,
-    t('ACCOUNT & PROFILE', 'खाता और प्रोफ़ाइल'),
+    t('ACCOUNT & SUPABASE RLS PROFILE', 'खाता और सुपाबेस RLS प्रोफ़ाइल'),
     t('Your civic profile & saved references.', 'आपकी नागरिक प्रोफ़ाइल और सहेजे गए संदर्भ।'),
-    t('Your profile and saved references are private to your account.', 'आपकी प्रोफ़ाइल और सहेजे गए संदर्भ केवल आपके खाते के लिए निजी हैं।'),
+    t('Synced with Supabase PostgreSQL (`public.profiles` and `public.saved_sources`) under strict Row-Level Security.', 'सख्त रो-लेवल सुरक्षा (RLS) के अंतर्गत सुपाबेस PostgreSQL (`public.profiles` और `public.saved_sources`) के साथ सिंक किया गया।'),
   );
   if (authGate(parent)) return;
 
   const container = el('div', 'detail-grid');
   parent.append(container);
-  notice(container, t('Loading your profile & saved references…', 'आपकी प्रोफ़ाइल और सहेजे गए संदर्भ लोड हो रहे हैं…'));
+  notice(container, t('Loading your Supabase profile & saved sources…', 'आपकी सुपाबेस प्रोफ़ाइल और सहेजे गए स्रोत लोड हो रहे हैं…'));
 
   try {
     const [profile, savedSources] = await Promise.all([getProfile(), getSavedSources()]);
@@ -492,7 +492,7 @@ export async function account(parent:HTMLElement) {
     langLabel.append(langSelect);
 
     const alert = el('div');
-    const saveBtn = el('button', 'button', t('Save profile', 'प्रोफ़ाइल सहेजें'));
+    const saveBtn = el('button', 'button', t('Save profile to Supabase', 'सुपाबेस में प्रोफ़ाइल सहेजें'));
     saveBtn.type = 'submit';
     form.append(fullName.wrapper, organization.wrapper, ward.wrapper, langLabel, alert, saveBtn);
 
@@ -510,7 +510,7 @@ export async function account(parent:HTMLElement) {
         preferredLanguage: langSelect.value,
       })
         .then(() => {
-          notice(alert, t('Profile saved.', 'प्रोफ़ाइल सहेजी गई।'));
+          notice(alert, t('Profile synced to Supabase `public.profiles`.', 'प्रोफ़ाइल सुपाबेस `public.profiles` में सहेजी गई।'));
         })
         .catch(err => notice(alert, errorMessage(err), true))
         .finally(() => { saveBtn.disabled = false; });
@@ -523,7 +523,7 @@ export async function account(parent:HTMLElement) {
     rightCol.append(
       el('p', 'eyebrow', t('BOOKMARKED CIVIC & LEGAL SOURCES', 'सहेजे गए नागरिक और कानूनी संदर्भ')),
       el('h2', '', t('Saved reference pack', 'सहेजे गए संदर्भ')),
-      el('p', 'microcopy', t('Only you can see the references saved to your account.', 'आपके खाते में सहेजे गए संदर्भ केवल आपको दिखाई देते हैं।')),
+      el('p', 'microcopy', t('Stored in Supabase `public.saved_sources` with per-user RLS policies.', 'प्रति-उपयोगकर्ता RLS नीतियों के साथ सुपाबेस `public.saved_sources` में संग्रहीत।')),
     );
     const listWrap = el('div', 'case-list');
     const drawBookmarks = (items: SavedSource[]) => {
@@ -591,27 +591,39 @@ export async function detail(parent:HTMLElement,id:string) {
 }
 
 export function library(parent:HTMLElement){
-  heading(parent,t('THE REFERENCE LIBRARY','संदर्भ लाइब्रेरी'),t('Know your next step.','अपना अगला कदम जानें।'),t('Clear civic guidance with links to approved official sources and a local backup when needed.','स्वीकृत आधिकारिक स्रोतों के लिंक और ज़रूरत पड़ने पर स्थानीय बैकअप के साथ स्पष्ट नागरिक मार्गदर्शन।'));
-  const form=el('form','panel library-form'),query=field(t('What would you like to understand?','आप क्या समझना चाहते हैं?'),'question');query.input.placeholder=t('e.g. How does the Haryana Auto Appeal System (AAS) handle overdue services?','जैसे हरियाणा ऑटो अपील सिस्टम (AAS) समय-सीमा पार होने पर कैसे काम करता है?');query.input.minLength=3;query.input.maxLength=1000;const jurisdiction=el('select');jurisdiction.setAttribute('aria-label',t('Jurisdiction','क्षेत्राधिकार'));for(const [value,label] of [['CENTRAL',t('Central guidance','केंद्रीय मार्गदर्शन')],['HARYANA',t('Haryana + central guidance','हरियाणा और केंद्रीय मार्गदर्शन')]]){const option=el('option','',label);option.value=value;jurisdiction.append(option)}const search=el('button','button',t('Find guidance','मार्गदर्शन खोजें'));search.type='submit';const answer=el('div','legal-results');form.append(query.wrapper,jurisdiction,search,el('p','microcopy',t('Answers use approved official references. Source links are shown so you can check the original guidance.','जवाब स्वीकृत आधिकारिक संदर्भों पर आधारित हैं। मूल जानकारी जाँचने के लिए स्रोत लिंक दिए जाते हैं।')));parent.append(form,answer);
+  heading(parent,t('THE REFERENCE LIBRARY','संदर्भ लाइब्रेरी'),t('Know your next step.','अपना अगला कदम जानें।'),t('Approved civic guidance powered by TinyFish Agent & Monitor, OpenRouter grounded synthesis, Tavily official-domain discovery, and local source backup fallback.','टाइनीफिश एजेंट और मॉनिटर, ओपनराउटर संश्लेषण, टैविली खोज तथा स्थानीय स्वीकृत स्रोत बैकअप के साथ नागरिक मार्गदर्शन।'));
+  const provBanner=el('div','stats stats-4');
+  parent.append(provBanner);
+  const providerNote=el('p','microcopy',t('Configuration indicators only — they do not verify live provider health or database access policies.','ये केवल कॉन्फ़िगरेशन संकेतक हैं — लाइव सेवा स्थिति या डेटाबेस पहुँच नीतियों का सत्यापन नहीं।'));
+  provBanner.after(providerNote);
+  void api<{supabaseConfigured:boolean,tinyFishConfigured:boolean,tavilyConfigured:boolean,openRouterConfigured:boolean}>('/providers').then(p=>{
+    provBanner.replaceChildren();
+    for(const [name,ok] of [['Supabase Auth',p.supabaseConfigured],['TinyFish Agent & Monitor',p.tinyFishConfigured],['OpenRouter AI',p.openRouterConfigured],['Tavily Official Search',p.tavilyConfigured]]){
+      const item=el('div');
+      item.append(el('span','label',String(name)),el('span',ok?'status status-closed':'status status-assigned',ok?t('Configured','कॉन्फ़िगर है'):t('Not configured','कॉन्फ़िगर नहीं')));
+      provBanner.append(item);
+    }
+  }).catch(()=>{provBanner.replaceChildren(el('div','microcopy',t('Provider configuration is unavailable.','प्रदाता कॉन्फ़िगरेशन उपलब्ध नहीं है।')))});
+  const form=el('form','panel library-form'),query=field(t('What would you like to understand?','आप क्या समझना चाहते हैं?'),'question');query.input.placeholder=t('e.g. How does the Haryana Auto Appeal System (AAS) handle overdue services?','जैसे हरियाणा ऑटो अपील सिस्टम (AAS) समय-सीमा पार होने पर कैसे काम करता है?');query.input.minLength=3;query.input.maxLength=1000;const jurisdiction=el('select');jurisdiction.setAttribute('aria-label',t('Jurisdiction','क्षेत्राधिकार'));for(const [value,label] of [['CENTRAL',t('Central guidance','केंद्रीय मार्गदर्शन')],['HARYANA',t('Haryana + central guidance','हरियाणा और केंद्रीय मार्गदर्शन')]]){const option=el('option','',label);option.value=value;jurisdiction.append(option)}const search=el('button','button',t('Find guidance','मार्गदर्शन खोजें'));search.type='submit';const answer=el('div','legal-results');form.append(query.wrapper,jurisdiction,search,el('p','microcopy',t('Uses TinyFish Agent Mode on approved official sources, with Tavily official-domain fallback and deterministic local excerpt backup (SOURCES_ONLY).','स्वीकृत आधिकारिक स्रोतों पर टाइनीफिश एजेंट मोड का उपयोग करता है, टैविली फ़ॉलबैक और स्थानीय अंश बैकअप (SOURCES_ONLY) के साथ।')));parent.append(form,answer);
   function sources(items:LegalSource[]){for(const source of items){const card=el('article','panel source-card');const a=link(source.title,source.url,'text-link');a.target='_blank';a.rel='noopener noreferrer';const foot=el('div','source-card-foot');foot.append(el('small','microcopy',t('Retrieved ','प्राप्त ')+date(source.retrievedAt)));if(identity){const saveBtn=button(t('Save to account','खाते में सहेजें'),()=>{saveBtn.disabled=true;void saveSourceBookmark({title:source.title,sourceUrl:source.url,jurisdiction:source.jurisdiction,snippet:source.content.slice(0,400)}).then(()=>{saveBtn.textContent=t('Saved ✓','सहेजा गया ✓')}).catch(()=>{saveBtn.disabled=false})},'quiet');foot.append(saveBtn)}card.append(el('span','label',source.jurisdiction+' · '+source.language),a,el('p','',source.content.slice(0,700)),foot);answer.append(card)}}
-  form.addEventListener('submit',event=>{event.preventDefault();search.disabled=true;notice(answer,t('Searching approved references…','स्वीकृत संदर्भ खोजे जा रहे हैं…'));void(async()=>{try{if(identity){const result=await api<LegalAnswer>('/legal/ask',{method:'POST',body:JSON.stringify({question:query.input.value,jurisdiction:jurisdiction.value})});answer.replaceChildren(el('span','label',t('Guidance response','मार्गदर्शन')),el('p','legal-answer',result.answer),el('p','microcopy',result.limitation));sources(result.citations)}else{const result=await api<LegalSource[]>(`/legal/sources?q=${encodeURIComponent(query.input.value)}&jurisdiction=${jurisdiction.value}`);answer.replaceChildren();if(!result.length)notice(answer,t('No approved matching sources are installed yet.','अभी कोई संबंधित स्वीकृत स्रोत स्थापित नहीं है।'));sources(result)}}catch(error){notice(answer,errorMessage(error),true)}finally{search.disabled=false}})()});
+  form.addEventListener('submit',event=>{event.preventDefault();search.disabled=true;notice(answer,t('Searching approved sources via TinyFish Agent / fallback…','टाइनीफिश एजेंट / फ़ॉलबैक के माध्यम से स्वीकृत स्रोत खोजे जा रहे हैं…'));void(async()=>{try{if(identity){const result=await api<LegalAnswer>('/legal/ask',{method:'POST',body:JSON.stringify({question:query.input.value,jurisdiction:jurisdiction.value})});const badge=el('span','label',`Mode: ${result.mode}`);answer.replaceChildren(badge,el('p','legal-answer',result.answer),el('p','microcopy',result.limitation));sources(result.citations)}else{const result=await api<LegalSource[]>(`/legal/sources?q=${encodeURIComponent(query.input.value)}&jurisdiction=${jurisdiction.value}`);answer.replaceChildren();if(!result.length)notice(answer,t('No approved matching sources are installed yet.','अभी कोई संबंधित स्वीकृत स्रोत स्थापित नहीं है।'));sources(result)}}catch(error){notice(answer,errorMessage(error),true)}finally{search.disabled=false}})()});
   if(identity?.role==='REVIEWER'||identity?.role==='ADMIN'){
-    const ops=el('section','panel');ops.append(el('p','eyebrow',t('OFFICIAL SOURCE MANAGEMENT','आधिकारिक स्रोत प्रबंधन')),el('h2','',t('Source discovery, monitoring & review','स्रोत खोज, निगरानी और समीक्षा')));
+    const ops=el('section','panel');ops.append(el('p','eyebrow',t('TINYFISH AGENT & MONITOR + TAVILY','टाइनीफिश एजेंट और मॉनिटर + टैविली')),el('h2','',t('Source discovery, monitors & review queue','स्रोत खोज, मॉनिटर और समीक्षा कतार')));
     const statusBox=el('div');
-    const discForm=el('form','library-form'),discQuery=field(t('Search question or source goal','खोज प्रश्न या स्रोत लक्ष्य'),'discQuery'),discUrl=field(t('Official source URL (optional)','आधिकारिक स्रोत URL (वैकल्पिक)'),'discUrl');discUrl.input.required=false;discUrl.input.placeholder='https://haryana-rtsc.gov.in/guidelines';
-    const discBtn=el('button','button secondary',t('Find official sources','आधिकारिक स्रोत खोजें'));discBtn.type='submit';
+    const discForm=el('form','library-form'),discQuery=field(t('Tavily discovery query or TinyFish target goal','टैविली खोज प्रश्न या टाइनीफिश लक्ष्य'),'discQuery'),discUrl=field(t('Allowlisted official URL (optional for Tavily discovery)','आधिकारिक URL (टैविली खोज के लिए वैकल्पिक)'),'discUrl');discUrl.input.required=false;discUrl.input.placeholder='https://haryana-rtsc.gov.in/guidelines';
+    const discBtn=el('button','button secondary',t('Run TinyFish Agent + Tavily Discovery','टाइनीफिश एजेंट + टैविली खोज चलाएँ'));discBtn.type='submit';
     discForm.append(discQuery.wrapper,discUrl.wrapper,discBtn);
     const monForm=el('form','library-form'),monName=field(t('Monitor name','मॉनिटर का नाम'),'monName'),monTarget=field(t('Official URL (fetch) or topic query (search)','आधिकारिक URL (fetch) या विषय (search)'),'monTarget');
-    const monType=el('select');for(const [v,l] of [['fetch',t('Monitor an official page','आधिकारिक पेज की निगरानी')],['search',t('Monitor a topic','विषय की निगरानी')]]){const o=el('option','',l);o.value=v;monType.append(o)}
-    const monBtn=el('button','button secondary',t('Create source monitor','स्रोत मॉनिटर बनाएँ'));monBtn.type='submit';
+    const monType=el('select');for(const [v,l] of [['fetch','TinyFish Page Monitor (fetch)'],['search','TinyFish Topic Monitor (search)']]){const o=el('option','',l);o.value=v;monType.append(o)}
+    const monBtn=el('button','button secondary',t('Create TinyFish Monitor','टाइनीफिश मॉनिटर बनाएँ'));monBtn.type='submit';
     monForm.append(monName.wrapper,monType,monTarget.wrapper,monBtn);
     const monList=el('div','case-list'),pendingList=el('div','case-list');
     async function refreshOps(){
       try{
         const [monitors,pending]=await Promise.all([api<LegalMonitor[]>('/legal/monitors'),api<LegalSource[]>('/legal/review')]);
-        monList.replaceChildren(el('h3','',t('Active source monitors','सक्रिय स्रोत मॉनिटर')));
+        monList.replaceChildren(el('h3','',t('Active TinyFish Monitors','सक्रिय टाइनीफिश मॉनिटर')));
         for(const m of monitors){
-          const row=el('div','task-row');row.append(el('span','label',`${m.monitorType.toUpperCase()} · ${m.jurisdiction}`),el('span','',`${m.name} (${m.target})`),el('small','',m.lastStatus??m.status),button(t('Run check now','अभी जाँचें'),()=>{void api<MonitorRunResult>(`/legal/monitors/${m.id}/run`,{method:'POST'}).then(r=>{notice(statusBox,t(`${r.queuedSources.length} source(s) queued for review.`,`${r.queuedSources.length} स्रोत समीक्षा के लिए जोड़े गए।`));return refreshOps()}).catch(e=>notice(statusBox,errorMessage(e),true))},'quiet'));
+          const row=el('div','task-row');row.append(el('span','label',`${m.monitorType.toUpperCase()} · ${m.jurisdiction}`),el('span','',`${m.name} (${m.target})`),el('small','',m.lastStatus??m.status),button(t('Run check now','अभी जाँचें'),()=>{void api<MonitorRunResult>(`/legal/monitors/${m.id}/run`,{method:'POST'}).then(r=>{notice(statusBox,`Monitor run (${r.providerMode}): ${r.queuedSources.length} source(s) queued.`);return refreshOps()}).catch(e=>notice(statusBox,errorMessage(e),true))},'quiet'));
           monList.append(row);
         }
         pendingList.replaceChildren(el('h3','',t('Pending source review queue','स्रोत समीक्षा कतार')));
@@ -622,13 +634,13 @@ export function library(parent:HTMLElement){
       }catch(e){notice(statusBox,errorMessage(e),true)}
     }
     discForm.addEventListener('submit',e=>{e.preventDefault();void api<LegalSource[]>('/legal/discover',{method:'POST',body:JSON.stringify({query:discQuery.input.value,url:discUrl.input.value,jurisdiction:jurisdiction.value,language:'en'})}).then(res=>{notice(statusBox,`Queued ${res.length} source(s) for review.`);return refreshOps()}).catch(err=>notice(statusBox,errorMessage(err),true))});
-    monForm.addEventListener('submit',e=>{e.preventDefault();void api<LegalMonitor>('/legal/monitors',{method:'POST',body:JSON.stringify({name:monName.input.value,monitorType:monType.value,target:monTarget.input.value,jurisdiction:jurisdiction.value,language:'en',scheduleCron:'0 0 * * *'})}).then(()=>{notice(statusBox,t('Source monitor created.','स्रोत मॉनिटर बनाया गया।'));return refreshOps()}).catch(err=>notice(statusBox,errorMessage(err),true))});
+    monForm.addEventListener('submit',e=>{e.preventDefault();void api<LegalMonitor>('/legal/monitors',{method:'POST',body:JSON.stringify({name:monName.input.value,monitorType:monType.value,target:monTarget.input.value,jurisdiction:jurisdiction.value,language:'en',scheduleCron:'0 0 * * *'})}).then(()=>{notice(statusBox,'TinyFish monitor created.');return refreshOps()}).catch(err=>notice(statusBox,errorMessage(err),true))});
     ops.append(statusBox,discForm,monForm,monList,pendingList);parent.append(ops);void refreshOps();
   }
 }
 
 export function information(parent:HTMLElement,path:string){const pages:Record<string,[string,string]>={
-  '/privacy':[t('Your information, handled with care.','आपकी जानकारी, सावधानी के साथ।'),t('This pilot sends reports to the service so the appropriate team can respond. Account details and saved references are protected and access is limited by role. Drafts stay on this browser only when you choose Save draft. Location and microphone access are optional and requested when used. Guidance searches use approved public references; private complaint details are not included in source discovery.','यह पायलट उचित टीम को जवाब देने के लिए रिपोर्ट सेवा तक भेजता है। खाते का विवरण और सहेजे गए संदर्भ सुरक्षित रहते हैं और पहुँच भूमिका के अनुसार सीमित है। ड्राफ्ट केवल आपके चुनने पर इसी ब्राउज़र में सहेजे जाते हैं। स्थान और माइक्रोफ़ोन वैकल्पिक हैं और उपयोग के समय ही अनुमति माँगी जाती है। मार्गदर्शन खोज में स्वीकृत सार्वजनिक संदर्भ उपयोग होते हैं; निजी शिकायत विवरण स्रोत खोज में शामिल नहीं होते।')],
+  '/privacy':[t('Your information, handled with care.','आपकी जानकारी, सावधानी के साथ।'),t('This pilot sends reports to the common backend and limits access by account and department. User profiles and bookmarked sources are stored in Supabase PostgreSQL under Row-Level Security (`(select auth.uid()) = user_id`). Drafts are stored on this browser only when you choose Save draft. Location and microphone access are optional and requested when used. Legal reference queries use approved sources with TinyFish Agent Mode, Tavily official-domain fallback, and a local approved-source backup fallback (SOURCES_ONLY); private complaint details are excluded from source discovery.','यह पायलट रिपोर्ट साझा बैकएंड पर भेजता है और खाते तथा विभाग के अनुसार पहुँच सीमित करता है। उपयोगकर्ता प्रोफ़ाइल और सहेजे गए स्रोत सुपाबेस PostgreSQL में रो-लेवल सुरक्षा (RLS) के अंतर्गत सुरक्षित रहते हैं। ड्राफ्ट केवल आपके चुनने पर इस ब्राउज़र में सहेजा जाता है। स्थान और माइक्रोफोन वैकल्पिक हैं। कानूनी संदर्भ प्रश्न स्वीकृत स्रोतों के साथ टाइनीफिश एजेंट मोड, टैविली फ़ॉलबैक और स्थानीय स्वीकृत स्रोत बैकअप (SOURCES_ONLY) का उपयोग करते हैं।')],
   '/terms':[t('Pilot terms','पायलट शर्तें'),t('This is a development pilot, not an official government filing channel or emergency service. Demonstration service targets are not legal deadlines. Reference excerpts do not establish eligibility or guarantee a legal outcome. Use synthetic information during testing. Public-launch terms remain subject to operator review.','यह विकास पायलट है, आधिकारिक सरकारी आवेदन माध्यम या आपातकालीन सेवा नहीं। प्रदर्शन सेवा लक्ष्य कानूनी समय-सीमा नहीं हैं। संदर्भ अंश पात्रता या कानूनी परिणाम सुनिश्चित नहीं करते। परीक्षण में काल्पनिक जानकारी उपयोग करें। सार्वजनिक लॉन्च की शर्तों की संचालक समीक्षा बाकी है।')],
   '/help':[t('A little guidance.','थोड़ा मार्गदर्शन।'),t('Start with a clear description and an address. Location and recording are optional: deny permission and continue with text. You can revoke permissions in your browser settings. Save a draft explicitly before leaving. A report is submitted only when a case ID is returned. Staff request closure; an independent reviewer decides it.','स्पष्ट विवरण और पते से शुरू करें। स्थान और रिकॉर्डिंग वैकल्पिक हैं: अनुमति न देकर लिखित रूप में आगे बढ़ें। ब्राउज़र सेटिंग्स से अनुमति वापस ले सकते हैं। जाने से पहले ड्राफ्ट सहेजें। मामला ID मिलने पर ही रिपोर्ट जमा मानी जाती है। कर्मचारी बंद करने का अनुरोध करते हैं; स्वतंत्र समीक्षक फैसला करता है।')]
 };const page=pages[path];heading(parent,page?t('THE SMALL PRINT, CLEARLY','स्पष्ट जानकारी'):'404',page?.[0]??t('This street leads elsewhere.','यह रास्ता कहीं और जाता है।'),page?.[1]??t('We could not find that page. Let’s get you back on track.','यह पृष्ठ नहीं मिला। वापस चलते हैं।'));parent.append(link(t('Back to overview','परिचय पर लौटें'),'/','button'));}

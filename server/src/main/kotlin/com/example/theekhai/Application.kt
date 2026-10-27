@@ -66,20 +66,34 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     suspend fun identity(call: ApplicationCall): Actor = testIdentity?.invoke(call) ?: auth.authenticate(call)
     routing {
         get("/") { call.respondText("THEEKHAI Smart Cities Backend Server") }
-        get("/health") { call.respond(mapOf("status" to "HEALTHY", "version" to "pilot")) }
+        get("/health") {
+            val ps = legal.providerStatus(auth.config().configured)
+            call.respond(
+                mapOf(
+                    "status" to "HEALTHY",
+                    "version" to "pilot",
+                    "supabaseConfigured" to ps.supabaseConfigured.toString(),
+                    "tinyFishConfigured" to ps.tinyFishConfigured.toString(),
+                    "tavilyConfigured" to ps.tavilyConfigured.toString(),
+                    "openRouterConfigured" to ps.openRouterConfigured.toString(),
+                )
+            )
+        }
+        get("/api/v1/providers") { safe(call) { call.respond(legal.providerStatus(auth.config().configured)) } }
+        get("/api/v1/auth/config") { safe(call) { call.respond(auth.config()) } }
         post("/api/v1/auth/login") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)
             if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")
             val (id, session) = auth.login(call.receive<LoginDto>())
             call.response.cookies.append(Cookie("theekhai_session",id,httpOnly=true,secure=cookieSecure,path="/",extensions=mapOf("SameSite" to "Lax")))
-            call.respond(if (origin != null) mapOf("status" to "signed_in") else mapOf("status" to "signed_in", "accessToken" to session.token))
+            call.respond(mapOf("status" to "signed_in", "accessToken" to session.token))
         } }
         post("/api/v1/auth/register") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)
             if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")
             val (id, session) = auth.register(call.receive<RegisterDto>())
             call.response.cookies.append(Cookie("theekhai_session",id,httpOnly=true,secure=cookieSecure,path="/",extensions=mapOf("SameSite" to "Lax")))
-            call.respond(HttpStatusCode.Created, if (origin != null) mapOf("status" to "registered") else mapOf("status" to "registered", "accessToken" to session.token))
+            call.respond(HttpStatusCode.Created, mapOf("status" to "registered", "accessToken" to session.token))
         } }
         post("/api/v1/auth/recover") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)

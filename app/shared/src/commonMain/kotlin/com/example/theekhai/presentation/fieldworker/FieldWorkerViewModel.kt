@@ -89,7 +89,7 @@ class FieldWorkerViewModel(
 
     fun syncOfflineQueue() {
         viewModelScope.launch {
-            _uiState.update { it.copy(syncStatusMessage = "Syncing saved reports with the service...") }
+            _uiState.update { it.copy(syncStatusMessage = "Syncing local SQLDelight database with Supabase...") }
             val result = syncOfflineComplaintsUseCase()
             result.onSuccess { count ->
                 _uiState.update { it.copy(syncStatusMessage = "Synced $count pending records with backend!") }
