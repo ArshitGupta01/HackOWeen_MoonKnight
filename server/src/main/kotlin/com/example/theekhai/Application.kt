@@ -1,5 +1,6 @@
 package com.example.theekhai
 
+import com.example.theekhai.auth.EnvConfig
 import com.example.theekhai.auth.SupabaseJwtAuth
 import com.example.theekhai.contract.*
 import com.example.theekhai.data.db.AppDatabase
@@ -25,27 +26,28 @@ import org.koin.ktor.plugin.Koin
 import java.util.UUID
 
 fun main() {
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0") { module(System.getenv("THEEKHAI_DB_PATH") ?: "theekhai-server.db") }.start(wait = true)
+    embeddedServer(Netty, port = 8080, host = "0.0.0.0") { module(EnvConfig.get("THEEKHAI_DB_PATH", "theekhai-server.db")) }.start(wait = true)
 }
 
 /** Test identity is injectable only in-process; production has no development login bypass. */
 fun Application.module(databasePath: String? = null, testIdentity: ((ApplicationCall) -> Actor)? = null) {
     install(Koin) { modules(serverModule(databasePath)) }
     install(ContentNegotiation) { json(Json { ignoreUnknownKeys = false; isLenient = false }) }
-    val allowedOrigins = (System.getenv("THEEKHAI_ALLOWED_ORIGINS") ?: "http://localhost:5173,http://127.0.0.1:5173").split(',').map { it.trim() }.filter { it.isNotEmpty() }
+    val allowedOrigins = EnvConfig.get("THEEKHAI_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(',').map { it.trim() }.filter { it.isNotEmpty() }
     install(CORS) {
         allowedOrigins.forEach { val uri = java.net.URI(it); require(uri.scheme in listOf("http","https") && uri.host != null); allowHost(uri.authority, schemes = listOf(uri.scheme)) }
         allowHeader(HttpHeaders.ContentType); allowHeader(HttpHeaders.Authorization); allowHeader("X-CSRF-Token"); allowHeader("Idempotency-Key")
-        allowMethod(HttpMethod.Post); allowCredentials = true
+        allowMethod(HttpMethod.Post); allowMethod(HttpMethod.Delete); allowCredentials = true
     }
     val workflow: Workflow by inject()
     val database: AppDatabase by inject()
     val http = HttpClient(OkHttp) { install(HttpTimeout) { requestTimeoutMillis = 20_000; connectTimeoutMillis = 5_000 }; followRedirects = false }
-    val staff = (System.getenv("THEEKHAI_STAFF") ?: "").split(';').filter { it.isNotBlank() }.associate { entry ->
+    val staff = EnvConfig.get("THEEKHAI_STAFF").split(';').filter { it.isNotBlank() }.associate { entry ->
         val parts = entry.split('|'); require(parts.size >= 2); parts[0] to (Role.valueOf(parts[1]) to parts.getOrNull(2))
     }
-    val auth = SupabaseJwtAuth(http,System.getenv("SUPABASE_URL") ?: "",System.getenv("SUPABASE_PUBLISHABLE_KEY") ?: "",staff)
-    val legal = com.example.theekhai.legal.LegalService(database,http)
+    val auth = SupabaseJwtAuth(http, EnvConfig.get("SUPABASE_URL"), EnvConfig.get("SUPABASE_PUBLISHABLE_KEY"), staff)
+    val legal = com.example.theekhai.legal.LegalService(database, http)
+    val cookieSecure = EnvConfig.get("THEEKHAI_COOKIE_SECURE", "false") != "false"
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     scope.launch { while(isActive) { try { synchronized(workflow) { workflow.checkDeadlines() } } catch (e: Exception) { if (e is CancellationException) throw e; log.error("Deadline worker failed: {}",e.javaClass.simpleName) }; delay(60_000) } }
     scope.launch { while(isActive) { delay(24 * 60 * 60_000L); try { legal.runScheduledMonitors() } catch (e: Exception) { if (e is CancellationException) throw e; log.error("Monitor worker failed: {}",e.javaClass.simpleName) } } }
@@ -53,16 +55,42 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     suspend fun identity(call: ApplicationCall): Actor = testIdentity?.invoke(call) ?: auth.authenticate(call)
     routing {
         get("/") { call.respondText("THEEKHAI Smart Cities Backend Server") }
-        get("/health") { call.respond(mapOf("status" to "HEALTHY", "version" to "pilot")) }
+        get("/health") { call.respond(mapOf("status" to "HEALTHY", "version" to "pilot", "supabaseConfigured" to auth.config().configured.toString())) }
+        get("/api/v1/auth/config") { safe(call) { call.respond(auth.config()) } }
         post("/api/v1/auth/login") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)
             if (origin != null && origin !in allowedOrigins) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")
             val (id,_) = auth.login(call.receive<LoginDto>())
-            call.response.cookies.append(Cookie("theekhai_session",id,httpOnly=true,secure=System.getenv("THEEKHAI_COOKIE_SECURE") != "false",path="/",extensions=mapOf("SameSite" to "Strict")))
+            call.response.cookies.append(Cookie("theekhai_session",id,httpOnly=true,secure=cookieSecure,path="/",extensions=mapOf("SameSite" to "Strict")))
             call.respond(mapOf("status" to "signed_in"))
         } }
-        get("/api/v1/auth/me") { safe(call) { val actor = identity(call); call.respond(IdentityDto(actor.id,actor.role.name,actor.department,auth.csrf(call))) } }
-        post("/api/v1/auth/logout") { safe(call) { identity(call); auth.logout(call); call.response.cookies.append(Cookie("theekhai_session","",maxAge=0,httpOnly=true,path="/",secure=System.getenv("THEEKHAI_COOKIE_SECURE") != "false",extensions=mapOf("SameSite" to "Strict"))); call.respond(mapOf("status" to "signed_out")) } }
+        post("/api/v1/auth/register") { safe(call) {
+            val origin = call.request.header(HttpHeaders.Origin)
+            if (origin != null && origin !in allowedOrigins) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")
+            val (id,_) = auth.register(call.receive<RegisterDto>())
+            call.response.cookies.append(Cookie("theekhai_session",id,httpOnly=true,secure=cookieSecure,path="/",extensions=mapOf("SameSite" to "Strict")))
+            call.respond(HttpStatusCode.Created, mapOf("status" to "registered"))
+        } }
+        post("/api/v1/auth/recover") { safe(call) {
+            val origin = call.request.header(HttpHeaders.Origin)
+            if (origin != null && origin !in allowedOrigins) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")
+            auth.recoverPassword(call.receive<RecoverPasswordDto>().email)
+            call.respond(mapOf("status" to "recovery_sent"))
+        } }
+        get("/api/v1/auth/me") { safe(call) {
+            if (testIdentity != null) {
+                val actor = testIdentity.invoke(call)
+                call.respond(IdentityDto(actor.id, actor.role.name, actor.department, auth.csrf(call)))
+            } else {
+                call.respond(auth.authenticateIdentity(call))
+            }
+        } }
+        post("/api/v1/auth/logout") { safe(call) { identity(call); auth.logout(call); call.response.cookies.append(Cookie("theekhai_session","",maxAge=0,httpOnly=true,path="/",secure=cookieSecure,extensions=mapOf("SameSite" to "Strict"))); call.respond(mapOf("status" to "signed_out")) } }
+        get("/api/v1/profile") { safe(call) { call.respond(auth.getProfile(call)) } }
+        post("/api/v1/profile") { safe(call) { call.respond(auth.saveProfile(call, call.receive())) } }
+        get("/api/v1/saved-sources") { safe(call) { call.respond(auth.listSavedSources(call)) } }
+        post("/api/v1/saved-sources") { safe(call) { call.respond(HttpStatusCode.Created, auth.saveBookmark(call, call.receive())) } }
+        delete("/api/v1/saved-sources/{id}") { safe(call) { auth.deleteBookmark(call, call.parameters["id"]!!); call.respond(mapOf("status" to "deleted")) } }
         get("/api/v1/complaints") { safe(call) {
             val actor = identity(call); val offset = call.request.queryParameters["offset"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
             val all = synchronized(workflow) { workflow.list(actor) }

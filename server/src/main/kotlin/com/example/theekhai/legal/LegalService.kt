@@ -1,5 +1,6 @@
 package com.example.theekhai.legal
 
+import com.example.theekhai.auth.EnvConfig
 import com.example.theekhai.contract.*
 import com.example.theekhai.data.db.AppDatabase
 import com.example.theekhai.domain.workflow.WorkflowFailure
@@ -25,10 +26,10 @@ import java.util.UUID
 class LegalService(
     private val db: AppDatabase,
     private val client: HttpClient,
-    private val tinyFishApiKey: String = System.getenv("TINYFISH_API_KEY") ?: "",
-    private val tavilyApiKey: String = System.getenv("TAVILY_API_KEY") ?: "",
-    private val tinyFishBaseUrl: String = (System.getenv("TINYFISH_BASE_URL") ?: "https://agent.tinyfish.ai").trimEnd('/'),
-    private val tavilyBaseUrl: String = (System.getenv("TAVILY_BASE_URL") ?: "https://api.tavily.com").trimEnd('/'),
+    private val tinyFishApiKey: String = EnvConfig.get("TINYFISH_API_KEY"),
+    private val tavilyApiKey: String = EnvConfig.get("TAVILY_API_KEY"),
+    private val tinyFishBaseUrl: String = EnvConfig.get("TINYFISH_BASE_URL", "https://agent.tinyfish.ai").trimEnd('/'),
+    private val tavilyBaseUrl: String = EnvConfig.get("TAVILY_BASE_URL", "https://api.tavily.com").trimEnd('/'),
 ) {
     private val agentSemaphore = Semaphore(1)
     private val json = Json { ignoreUnknownKeys = true }
