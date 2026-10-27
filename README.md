@@ -192,6 +192,9 @@ npm run dev
 
 # Type-check and build the production web bundle
 cd web && npm run build
+
+# 5. Public HTTPS Deployment via Ngrok (Website + Backend API on one URL)
+# .\start-ngrok.ps1 -AuthToken "<YOUR_NGROK_AUTHTOKEN>"
 ```
 
 ---
