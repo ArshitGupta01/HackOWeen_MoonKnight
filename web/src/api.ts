@@ -47,10 +47,28 @@ export interface SavedSource {
   createdAt?: string | null;
 }
 
+export interface CaseLink {
+  caseId: string;
+  targetId: string;
+  kind: string;
+}
+
+export interface VerificationResult {
+  id: string;
+  complaintId: string;
+  state: 'IN_PROGRESS' | 'CONFIRMED_RESOLVED' | 'CONTRADICTION_FOUND' | 'MANUAL_INSPECTION_REQUIRED';
+  verified: boolean;
+  scrapedPortalUrl?: string | null;
+  scrapedEvidenceSnippet?: string | null;
+  contradictionDetected: boolean;
+  explanation: string;
+  verifiedAtEpochMillis: number;
+}
+
 export interface CaseRecord { id:string; title:string; description:string; category:string; address:string; latitude:number|null; longitude:number|null; citizenId:string; department:string; priority:string; status:string; createdAt:number; updatedAt:number; dueAt:number; version:number; escalation:number; closureBy:string|null }
 export interface CaseTask { id:string; caseId:string; department:string; title:string; required:boolean; complete:boolean }
 export interface CaseEvent { id:string; caseId:string; actorId:string; action:string; note:string; at:number }
-export interface CaseDetail { case:CaseRecord; tasks:CaseTask[]; events:CaseEvent[] }
+export interface CaseDetail { case:CaseRecord; tasks:CaseTask[]; events:CaseEvent[]; links?:CaseLink[] }
 export interface LegalSource { id:string; title:string; url:string; jurisdiction:string; language:string; content:string; retrievedAt:number; status:string; hash:string; supersedes:string|null }
 export interface LegalAnswer { answer:string; citations:LegalSource[]; mode:string; limitation:string }
 export interface LegalMonitor { id:string; remoteMonitorId:string|null; name:string; monitorType:string; target:string; jurisdiction:string; language:string; scheduleCron:string; status:string; lastCheckedAt:number|null; lastStatus:string|null }
@@ -198,4 +216,69 @@ export async function transcribeAudio(input: { audioBase64: string; mimeType: st
 
 export async function reverseGeocode(lat: number, lon: number, lang: string = 'en') {
   return api<ReverseGeocodeResult>(`/geo/reverse?lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lon))}&lang=${encodeURIComponent(lang)}`);
+}
+
+export function verifyCaseResolution(complaintId: string, officialPortalUrl?: string) {
+  return api<VerificationResult>(`/complaints/${encodeURIComponent(complaintId)}/verify`, {
+    method: 'POST',
+    body: JSON.stringify({ complaintId, officialPortalUrl }),
+  });
+}
+
+export function importLegalSource(input: { title: string; url: string; jurisdiction: string; language: string; content: string }) {
+  return api<LegalSource>('/legal/sources', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export interface EmailDraft {
+  caseId: string;
+  senderEmail: string;
+  recipientEmail: string;
+  recipientDepartment: string;
+  recipientAuthority: string;
+  officialSourceUrl: string;
+  subject: string;
+  body: string;
+  discoveryMode: string;
+  timestamp: number;
+}
+
+export interface SendEmailResponse {
+  success: boolean;
+  messageId: string;
+  sender: string;
+  recipient: string;
+  sentAt: number;
+  message: string;
+}
+
+export interface GmailOAuthStatus {
+  configured: boolean;
+  connected: boolean;
+  senderEmail: string;
+  authUrl?: string;
+}
+
+export function getGmailStatus() {
+  return api<GmailOAuthStatus>('/gmail/status');
+}
+
+export function getGmailAuthUrl() {
+  return api<{ authUrl: string }>('/gmail/auth-url');
+}
+
+export function draftComplaintEmail(caseId: string) {
+  return api<EmailDraft>(`/complaints/${encodeURIComponent(caseId)}/email/draft`, {
+    method: 'POST',
+    body: JSON.stringify({ caseId }),
+  });
+}
+
+export function sendComplaintEmail(caseId: string, recipientEmail: string, subject: string, body: string) {
+  return api<SendEmailResponse>(`/complaints/${encodeURIComponent(caseId)}/email/send`, {
+    method: 'POST',
+    body: JSON.stringify({ recipientEmail, subject, body }),
+  });
 }

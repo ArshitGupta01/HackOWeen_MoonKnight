@@ -3,11 +3,12 @@ package com.example.theekhai.contract
 import kotlinx.serialization.Serializable
 
 @Serializable data class CaseDto(val id: String, val title: String, val description: String, val category: String, val address: String, val latitude: Double?, val longitude: Double?, val citizenId: String, val department: String, val priority: String, val status: String, val createdAt: Long, val updatedAt: Long, val dueAt: Long, val version: Long, val escalation: Long, val closureBy: String?)
-@Serializable data class ReportDto(val title: String, val description: String, val category: String, val address: String, val latitude: Double? = null, val longitude: Double? = null, val consent: Boolean = false)
+@Serializable data class ReportDto(val title: String, val description: String, val category: String, val address: String, val latitude: Double? = null, val longitude: Double? = null, val consent: Boolean = false, val priority: String = "MEDIUM")
 @Serializable data class ActionDto(val action: String, val version: Long, val note: String, val target: String = "", val department: String = "")
 @Serializable data class TaskDto(val id: String, val caseId: String, val department: String, val title: String, val required: Boolean, val complete: Boolean)
 @Serializable data class EventDto(val id: String, val caseId: String, val actorId: String, val action: String, val note: String, val at: Long)
-@Serializable data class CaseDetailDto(val case: CaseDto, val tasks: List<TaskDto>, val events: List<EventDto>)
+@Serializable data class CaseLinkDto(val caseId: String, val targetId: String, val kind: String)
+@Serializable data class CaseDetailDto(val case: CaseDto, val tasks: List<TaskDto>, val events: List<EventDto>, val links: List<CaseLinkDto> = emptyList())
 @Serializable data class CasePageDto(val items: List<CaseDto>, val total: Int, val offset: Int)
 @Serializable data class IdentityDto(val id: String, val role: String, val department: String?, val csrf: String? = null, val email: String = "", val fullName: String = "", val organization: String = "", val ward: String = "Ward 1", val preferredLanguage: String = "en")
 @Serializable data class AuthConfigDto(val configured: Boolean, val supabaseUrl: String, val publishableKey: String)
@@ -32,4 +33,38 @@ import kotlinx.serialization.Serializable
 @Serializable data class ReverseGeocodeResponseDto(val latitude: Double, val longitude: Double, val address: String, val ward: String = "Ward 4", val landmark: String = "", val source: String = "NOMINATIM_OSM")
 @Serializable data class TriageAssistRequestDto(val title: String = "", val description: String = "", val address: String = "", val language: String = "en")
 @Serializable data class TriageAssistResponseDto(val suggestedTitle: String, val suggestedCategory: String, val suggestedPriority: String, val suggestedDepartment: String, val duplicateCaseIds: List<String> = emptyList(), val summary: String, val provider: String)
-@Serializable data class ProviderStatusDto(val supabaseConfigured: Boolean, val tinyFishConfigured: Boolean, val tavilyConfigured: Boolean, val openRouterConfigured: Boolean, val sarvamConfigured: Boolean = false)
+@Serializable data class ProviderStatusDto(val supabaseConfigured: Boolean, val tinyFishConfigured: Boolean, val tavilyConfigured: Boolean, val openRouterConfigured: Boolean, val sarvamConfigured: Boolean = false, val groqConfigured: Boolean = false)
+
+// Gmail & TinyFish Automated Civic Dispatch Contracts
+@Serializable data class EmailDraftRequestDto(val caseId: String)
+@Serializable data class EmailDraftDto(
+    val caseId: String,
+    val senderEmail: String = "arshitgupta34@gmail.com",
+    val recipientEmail: String,
+    val recipientDepartment: String,
+    val recipientAuthority: String,
+    val officialSourceUrl: String,
+    val subject: String,
+    val body: String,
+    val discoveryMode: String,
+    val timestamp: Long = 0L
+)
+@Serializable data class SendEmailRequestDto(
+    val recipientEmail: String,
+    val subject: String,
+    val body: String
+)
+@Serializable data class SendEmailResponseDto(
+    val success: Boolean,
+    val messageId: String,
+    val sender: String = "arshitgupta34@gmail.com",
+    val recipient: String,
+    val sentAt: Long,
+    val message: String
+)
+@Serializable data class GmailOAuthStatusDto(
+    val configured: Boolean,
+    val connected: Boolean,
+    val senderEmail: String = "arshitgupta34@gmail.com",
+    val authUrl: String? = null
+)

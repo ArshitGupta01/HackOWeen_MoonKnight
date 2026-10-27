@@ -60,7 +60,7 @@ class CheckEvidenceUseCase(
         )
 
         // Log to explainable audit trail
-        val now = 1793100000000L
+        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
         auditRepository.recordAuditLog(
             AuditLog(
                 id = "audit-evidence-${request.complaintId}-${now.hashCode()}",

@@ -49,7 +49,7 @@ val remoteDataModule: Module = module {
     }
     single<TriageAiClient> { OpenRouterApiClient(client = get(), backendBaseUrl = get<String>(DataQualifiers.BackendBaseUrl)) }
     single<VoiceSpeechToTextClient> { SarvamApiClient(client = get(), backendBaseUrl = get<String>(DataQualifiers.BackendBaseUrl)) }
-    single { TinyFishApiClient() }
+    single { TinyFishApiClient(client = get(), backendBaseUrl = get<String>(DataQualifiers.BackendBaseUrl)) }
 }
 
 val dataModule: Module = module {

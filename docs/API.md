@@ -4,7 +4,7 @@ The Ktor API is JSON at `/api/v1`, defined by `:core`'s `PilotDto.kt` and mounte
 
 ## Authentication, Profile & Saved Sources (Supabase `TheekHai` + RLS)
 
-- `GET /api/v1/providers` -> `ProviderStatusDto` (`supabaseConfigured`, `tinyFishConfigured`, `tavilyConfigured`, `openRouterConfigured`).
+- `GET /api/v1/providers` -> `ProviderStatusDto` (`supabaseConfigured`, `tinyFishConfigured`, `tavilyConfigured`, `openRouterConfigured`, `sarvamConfigured`, `groqConfigured`).
 - `GET /api/v1/auth/config` -> `AuthConfigDto` (`supabaseUrl`, `publishableKey`, `configured`).
 - `POST /api/v1/auth/login` -> Authenticates via Supabase `/auth/v1/token?grant_type=password`, resolves role/profile from `public.profiles`, sets an `HttpOnly` cookie (`theekhai_session`), and returns `accessToken` for Bearer fallback.
 - `POST /api/v1/auth/register` -> Registers a citizen account via Supabase `/auth/v1/signup`, auto-provisions `public.profiles` (including `organization`, `ward`, `preferredLanguage`), and sets `theekhai_session`.
@@ -14,13 +14,27 @@ The Ktor API is JSON at `/api/v1`, defined by `:core`'s `PilotDto.kt` and mounte
 - `GET /api/v1/profile` & `POST /api/v1/profile` -> Reads/updates the user's RLS-protected `public.profiles` record in Supabase using the session's Bearer JWT.
 - `GET /api/v1/saved-sources`, `POST /api/v1/saved-sources`, `DELETE /api/v1/saved-sources/{id}` -> Lists, bookmarks, and deletes RLS-protected `public.saved_sources` rows in Supabase.
 
-## Case Workflow & OpenRouter AI Triage (`/api/v1/complaints`)
+## Case Workflow, Verification & Priority (`/api/v1/complaints`)
 
 - `GET /api/v1/complaints?offset=0` -> Paginated `CasePageDto` filtered by actor role/ownership.
 - `POST /api/v1/complaints/triage` -> Analyzes complaint intake (`TriageAssistRequestDto`) via OpenRouter (`/chat/completions`) and returns `TriageAssistResponseDto` (`suggestedTitle`, `suggestedCategory`, `suggestedPriority`, `suggestedDepartment`, `duplicateCaseIds`, `summary`, `provider`), falling back deterministically to `LOCAL_RULE_FALLBACK` when offline.
-- `POST /api/v1/complaints` -> Submits a new complaint (`ReportDto`) with `Idempotency-Key` and `X-CSRF-Token`, persisting to SQLDelight and syncing to Supabase `public.complaints`, `public.case_tasks`, and `public.audit_logs`.
-- `GET /api/v1/complaints/{id}` -> Returns `CaseDetailDto` (`case`, `tasks`, `events`).
-- `POST /api/v1/complaints/{id}/actions` -> Executes workflow transitions (`START`, `ADD_TASK`, `COMPLETE_TASK`, `REQUEST_CLOSURE`, `APPROVE_CLOSURE`, `REJECT_CLOSURE`, `CHALLENGE`, `REOPEN`) with optimistic concurrency (`version`) and separation of duties.
+- `POST /api/v1/complaints` -> Submits a new complaint (`ReportDto` with `priority`) with `Idempotency-Key` and `X-CSRF-Token`, persisting to SQLDelight and syncing to Supabase `public.complaints`, `public.case_tasks`, and `public.audit_logs`. Computes SLA deadlines dynamically (`CRITICAL` = 4h, `HIGH` = 24h, `MEDIUM` = 72h, `LOW` = 168h).
+- `GET /api/v1/complaints/{id}` -> Returns `CaseDetailDto` (`case`, `tasks`, `events`, `links`).
+- `POST /api/v1/complaints/{id}/actions` -> Executes workflow transitions (`START`, `ADD_TASK`, `COMPLETE_TASK`, `REQUEST_CLOSURE`, `APPROVE_CLOSURE`, `REJECT_CLOSURE`, `CHALLENGE`, `REOPEN`, `LINK_DUPLICATE`, `LINK_RELATED`) with optimistic concurrency (`version`) and separation of duties.
+- `POST /api/v1/complaints/{id}/verify` -> Autonomous municipal resolution verification via TinyFish Agent Mode.
+- `POST /api/v1/complaints/{id}/resolve` -> Worker completion and closure request.
+- `POST /api/v1/complaints/{id}/escalate` -> Manual operational escalation.
+- `POST /api/v1/evidence/verify` -> Field worker geofence validation (Haversine formula) and visual evidence analysis.
+- `GET /api/v1/audit/logs` -> Case audit events.
+- `POST /api/v1/sync/batch` -> Offline sync batch ingest.
+
+## Gmail & Official Civic Grievance Dispatch (`/api/v1/gmail/*` & `/api/v1/complaints/{id}/email/*`)
+
+- `GET /api/v1/gmail/status` -> Returns `GmailOAuthStatusDto` (`configured`, `connected`, `senderEmail = "arshitgupta34@gmail.com"`, `authUrl`).
+- `GET /api/v1/gmail/auth-url?redirect_uri=...` -> Returns Google OAuth consent URL for `https://www.googleapis.com/auth/gmail.send` scope.
+- `GET /api/v1/gmail/oauth2callback?code=...` -> Google OAuth callback handler that exchanges authorization code for refresh/access tokens and persists `.gmail_tokens.json`.
+- `POST /api/v1/complaints/{id}/email/draft` -> Uses TinyFish Agent Mode to discover the responsible government authority and email from official `.gov.in`/`.nic.in` portals (with verified Haryana civic directory fallback), then drafts a formal statutory civic grievance petition via OpenRouter (or grounded legal template). Sender is strictly hardcoded to `arshitgupta34@gmail.com`. Returns `EmailDraftDto`.
+- `POST /api/v1/complaints/{id}/email/send` -> Dispatches the reviewed grievance email from `arshitgupta34@gmail.com` to the official authority via Gmail API (`users/me/messages/send`), records a `GRIEVANCE_EMAILED` event on the case timeline, and returns `SendEmailResponseDto`.
 
 ## Legal Reference, TinyFish Agent/Monitor, OpenRouter & Tavily (`/api/v1/legal/*`)
 
@@ -29,5 +43,5 @@ The Ktor API is JSON at `/api/v1`, defined by `:core`'s `PilotDto.kt` and mounte
 - `POST /api/v1/legal/discover` -> Reviewer/Admin endpoint using Tavily official-domain discovery and TinyFish Agent extraction to queue `PENDING` sources.
 - `GET /api/v1/legal/monitors`, `POST /api/v1/legal/monitors`, `POST /api/v1/legal/monitors/{id}/run` -> Creates and executes TinyFish Page (`fetch`) and Topic (`search`) monitors.
 - `GET /api/v1/legal/review`, `POST /api/v1/legal/sources`, `POST /api/v1/legal/sources/{id}/review` -> Reviewer approval/rejection queue.
-- `POST /api/v1/voice/transcribe` -> Transcribes and refines recorded voice notes (`TranscribeRequestDto` with `audioBase64`, `mimeType`, `language`, `transcriptHint`) via OpenRouter AI into structured `TranscribeResponseDto` (`text`, `suggestedTitle`, `suggestedCategory`, `provider`).
-- `GET /api/v1/geo/reverse?lat=...&lon=...&lang=en|hi` -> Reverse-geocodes GPS or map-picked coordinates via OpenStreetMap Nominatim + Ward 4 geospatial landmark index into `ReverseGeocodeResponseDto` (`latitude`, `longitude`, `address`, `ward`, `landmark`, `source`).
+- `POST /api/v1/voice/transcribe` -> Transcribes and refines recorded voice notes (`TranscribeRequestDto` with `audioBase64`, `mimeType`, `language`, `transcriptHint`) via Groq Whisper / Sarvam AI / OpenRouter into structured `TranscribeResponseDto`.
+- `GET /api/v1/geo/reverse?lat=...&lon=...&lang=en|hi` -> Reverse-geocodes GPS or map-picked coordinates via OpenStreetMap Nominatim + Murthal geospatial index (`map.osm`) into `ReverseGeocodeResponseDto`.

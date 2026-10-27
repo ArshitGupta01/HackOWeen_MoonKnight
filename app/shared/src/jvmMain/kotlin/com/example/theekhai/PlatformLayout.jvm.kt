@@ -24,6 +24,8 @@ import com.example.theekhai.ui.localization.LocalAppLanguage
 import com.example.theekhai.ui.localization.t
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
+import org.koin.compose.koinInject
+import com.example.theekhai.presentation.nativeconnect.NativeConnectViewModel
 
 /**
  * Desktop (JVM) platform target layout.
@@ -373,8 +375,15 @@ private fun DesktopTopBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AvatarCircle(initials = "?", size = 24.dp, bgColor = ext.green)
-                    Text(t("Your account", "आपका खाता"), fontSize = 12.sp, color = ext.ink, fontWeight = FontWeight.Medium)
+                    val connectVm: NativeConnectViewModel = koinInject()
+                    val state by connectVm.state.collectAsState()
+                    val profile = state.profile
+                    val initials = (profile?.fullName?.takeIf { it.isNotBlank() } ?: profile?.email?.takeIf { it.isNotBlank() } ?: "TH")
+                        .split(Regex("\\s+")).filter { it.isNotBlank() }.map { it.first().uppercase() }.take(2).joinToString("").ifEmpty { "TH" }
+                    val displayName = profile?.fullName?.takeIf { it.isNotBlank() } ?: profile?.email?.takeIf { it.isNotBlank() } ?: t("Your account", "आपका खाता")
+
+                    AvatarCircle(initials = initials, size = 24.dp, bgColor = ext.green)
+                    Text(displayName, fontSize = 12.sp, color = ext.ink, fontWeight = FontWeight.Medium)
                     Surface(
                         color = ext.greenSurface,
                         shape = RoundedCornerShape(3.dp)

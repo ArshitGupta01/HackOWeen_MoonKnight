@@ -18,4 +18,20 @@ class CivicBackendUseCases(private val repository: NativeCivicRepository) {
     suspend fun reverseGeocode(latitude: Double, longitude: Double, language: String) = repository.reverseGeocode(latitude, longitude, language)
     suspend fun triage(title: String, description: String, address: String, language: String) = repository.triageReport(title, description, address, language)
     suspend fun signOut() = repository.signOut()
+    suspend fun verifyCaseWithTinyFish(complaintId: String, portalUrl: String? = null) = repository.verifyCaseWithTinyFish(complaintId, portalUrl)
+    suspend fun getMonitors() = repository.getMonitors()
+    suspend fun createMonitor(name: String, monitorType: String, target: String, jurisdiction: String) = repository.createMonitor(name, monitorType, target, jurisdiction)
+    suspend fun runMonitor(id: String) = repository.runMonitor(id)
+    suspend fun discoverSources(query: String, url: String, jurisdiction: String) = repository.discoverSources(query, url, jurisdiction)
+    suspend fun getPendingSources() = repository.getPendingSources()
+    suspend fun reviewSource(id: String, approve: Boolean) = repository.reviewSource(id, approve)
+    suspend fun draftComplaintEmail(caseId: String) = repository.draftComplaintEmail(caseId)
+    suspend fun sendComplaintEmail(caseId: String, recipient: String, subject: String, body: String) = repository.sendComplaintEmail(caseId, recipient, subject, body)
+}
+class DraftComplaintEmailUseCase(private val repository: NativeCivicRepository) {
+    suspend operator fun invoke(caseId: String) = repository.draftComplaintEmail(caseId)
+}
+class SendComplaintEmailUseCase(private val repository: NativeCivicRepository) {
+    suspend operator fun invoke(caseId: String, recipientEmail: String, subject: String, body: String) =
+        repository.sendComplaintEmail(caseId, recipientEmail, subject, body)
 }

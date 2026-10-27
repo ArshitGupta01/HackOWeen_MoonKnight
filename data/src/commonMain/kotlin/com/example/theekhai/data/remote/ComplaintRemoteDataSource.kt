@@ -46,17 +46,27 @@ class KtorComplaintRemoteDataSource(
     private fun url(path: String): String = "${baseUrl.trimEnd('/')}$path"
 
     override suspend fun getComplaints(): List<ComplaintDto> =
-        client.get(url(ApiRoutes.COMPLAINTS)) {
-            header("X-Client-Platform", "kmp")
-        }.body()
+        try {
+            val page = client.get(url(ApiRoutes.COMPLAINTS)).body<com.example.theekhai.contract.CasePageDto>()
+            page.items.map { it.toComplaintDto() }
+        } catch (_: Exception) {
+            client.get(url(ApiRoutes.COMPLAINTS)) {
+                header("X-Client-Platform", "kmp")
+            }.body()
+        }
 
     override suspend fun getComplaintById(id: String): ComplaintDto? =
         try {
-            client.get(url(ApiRoutes.COMPLAINTS) + "/$id") {
-                header("X-Client-Platform", "kmp")
-            }.body()
+            val detail = client.get(url(ApiRoutes.COMPLAINTS) + "/$id").body<com.example.theekhai.contract.CaseDetailDto>()
+            detail.case.toComplaintDto()
         } catch (_: Exception) {
-            null
+            try {
+                client.get(url(ApiRoutes.COMPLAINTS) + "/$id") {
+                    header("X-Client-Platform", "kmp")
+                }.body()
+            } catch (_: Exception) {
+                null
+            }
         }
 
     override suspend fun createComplaint(request: CreateComplaintRequestDto): ComplaintDto =
@@ -120,3 +130,25 @@ class KtorComplaintRemoteDataSource(
         return client.get(url(path)).body()
     }
 }
+
+private fun com.example.theekhai.contract.CaseDto.toComplaintDto(): ComplaintDto = ComplaintDto(
+    id = id,
+    title = title,
+    description = description,
+    category = category,
+    priority = runCatching { com.example.theekhai.contract.ComplaintPriorityDto.valueOf(priority) }.getOrDefault(com.example.theekhai.contract.ComplaintPriorityDto.MEDIUM),
+    status = runCatching { com.example.theekhai.contract.ComplaintStatusDto.valueOf(status) }.getOrDefault(com.example.theekhai.contract.ComplaintStatusDto.PENDING),
+    latitude = latitude ?: 0.0,
+    longitude = longitude ?: 0.0,
+    address = address,
+    citizenId = citizenId,
+    assignedWorkerId = null,
+    zone = department,
+    photoUrl = null,
+    resolutionNotes = null,
+    resolutionPhotoUrl = null,
+    clusterId = null,
+    slaDueEpochMillis = dueAt,
+    createdAtEpochMillis = createdAt,
+    updatedAtEpochMillis = updatedAt
+)

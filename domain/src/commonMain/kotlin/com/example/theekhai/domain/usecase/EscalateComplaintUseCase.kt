@@ -29,7 +29,7 @@ class EscalateComplaintUseCase(
             category = complaint.category
         )
 
-        val nowEpoch = 1793100000000L // 2026 epoch fallback or caller timestamp
+        val nowEpoch = kotlin.time.Clock.System.now().toEpochMilliseconds() // 2026 epoch fallback or caller timestamp
         auditRepository.recordAuditLog(
             AuditLog(
                 id = "audit-escalate-$complaintId-${nowEpoch.hashCode()}",

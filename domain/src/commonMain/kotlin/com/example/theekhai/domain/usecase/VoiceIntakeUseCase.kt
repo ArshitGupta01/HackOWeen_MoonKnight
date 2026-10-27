@@ -37,7 +37,7 @@ class VoiceIntakeUseCase(
                 languageHint = request.languageHint
             )
 
-            val now = 1793100000000L
+            val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
             val initialPriority = when (sttResult.proposedPriority) {
                 com.example.theekhai.contract.ComplaintPriorityDto.LOW -> ComplaintPriority.LOW
                 com.example.theekhai.contract.ComplaintPriorityDto.MEDIUM -> ComplaintPriority.MEDIUM

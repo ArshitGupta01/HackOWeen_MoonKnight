@@ -24,6 +24,11 @@ import com.example.theekhai.navigation.Route
 import com.example.theekhai.ui.components.*
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
+import org.koin.compose.koinInject
+import com.example.theekhai.presentation.nativeconnect.NativeConnectViewModel
+import com.example.theekhai.ui.localization.AppLanguage
+import com.example.theekhai.ui.localization.LocalAppLanguage
+import com.example.theekhai.ui.localization.t
 import kotlinx.coroutines.launch
 
 @Composable
@@ -37,8 +42,10 @@ actual fun PlatformAppScaffold(
     val ext = LocalTheekHaiColors.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
+    var currentLanguage by remember { mutableStateOf(AppLanguage.EN) }
 
-    ModalNavigationDrawer(
+    CompositionLocalProvider(LocalAppLanguage provides currentLanguage) {
+        ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
@@ -80,6 +87,7 @@ actual fun PlatformAppScaffold(
                 content()
             }
         }
+    }
     }
 }
 

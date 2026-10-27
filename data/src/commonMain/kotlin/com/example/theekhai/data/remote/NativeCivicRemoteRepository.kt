@@ -124,6 +124,67 @@ class NativeCivicRemoteRepository(
         val response = client.post(url("/complaints/triage")) { contentType(ContentType.Application.Json); setBody(TriageAssistRequestDto(title, description, address, language)) }; requireSuccess(response)
         return response.body<TriageAssistResponseDto>().let { CivicTriageSuggestion(it.suggestedTitle, it.suggestedCategory, it.suggestedPriority, it.suggestedDepartment, it.duplicateCaseIds, it.summary) }
     }
+    override suspend fun verifyCaseWithTinyFish(complaintId: String, portalUrl: String?): com.example.theekhai.contract.VerificationResultDto {
+        val response = client.post(url("/complaints/${complaintId.encodePathSegment()}/verify")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.TriggerVerificationRequestDto(complaintId, portalUrl))
+        }
+        requireSuccess(response)
+        return response.body()
+    }
+    override suspend fun getMonitors(): List<com.example.theekhai.contract.LegalMonitorDto> {
+        val response = client.get(url("/legal/monitors")); requireSuccess(response)
+        return response.body()
+    }
+    override suspend fun createMonitor(name: String, monitorType: String, target: String, jurisdiction: String): com.example.theekhai.contract.LegalMonitorDto {
+        val response = client.post(url("/legal/monitors")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.CreateMonitorDto(name = name, monitorType = monitorType, target = target, jurisdiction = jurisdiction))
+        }
+        requireSuccess(response)
+        return response.body()
+    }
+    override suspend fun runMonitor(id: String): com.example.theekhai.contract.MonitorRunResultDto {
+        val response = client.post(url("/legal/monitors/${id.encodePathSegment()}/run")); requireSuccess(response)
+        return response.body()
+    }
+    override suspend fun discoverSources(query: String, url: String, jurisdiction: String): List<CivicGuidanceSource> {
+        val response = client.post(url("/legal/discover")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.SourceDiscoveryDto(query = query, url = url, jurisdiction = jurisdiction))
+        }
+        requireSuccess(response)
+        return response.body<List<LegalSourceDto>>().map { it.toDomain() }
+    }
+    override suspend fun getPendingSources(): List<CivicGuidanceSource> {
+        val response = client.get(url("/legal/review")); requireSuccess(response)
+        return response.body<List<LegalSourceDto>>().map { it.toDomain() }
+    }
+    override suspend fun reviewSource(id: String, approve: Boolean) {
+        val response = client.post(url("/legal/sources/${id.encodePathSegment()}/review")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.SourceReviewDto(approve = approve))
+        }
+        requireSuccess(response)
+    }
+
+    override suspend fun draftComplaintEmail(caseId: String): com.example.theekhai.contract.EmailDraftDto {
+        val response = client.post(url("/complaints/${caseId.encodePathSegment()}/email/draft")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.EmailDraftRequestDto(caseId = caseId))
+        }
+        requireSuccess(response)
+        return response.body()
+    }
+
+    override suspend fun sendComplaintEmail(caseId: String, recipientEmail: String, subject: String, body: String): com.example.theekhai.contract.SendEmailResponseDto {
+        val response = client.post(url("/complaints/${caseId.encodePathSegment()}/email/send")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.SendEmailRequestDto(recipientEmail = recipientEmail, subject = subject, body = body))
+        }
+        requireSuccess(response)
+        return response.body()
+    }
 
     private suspend fun requireSuccess(response: HttpResponse) {
         if (response.status.isSuccess()) return

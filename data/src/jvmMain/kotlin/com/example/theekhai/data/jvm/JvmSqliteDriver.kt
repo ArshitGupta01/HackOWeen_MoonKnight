@@ -10,8 +10,9 @@ import com.example.theekhai.data.db.AppDatabase
  * schema through `PRAGMA user_version`. Pass `null` for an in-memory database (tests).
  */
 fun createJvmSqliteDriver(databasePath: String?): SqlDriver {
-    val url = if (databasePath == null) JdbcSqliteDriver.IN_MEMORY else JdbcSqliteDriver.IN_MEMORY + databasePath
+    val url = if (databasePath == null) JdbcSqliteDriver.IN_MEMORY else "jdbc:sqlite:$databasePath"
     val driver = JdbcSqliteDriver(url)
+    driver.execute(null, "PRAGMA foreign_keys = ON", 0)
 
     val currentVersion = driver.executeQuery(
         identifier = null,
