@@ -596,9 +596,9 @@ export function library(parent:HTMLElement){
   parent.append(provBanner);
   const providerNote=el('p','microcopy',t('Configuration indicators only — they do not verify live provider health or database access policies.','ये केवल कॉन्फ़िगरेशन संकेतक हैं — लाइव सेवा स्थिति या डेटाबेस पहुँच नीतियों का सत्यापन नहीं।'));
   provBanner.after(providerNote);
-  void api<{supabaseConfigured:boolean,tinyFishConfigured:boolean,tavilyConfigured:boolean,openRouterConfigured:boolean}>('/providers').then(p=>{
+  void api<{supabaseConfigured:boolean,tinyFishConfigured:boolean,tavilyConfigured:boolean,openRouterConfigured:boolean,sarvamConfigured?:boolean}>('/providers').then(p=>{
     provBanner.replaceChildren();
-    for(const [name,ok] of [['Supabase Auth',p.supabaseConfigured],['TinyFish Agent & Monitor',p.tinyFishConfigured],['OpenRouter AI',p.openRouterConfigured],['Tavily Official Search',p.tavilyConfigured]]){
+    for(const [name,ok] of [['Supabase Auth',p.supabaseConfigured],['TinyFish Agent & Monitor',p.tinyFishConfigured],['OpenRouter AI',p.openRouterConfigured],['Tavily Official Search',p.tavilyConfigured],['Sarvam AI Speech Fallback',Boolean(p.sarvamConfigured)]]){
       const item=el('div');
       item.append(el('span','label',String(name)),el('span',ok?'status status-closed':'status status-assigned',ok?t('Configured','कॉन्फ़िगर है'):t('Not configured','कॉन्फ़िगर नहीं')));
       provBanner.append(item);

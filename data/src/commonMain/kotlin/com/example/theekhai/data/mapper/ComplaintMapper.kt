@@ -46,10 +46,13 @@ fun ComplaintDto.toDomain(): Complaint = Complaint(
     },
     status = when (status) {
         ComplaintStatusDto.PENDING -> ComplaintStatus.PENDING
+        ComplaintStatusDto.ASSIGNED -> ComplaintStatus.ASSIGNED
         ComplaintStatusDto.TRIAGED -> ComplaintStatus.TRIAGED
         ComplaintStatusDto.IN_PROGRESS -> ComplaintStatus.IN_PROGRESS
         ComplaintStatusDto.RESOLVED -> ComplaintStatus.RESOLVED
         ComplaintStatusDto.VERIFIED -> ComplaintStatus.VERIFIED
+        ComplaintStatusDto.PENDING_VERIFICATION -> ComplaintStatus.PENDING_VERIFICATION
+        ComplaintStatusDto.CLOSED -> ComplaintStatus.CLOSED
         ComplaintStatusDto.ESCALATED -> ComplaintStatus.ESCALATED
         ComplaintStatusDto.REOPENED -> ComplaintStatus.REOPENED
     },
@@ -81,10 +84,13 @@ fun Complaint.toDto(): ComplaintDto = ComplaintDto(
     },
     status = when (status) {
         ComplaintStatus.PENDING -> ComplaintStatusDto.PENDING
+        ComplaintStatus.ASSIGNED -> ComplaintStatusDto.ASSIGNED
         ComplaintStatus.TRIAGED -> ComplaintStatusDto.TRIAGED
         ComplaintStatus.IN_PROGRESS -> ComplaintStatusDto.IN_PROGRESS
         ComplaintStatus.RESOLVED -> ComplaintStatusDto.RESOLVED
         ComplaintStatus.VERIFIED -> ComplaintStatusDto.VERIFIED
+        ComplaintStatus.PENDING_VERIFICATION -> ComplaintStatusDto.PENDING_VERIFICATION
+        ComplaintStatus.CLOSED -> ComplaintStatusDto.CLOSED
         ComplaintStatus.ESCALATED -> ComplaintStatusDto.ESCALATED
         ComplaintStatus.REOPENED -> ComplaintStatusDto.REOPENED
     },

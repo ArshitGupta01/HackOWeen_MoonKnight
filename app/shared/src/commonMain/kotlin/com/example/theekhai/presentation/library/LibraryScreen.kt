@@ -19,9 +19,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.theekhai.navigation.LocalNavigator
+import com.example.theekhai.domain.model.CivicGuidanceSource
+import com.example.theekhai.presentation.nativeconnect.NativeConnectViewModel
 import com.example.theekhai.ui.components.*
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
+import org.koin.compose.viewmodel.koinViewModel
 
 data class LegalCitation(
     val id: String,
@@ -33,58 +36,22 @@ data class LegalCitation(
     var isSaved: Boolean = false
 )
 
-data class TinyFishMonitorItem(
-    val id: String,
-    val name: String,
-    val type: String,
-    val target: String,
-    val status: String
-)
-
-data class PendingReviewSource(
-    val id: String,
-    val title: String,
-    val jurisdiction: String,
-    val url: String
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen() {
+    val viewModel = koinViewModel<NativeConnectViewModel>()
+    val state by viewModel.state.collectAsState()
     val ext = LocalTheekHaiColors.current
 
     var query by remember { mutableStateOf("") }
     var jurisdiction by remember { mutableStateOf("HARYANA") }
     var jurisExpanded by remember { mutableStateOf(false) }
 
-    var isSearching by remember { mutableStateOf(false) }
-    var answerMode by remember { mutableStateOf<String?>(null) }
-    var synthesizedAnswer by remember { mutableStateOf<String?>(null) }
-
-    var citations by remember {
-        mutableStateOf<List<LegalCitation>>(emptyList())
+    val isSearching = state.isLoading
+    val synthesizedAnswer = state.guidanceAnswer?.answer ?: if (state.guidanceSources.isNotEmpty()) "Approved references matching your question are listed below." else null
+    val citations = (state.guidanceAnswer?.citations ?: state.guidanceSources).map { source ->
+        LegalCitation(source.id, source.title, source.jurisdiction, source.language, source.content, source.url, state.savedSources.any { saved -> saved.sourceUrl == source.url })
     }
-
-    var activeMonitors by remember {
-        mutableStateOf(
-            listOf(
-                TinyFishMonitorItem("mon-1", "Haryana RTSC Service Notification Watcher", "FETCH", "https://haryana-rtsc.gov.in/notifications", "HEALTHY (Checked 1h ago)"),
-                TinyFishMonitorItem("mon-2", "AAS Auto Appeal Escalation SOP Monitor", "SEARCH", "Auto Appeal System SLA Haryana Municipal", "ACTIVE (Hourly)")
-            )
-        )
-    }
-
-    var pendingSources by remember {
-        mutableStateOf(
-            listOf(
-                PendingReviewSource("rev-1", "Notification No. 12/2026: Municipal Solid Waste Grievance Timelines", "HARYANA", "https://ulbharyana.gov.in/rules-2026.pdf"),
-                PendingReviewSource("rev-2", "MoHUA Urban Drainage Maintenance Standard Benchmark v3.2", "CENTRAL", "https://mohua.gov.in/drainage-benchmark.pdf")
-            )
-        )
-    }
-
-    var discoveryQuery by remember { mutableStateOf("") }
-    var discoveryFeedback by remember { mutableStateOf<String?>(null) }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isWide = maxWidth >= 850.dp
@@ -109,6 +76,11 @@ fun LibraryScreen() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = ext.muted
             )
+
+            state.error?.let { error ->
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -173,37 +145,14 @@ fun LibraryScreen() {
 
                     TheekHaiButton(
                         text = if (isSearching) "Searching..." else "Find guidance",
-                        onClick = {
-                            isSearching = true
-                            answerMode = "TINYFISH_AGENT"
-                            synthesizedAnswer = "Under the Haryana Right to Service Act, if a notified service (such as streetlight repair or drain clearance) is not resolved within the designated SLA (typically 48 hours for municipal electrical failures), the ticket automatically elevates via AAS (Auto Appeal System) to the First Grievance Redressal Authority without requiring citizen re-filing. The authority has 30 days to order corrective action or summon the designated officer."
-                            citations = listOf(
-                                LegalCitation(
-                                    id = "cit-1",
-                                    title = "Haryana Right to Service Commission – Auto Appeal System (AAS) Standard Operating Procedure",
-                                    jurisdiction = "HARYANA",
-                                    language = "English",
-                                    snippet = "Section 7(1): In case of non-delivery of service within the timeline prescribed under the Schedule, an appeal shall be automatically triggered to the First Appellate Authority. Designated officers failing without sufficient cause face statutory penalties under Section 17.",
-                                    url = "https://haryana-rtsc.gov.in/aas-sop"
-                                ),
-                                LegalCitation(
-                                    id = "cit-2",
-                                    title = "The Right to Information & Public Service Guarantee Rules, 2014",
-                                    jurisdiction = "CENTRAL",
-                                    language = "English",
-                                    snippet = "Citizen service charters require municipal bodies to publish designated officers, time limits, and first appeal authorities for all notified municipal civic services.",
-                                    url = "https://darpg.gov.in"
-                                )
-                            )
-                            isSearching = false
-                        },
-                        enabled = !isSearching
+                        onClick = { if (state.user != null) viewModel.askGuidance(query, jurisdiction) else viewModel.searchGuidance(query, jurisdiction) },
+                        enabled = !isSearching && query.trim().length >= 3
                     )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "Searches verified municipal service charters, Right to Service notifications, and statutory appeal procedures.",
+                    text = "Search approved civic references and check each source directly.",
                     style = MaterialTheme.typography.bodySmall,
                     color = ext.muted,
                     fontSize = 11.sp
@@ -211,7 +160,8 @@ fun LibraryScreen() {
             }
 
             // Results Section
-            synthesizedAnswer?.let { ans ->
+            if (synthesizedAnswer != null || citations.isNotEmpty()) {
+                val ans = synthesizedAnswer ?: "Approved source excerpts are listed below."
                 Spacer(modifier = Modifier.height(24.dp))
                 PanelCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -232,7 +182,7 @@ fun LibraryScreen() {
                             )
                         }
 
-                        Text("Verified Gazette Reference", style = MaterialTheme.typography.bodySmall, color = ext.muted)
+                        Text("Approved reference results", style = MaterialTheme.typography.bodySmall, color = ext.muted)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -246,7 +196,7 @@ fun LibraryScreen() {
 
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "Pilot service reference. Synthesized from approved gazette and service commission documentation.",
+                        text = state.guidanceAnswer?.limitation ?: "Open the source links to check the original guidance.",
                         style = MaterialTheme.typography.bodySmall,
                         color = ext.muted,
                         fontSize = 11.sp
@@ -280,11 +230,7 @@ fun LibraryScreen() {
 
                             TheekHaiButton(
                                 text = if (cit.isSaved) "Saved ✓" else "Save to account",
-                                onClick = {
-                                    citations = citations.map {
-                                        if (it.id == cit.id) it.copy(isSaved = !it.isSaved) else it
-                                    }
-                                },
+                                onClick = { if (!cit.isSaved) viewModel.saveGuidance(CivicGuidanceSource(cit.id, cit.title, cit.url, cit.jurisdiction, cit.language, cit.snippet, 0L)) },
                                 isSecondary = !cit.isSaved
                             )
                         }
@@ -297,124 +243,6 @@ fun LibraryScreen() {
                 }
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
-
-            // TinyFish Ops, Discovery & Monitors Section (For reviewer/admin)
-            PanelCard(modifier = Modifier.fillMaxWidth()) {
-                Eyebrow("TINYFISH AGENT & MONITOR + TAVILY")
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Source discovery, monitors & review queue", style = MaterialTheme.typography.headlineSmall, color = ext.ink)
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Run Discovery Form
-                Text("Autonomous Source Discovery", style = MaterialTheme.typography.titleSmall, color = ext.ink)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = discoveryQuery,
-                        onValueChange = { discoveryQuery = it },
-                        placeholder = { Text("Tavily query or TinyFish target goal (e.g. Haryana RTSC guidelines)") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(4.dp)
-                    )
-                    TheekHaiButton(
-                        text = "Run Discovery",
-                        onClick = {
-                            discoveryFeedback = "TinyFish autonomous agent queued 2 official documents for verification."
-                        },
-                        isSecondary = true
-                    )
-                }
-
-                discoveryFeedback?.let { fb ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(fb, color = TheekHaiColors.Green, style = MaterialTheme.typography.bodySmall)
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                TheekHaiDivider()
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Active Monitors
-                Text("Active TinyFish Monitors", style = MaterialTheme.typography.titleSmall, color = ext.ink)
-                Spacer(modifier = Modifier.height(10.dp))
-
-                activeMonitors.forEach { mon ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Surface(color = TheekHaiColors.GreenSurface, shape = RoundedCornerShape(3.dp)) {
-                                    Text(mon.type, style = MaterialTheme.typography.labelSmall, color = TheekHaiColors.Green, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                                }
-                                Text(mon.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = ext.ink)
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(mon.status, style = MaterialTheme.typography.bodySmall, color = ext.muted)
-                        }
-
-                        TheekHaiButton(
-                            text = "Run check",
-                            onClick = {},
-                            isSecondary = true
-                        )
-                    }
-                    TheekHaiDivider()
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Pending Review Queue
-                Text("Pending Source Review Queue", style = MaterialTheme.typography.titleSmall, color = ext.ink)
-                Spacer(modifier = Modifier.height(10.dp))
-
-                if (pendingSources.isEmpty()) {
-                    Text("No pending sources in review queue.", style = MaterialTheme.typography.bodySmall, color = ext.muted)
-                } else {
-                    pendingSources.forEach { p ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Surface(color = TheekHaiColors.StatusDefault, shape = RoundedCornerShape(3.dp)) {
-                                    Text(p.jurisdiction, style = MaterialTheme.typography.labelSmall, color = TheekHaiColors.StatusDefaultText, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(p.title, style = MaterialTheme.typography.bodyMedium, color = ext.ink)
-                            }
-
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TheekHaiButton(
-                                    text = "Approve",
-                                    onClick = {
-                                        pendingSources = pendingSources.filter { it.id != p.id }
-                                    }
-                                )
-                                TheekHaiButton(
-                                    text = "Reject",
-                                    onClick = {
-                                        pendingSources = pendingSources.filter { it.id != p.id }
-                                    },
-                                    isSecondary = true
-                                )
-                            }
-                        }
-                        TheekHaiDivider()
-                    }
-                }
-            }
         }
     }
 }

@@ -5,10 +5,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class ComplaintStatusDto {
     PENDING,
+    ASSIGNED,
     TRIAGED,
     IN_PROGRESS,
     RESOLVED,
     VERIFIED,
+    PENDING_VERIFICATION,
+    CLOSED,
     ESCALATED,
     REOPENED
 }

@@ -113,6 +113,10 @@ class WorkflowTest {
                 routing {
                     post("/api/v1/chat/completions") {
                         val body = call.receiveText()
+                        if (body.contains("input_audio")) {
+                            call.respond(HttpStatusCode.BadRequest, """{"error":"model does not support input_audio"}""")
+                            return@post
+                        }
                         if (body.contains("suggestedCategory")) {
                             call.respondText(
                                 """{"choices":[{"message":{"content":"{\"suggestedTitle\":\"Waterlogged pothole near Ward 4 school\",\"suggestedCategory\":\"ROADS\",\"suggestedPriority\":\"HIGH\",\"suggestedDepartment\":\"Public works\",\"duplicateCaseIds\":[],\"summary\":\"High-priority road hazard routed to Public works.\"}"}}]}""",
@@ -124,6 +128,20 @@ class WorkflowTest {
                                 ContentType.Application.Json,
                             )
                         }
+                    }
+                }
+            }
+            hosts("https://mock.sarvam.local") {
+                routing {
+                    post("/speech-to-text") {
+                        if (call.request.headers["api-subscription-key"].isNullOrBlank()) {
+                            call.respond(HttpStatusCode.Unauthorized, """{"error":"missing key"}""")
+                            return@post
+                        }
+                        call.respondText(
+                            """{"request_id":"req-sarvam-001","transcript":"There is a deep waterlogged pothole near Ward 4 primary school crossing","language_code":"en-IN"}""",
+                            ContentType.Application.Json,
+                        )
                     }
                 }
             }
@@ -160,9 +178,11 @@ class WorkflowTest {
                 tinyFishApiKey = "tf-test-key",
                 tavilyApiKey = "tvly-test-key",
                 openRouterApiKey = "sk-or-test-key",
+                sarvamApiKey = "sk_sarvam_test_key",
                 tinyFishBaseUrl = "https://mock.tinyfish.local",
                 tavilyBaseUrl = "https://mock.tavily.local",
                 openRouterBaseUrl = "https://mock.openrouter.local/api/v1",
+                sarvamBaseUrl = "https://mock.sarvam.local",
             )
             val orAnswer = legalWithOpenRouter.ask(LegalQuestionDto("How does Haryana AAS handle service timelines?", "HARYANA"))
             assertEquals("TAVILY_AND_OPENROUTER", orAnswer.mode)
@@ -174,6 +194,19 @@ class WorkflowTest {
             assertEquals("ROADS", triage.suggestedCategory)
             assertEquals("HIGH", triage.suggestedPriority)
             assertTrue(triage.provider.startsWith("OPENROUTER"))
+
+            // 2c. Sarvam AI Speech-to-Text fallback when Whisper / OpenRouter input_audio is unavailable
+            val dummyWavB64 = java.util.Base64.getEncoder().encodeToString(ByteArray(128) { 1 })
+            val sarvamTranscription = legalWithOpenRouter.transcribeVoice(
+                TranscribeRequestDto(
+                    audioBase64 = dummyWavB64,
+                    mimeType = "audio/wav",
+                    language = "en",
+                    transcriptHint = "",
+                )
+            )
+            assertEquals("SARVAM_AI", sarvamTranscription.provider)
+            assertTrue(sarvamTranscription.text.contains("pothole", ignoreCase = true))
 
             // 3. Deterministic Local Backup Fallback (SOURCES_ONLY) when all external providers fail
             tavilyHealthy = false

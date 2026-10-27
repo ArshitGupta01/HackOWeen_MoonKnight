@@ -2,10 +2,13 @@ package com.example.theekhai.domain.model
 
 enum class ComplaintStatus {
     PENDING,
+    ASSIGNED,
     TRIAGED,
     IN_PROGRESS,
     RESOLVED,
     VERIFIED,
+    PENDING_VERIFICATION,
+    CLOSED,
     ESCALATED,
     REOPENED
 }
@@ -36,7 +39,8 @@ data class Complaint(
     val clusterId: String? = null,
     val slaDueEpochMillis: Long,
     val createdAtEpochMillis: Long,
-    val updatedAtEpochMillis: Long
+    val updatedAtEpochMillis: Long,
+    val version: Long = 1
 ) {
     fun isOverdue(currentEpochMillis: Long): Boolean {
         return (status != ComplaintStatus.RESOLVED && status != ComplaintStatus.VERIFIED) &&

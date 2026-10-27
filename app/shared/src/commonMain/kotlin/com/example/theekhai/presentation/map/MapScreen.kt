@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.theekhai.navigation.LocalNavigator
 import com.example.theekhai.navigation.Route
+import com.example.theekhai.domain.model.Complaint
 import com.example.theekhai.ui.components.Eyebrow
 import com.example.theekhai.ui.components.StatusChip
 import com.example.theekhai.ui.components.TheekHaiButton
@@ -62,24 +63,20 @@ data class MapCivicPin(
 )
 
 @Composable
-fun MapScreen() {
+fun MapScreen(complaints: List<Complaint> = emptyList()) {
     val navigator = LocalNavigator.current
     val ext = LocalTheekHaiColors.current
 
-    // Expanded authentic pins across the enlarged ward map
-    val pins = remember {
-        listOf(
-            MapCivicPin("c-003", "Broken Streetlight on 5th Cross Road", "LIGHTING", "IN_PROGRESS", "5th Cross Road, Ward 4", 14, "Yesterday", 560f, 620f),
-            MapCivicPin("c-001", "Deep pothole causing accidents", "ROADS", "URGENT", "12th Main Road Junction", 41, "2h ago", 1020f, 1020f),
-            MapCivicPin("c-002", "Sewage drain overflow near Market", "WATER", "OPEN", "Sector 14 Main Market Lane", 23, "5h ago", 1450f, 780f),
-            MapCivicPin("c-004", "Uncollected garbage near Metro Gate", "WASTE", "PENDING", "Sector 14 Metro Station", 18, "1d ago", 1380f, 1380f),
-            MapCivicPin("c-005", "Resurfaced road & asphalt seal", "ROADS", "RESOLVED", "Community Center Avenue", 32, "3d ago", 420f, 1420f),
-            MapCivicPin("c-006", "Flickering high-mast light at Park", "LIGHTING", "OPEN", "Central Park East Gate", 9, "4h ago", 820f, 440f),
-            MapCivicPin("c-007", "Drinking water pipeline leakage", "WATER", "IN_PROGRESS", "Govt School Link Road", 16, "1d ago", 650f, 1150f)
-        )
+    val pins = remember(complaints) {
+        complaints.filter { it.latitude != 0.0 && it.longitude != 0.0 }.map { complaint ->
+            val x = (((complaint.longitude - 76.99) / (77.08 - 76.99)) * 2000).coerceIn(40.0, 1960.0).toFloat()
+            val y = (((28.50 - complaint.latitude) / (28.50 - 28.42)) * 2000).coerceIn(40.0, 1960.0).toFloat()
+            MapCivicPin(complaint.id, complaint.title, complaint.category, complaint.status.name, complaint.address, 1, "Reported", x, y)
+        }
     }
 
-    var selectedPin by remember { mutableStateOf<MapCivicPin?>(pins[0]) }
+    var selectedPin by remember { mutableStateOf<MapCivicPin?>(pins.firstOrNull()) }
+    LaunchedEffect(pins) { if (selectedPin?.id !in pins.map { it.id }) selectedPin = pins.firstOrNull() }
     var selectedCategoryFilter by remember { mutableStateOf("ALL") }
 
     val categories = listOf("ALL", "LIGHTING", "ROADS", "WATER", "WASTE")
@@ -110,7 +107,7 @@ fun MapScreen() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Eyebrow("CIVIC GEOSPATIAL RADAR")
+                        Eyebrow("WARD 4 · LIVE CASES")
                         Text(
                             text = "Ward 4 • Central Zone",
                             style = MaterialTheme.typography.titleLarge,
@@ -135,7 +132,7 @@ fun MapScreen() {
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
-                                text = t("Sample map", "नमूना मानचित्र"),
+                                text = if (pins.isEmpty()) t("No mapped cases", "मानचित्र पर मामले नहीं") else t("Live cases", "लाइव मामले"),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = ext.green,
                                 fontWeight = FontWeight.Bold
@@ -145,10 +142,7 @@ fun MapScreen() {
                 }
 
                 Text(
-                    text = t(
-                        "Illustrative preview only. Pins and counts are sample data, not live civic reports.",
-                        "यह केवल उदाहरण है। पिन और संख्या नमूना डेटा हैं, लाइव नागरिक रिपोर्ट नहीं।"
-                    ),
+                    text = t("Pins show reports with available location data.", "पिन उन रिपोर्टों को दिखाते हैं जिनकी जगह उपलब्ध है।"),
                     style = MaterialTheme.typography.bodySmall,
                     color = ext.muted
                 )
@@ -602,7 +596,7 @@ fun MapScreen() {
                                     ) {
                                         StatusChip(label = pin.status)
                                         Text(
-                                            text = t("${pin.reportsCount} sample reports", "${pin.reportsCount} नमूना रिपोर्ट"),
+                                            text = t("${pin.reportsCount} report", "${pin.reportsCount} रिपोर्ट"),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = ext.muted

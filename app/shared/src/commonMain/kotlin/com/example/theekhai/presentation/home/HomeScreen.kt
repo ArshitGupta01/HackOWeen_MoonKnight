@@ -89,19 +89,19 @@ fun HomeScreen() {
                         PromiseStep(
                             number = "01",
                             title = "Tell us what happened",
-                            body = "Voice note in your language, photo proof, or quick text. We log consent and DPDP verification instantly.",
+                            body = "Share a voice note where supported, or describe the issue in your own words.",
                             modifier = Modifier.weight(1f)
                         )
                         PromiseStep(
                             number = "02",
-                            title = "AI triage & auto dispatch",
-                            body = "Gemini 3.8 Flash classifies department, urgency, and statutory SLA timeline under municipal rules.",
+                            title = "Careful review & routing",
+                            body = "Your report is reviewed for its category, urgency and responsible service team.",
                             modifier = Modifier.weight(1f)
                         )
                         PromiseStep(
                             number = "03",
-                            title = "Independent verified closure",
-                            body = "TinyFish autonomous web agents and field workers corroborate fix photos before case is marked resolved.",
+                            title = "Track progress clearly",
+                            body = "Follow the case timeline, assigned work and closure decisions from your workspace.",
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -110,17 +110,17 @@ fun HomeScreen() {
                         PromiseStep(
                             number = "01",
                             title = "Tell us what happened",
-                            body = "Voice note in your language, photo proof, or quick text. We log consent and DPDP verification instantly."
+                            body = "Share a voice note where supported, or describe the issue in your own words."
                         )
                         PromiseStep(
                             number = "02",
-                            title = "AI triage & auto dispatch",
-                            body = "Gemini 3.8 Flash classifies department, urgency, and statutory SLA timeline under municipal rules."
+                            title = "Careful review & routing",
+                            body = "Your report is reviewed for its category, urgency and responsible service team."
                         )
                         PromiseStep(
                             number = "03",
-                            title = "Independent verified closure",
-                            body = "TinyFish autonomous web agents and field workers corroborate fix photos before case is marked resolved."
+                            title = "Track progress clearly",
+                            body = "Follow the case timeline, assigned work and closure decisions from your workspace."
                         )
                     }
                 }

@@ -14,6 +14,7 @@ import com.example.theekhai.domain.usecase.VoiceIntakeUseCase
 import com.example.theekhai.domain.usecase.SignInUseCase
 import com.example.theekhai.domain.usecase.RegisterCitizenUseCase
 import com.example.theekhai.domain.usecase.SubmitCivicReportUseCase
+import com.example.theekhai.domain.usecase.CivicBackendUseCases
 import com.example.theekhai.presentation.nativeconnect.NativeConnectViewModel
 import com.example.theekhai.getPlatform
 import com.example.theekhai.presentation.admin.CommandCenterViewModel
@@ -46,6 +47,7 @@ val domainModule: Module = module {
     factory { SignInUseCase(get()) }
     factory { RegisterCitizenUseCase(get()) }
     factory { SubmitCivicReportUseCase(get()) }
+    factory { CivicBackendUseCases(get()) }
 }
 
 val presentationModule: Module = module {

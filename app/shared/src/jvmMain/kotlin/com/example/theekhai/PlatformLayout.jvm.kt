@@ -374,13 +374,13 @@ private fun DesktopTopBar(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     AvatarCircle(initials = "?", size = 24.dp, bgColor = ext.green)
-                    Text(t("Account preview", "खाता पूर्वावलोकन"), fontSize = 12.sp, color = ext.ink, fontWeight = FontWeight.Medium)
+                    Text(t("Your account", "आपका खाता"), fontSize = 12.sp, color = ext.ink, fontWeight = FontWeight.Medium)
                     Surface(
                         color = ext.greenSurface,
                         shape = RoundedCornerShape(3.dp)
                     ) {
                         Text(
-                            text = t("Preview", "पूर्वावलोकन"),
+                            text = t("Profile", "प्रोफ़ाइल"),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.7.sp,
