@@ -17,3 +17,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class LegalAnswerDto(val answer: String, val citations: List<LegalSourceDto>, val mode: String, val limitation: String)
 @Serializable data class SourceImportDto(val title: String, val url: String, val jurisdiction: String, val language: String, val content: String)
 @Serializable data class SourceReviewDto(val approve: Boolean)
+@Serializable data class SourceDiscoveryDto(val query: String = "", val url: String = "", val jurisdiction: String = "CENTRAL", val language: String = "en")
+@Serializable data class CreateMonitorDto(val name: String, val monitorType: String = "fetch", val target: String, val jurisdiction: String = "CENTRAL", val language: String = "en", val scheduleCron: String = "0 0 * * *")
+@Serializable data class LegalMonitorDto(val id: String, val remoteMonitorId: String?, val name: String, val monitorType: String, val target: String, val jurisdiction: String, val language: String, val scheduleCron: String, val status: String, val lastCheckedAt: Long?, val lastStatus: String?)
+@Serializable data class MonitorRunResultDto(val monitor: LegalMonitorDto, val queuedSources: List<LegalSourceDto>, val providerMode: String)

@@ -6,7 +6,7 @@ Last reviewed: 2026-10-27
 
 Read this guide before changing the project. Maintain a clean repository and Clean Architecture throughout development. Update this file in the same change when architecture, module ownership, setup, dependencies, validation, or established decisions change. Record decisions and current facts, not a transcript or per-edit log. Preserve user changes and keep work scoped.
 
-Current user instruction: implement the accepted English/Hindi civic pilot, common Ktor backend, local legal reference assistant and TinyFish source integration. Commit verified increments on `codex/theekhai-project-guides`; retain Mohit's history. See `docs/IMPLEMENTATION.md` for current verification and remaining release gates.
+Current user instruction: implement the accepted English/Hindi civic pilot, common Ktor backend, and legal reference & source monitoring powered by TinyFish (Agent Mode and Monitor Mode), Tavily discovery/fallback, and deterministic local approved-source backup fallback (`SOURCES_ONLY`), with no local LLM container. Commit verified increments on `codex/theekhai-project-guides`; retain Mohit's history. See `docs/IMPLEMENTATION.md` for current verification and remaining release gates.
 
 ## Current implementation
 
@@ -24,7 +24,7 @@ The project-specific [security](docs/SECURITY.md), [code style](docs/CODE_STYLE.
 
 [Legal channels and integration references](docs/LEGAL_AND_INTEGRATIONS.md) records Haryana AAS as the first government integration to investigate and eCourts as an authorized judicial filing channel requiring appropriate legal review. No API access, integration permission, outreach, or filing is established by those references. Internal SLA escalation is separate from an official appeal or court filing.
 
-TinyFish is an optional future integration candidate for source research and authorized browser assistance. Its capabilities and limits are recorded in the same integration reference. No automation is enabled; government access and filing requirements still apply. Any future TinyFish adapter belongs behind the Ktor backend with server-held credentials.
+TinyFish (Agent Mode `/v1/automation/run` and Monitor Mode `/v1/monitors`) and Tavily (`/search` restricted to allowlisted official domains) power official source discovery, scheduled change monitoring, and source-grounded legal/civic question answering behind the Ktor backend (`TINYFISH_API_KEY`, `TAVILY_API_KEY`). Local LLM inference (`llama.cpp` / `Qwen3`) has been removed; when external providers are unavailable or ungrounded, `LegalService` falls back deterministically to approved local SQLite source excerpts (`SOURCES_ONLY`). Changed or newly discovered sources always enter the `PENDING` review queue rather than overwriting `APPROVED` guidance.
 
 ## Required module boundaries
 

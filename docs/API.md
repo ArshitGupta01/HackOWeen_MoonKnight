@@ -9,8 +9,8 @@ The current Ktor API is JSON at `/api/v1`. Today it exposes `GET /api/v1/greetin
 - Use consistent JSON errors with a stable code, safe message, and request ID. Return suitable `400`, `401`, `403`, `404`, `409`, `413`, `429`, and `500` statuses. Never return raw exception details.
 - Use pagination for lists; validate filters and sorting. Use an idempotency key for submissions and conflict detection for concurrent workflow edits.
 - Document actual request/response fields, authentication, rate limits, and examples alongside route implementation, ideally in an OpenAPI document checked against tests.
-- Document Supabase Auth/Storage and Hugging Face integration boundaries, environment variable names, and degraded behavior when they are implemented. Provider secrets remain server-side.
-- TinyFish is an optional future provider for source research and authorized browser assistance. See [integration references](LEGAL_AND_INTEGRATIONS.md). No TinyFish endpoint or adapter exists in TheekHai yet; any future API key belongs in server configuration.
+- Document Supabase Auth/Storage, TinyFish (`TINYFISH_API_KEY`), and Tavily (`TAVILY_API_KEY`) integration boundaries, environment variable names, and degraded behavior (`SOURCES_ONLY` backup fallback). Provider secrets remain server-side.
+- TinyFish (Agent Mode `/v1/automation/run` and Monitor Mode `/v1/monitors`) and Tavily (`/search` restricted to allowlisted official domains) are integrated behind `/api/v1/legal/*` (`GET /api/v1/legal/sources`, `POST /api/v1/legal/ask`, `POST /api/v1/legal/discover`, `GET/POST /api/v1/legal/monitors`, `POST /api/v1/legal/monitors/{id}/run`, `GET /api/v1/legal/review`, `POST /api/v1/legal/sources/{id}/review`).
 
 ## Planned resource families
 

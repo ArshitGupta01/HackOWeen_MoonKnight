@@ -5,6 +5,8 @@ export interface CaseEvent { id:string; caseId:string; actorId:string; action:st
 export interface CaseDetail { case:CaseRecord; tasks:CaseTask[]; events:CaseEvent[] }
 export interface LegalSource { id:string; title:string; url:string; jurisdiction:string; language:string; content:string; retrievedAt:number; status:string; hash:string; supersedes:string|null }
 export interface LegalAnswer { answer:string; citations:LegalSource[]; mode:string; limitation:string }
+export interface LegalMonitor { id:string; remoteMonitorId:string|null; name:string; monitorType:string; target:string; jurisdiction:string; language:string; scheduleCron:string; status:string; lastCheckedAt:number|null; lastStatus:string|null }
+export interface MonitorRunResult { monitor:LegalMonitor; queuedSources:LegalSource[]; providerMode:string }
 export let identity: Identity|null = null;
 export async function api<T>(path:string, options:RequestInit = {}):Promise<T> {
   const headers = new Headers(options.headers);

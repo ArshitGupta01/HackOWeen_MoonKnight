@@ -35,13 +35,16 @@ This document records the user's supplied legal-channel requirements and the off
 
 **Project boundary:** a missed department deadline, rejected closure, or contradictory evidence must not automatically initiate judicial proceedings. An internal TheekHai case, a prepared document, an uploaded filing, and a court-accepted filing are distinct states. Record official acknowledgements and identifiers only when actually received.
 
-## 3. TinyFish
+## 3. TinyFish and Tavily
 
-**User decision:** include TinyFish as an optional integration candidate. Current scope remains documentation only; no account setup, credentials, paid runs, or automation has been performed.
+**User decision:** use TinyFish Agent Mode (`POST https://agent.tinyfish.ai/v1/automation/run`) and TinyFish Monitor Mode (`POST https://agent.tinyfish.ai/v1/monitors`, `POST https://agent.tinyfish.ai/v1/monitors/{id}/runs`) as the primary engine for source-grounded civic/legal question answering, official page extraction, and scheduled change monitoring, paired with Tavily Search (`POST https://api.tavily.com/search` restricted to allowlisted official domains) for discovery and secondary fallback, and deterministic local SQLite approved-source excerpts (`SOURCES_ONLY`) as the ultimate backup fallback. Local LLM inference (`llama.cpp` / `Qwen3`) has been removed.
 
-**Official reference:** [TinyFish developer documentation](https://docs.tinyfish.ai/) describes Search and Fetch for discovering and extracting sources, Research for source-backed reports, Agent for goal-driven web workflows, and Browser for controlled remote browser sessions. This overview was accessible and reviewed on 2026-10-27.
+**Official reference:** [TinyFish developer documentation](https://docs.tinyfish.ai/) describes Search and Fetch for discovering and extracting sources, Research for source-backed reports, Agent (`/v1/automation/run`) for goal-driven web workflows, and Monitor (`/v1/monitors`) for scheduled page/topic tracking.
 
-**Potential project use:** research official service information, extract relevant guidance, and investigate authorized portal workflows. A future server-side adapter may support permitted status lookups or assisted navigation after the target portal's access rules and authorization are established. Select the smallest capability needed for the specific task.
+**Implemented server use (`LegalService`):**
+- `POST /api/v1/legal/ask`: answers citizen/staff questions using TinyFish Agent Mode (`TINYFISH_AGENT`) grounded in approved Central/Haryana sources, falling back to Tavily (`TAVILY_FALLBACK`) on allowlisted domains if TinyFish is unavailable, and falling back to local SQLite approved excerpts (`SOURCES_ONLY`) if both are unavailable or ungrounded.
+- `POST /api/v1/legal/discover`: uses Tavily official-domain discovery and TinyFish Agent Mode extraction to queue new/updated official sources as `PENDING` for human reviewer approval.
+- `GET/POST /api/v1/legal/monitors` and `POST /api/v1/legal/monitors/{id}/run`: registers and runs TinyFish Page (`fetch`) and Topic (`search`) monitors, deduplicating by SHA-256 content hash and queuing changed material as `PENDING` without overwriting `APPROVED` guidance.
 
 **Integration boundary:** TinyFish supplies browser/web tooling; it does not grant permission to access a government system, establish AAS eligibility, or authorize a court filing. Keep the AAS and eCourts restrictions above. Require specific authorization for submissions and the appropriate legal review for judicial filings. Do not treat an agent's success message as an official filing acknowledgement.
 

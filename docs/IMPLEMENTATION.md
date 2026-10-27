@@ -7,8 +7,8 @@ Implementation started from merge `e060863`. This file records delivered behavio
 - Vite/TypeScript DOM website, civic editorial design, English/Hindi and explicitly synthetic municipal configuration.
 - Ktor is authoritative; SQLDelight stores workflow. Supabase TheekHai supplies identity and private evidence storage.
 - Automatic routing and deadline escalation; independent human closure review and disputed reopening.
-- Local Qwen3 0.6B via private llama.cpp Docker service; approved central/Haryana source packs with citation-first search.
-- TinyFish source collection feeds a review queue. No automatic government filing.
+- Legal reference & civic guidance uses TinyFish Agent Mode (`/v1/automation/run`) and TinyFish Monitor Mode (`/v1/monitors`), with Tavily Search (`/search` restricted to allowlisted official domains) as discovery and secondary fallback, and approved local SQLite source excerpts (`SOURCES_ONLY`) as deterministic backup fallback. Local LLM inference (`llama.cpp`) is removed.
+- TinyFish and Tavily source collection feeds a `PENDING` review queue. No automatic government filing.
 
 ## Baseline review
 
@@ -23,4 +23,10 @@ Update this file at each verified checkpoint, including outstanding gaps.
 
 `gradlew :server:test` passes (health, root, transactional lifecycle/ownership/idempotency and restart/deadline tests). The active server uses local SQLDelight repositories and an online Supabase identity check. Browser sessions are opaque HttpOnly cookies with CSRF checks; sessions expire on server restart. Staff permissions use server-managed `THEEKHAI_STAFF` configuration. Legal source import/review/search is implemented with conservative extractive local inference and no cloud fallback.
 
-Still pending: legacy native contract cleanup, production auth lifecycle/MFA, rate limits, evidence storage, full agent scheduling, UI and device validation. Legacy routes remain in source but are not mounted by the active server.
+## Checkpoint 2
+
+`gradlew :server:test` and `web` production build pass. Local AI (`LOCAL_AI_URL` / `llama.cpp`) is removed and replaced by:
+- **TinyFish Agent Mode (`POST /v1/automation/run`)** for source-grounded legal question answering (`TINYFISH_AGENT`) and official page extraction (`POST /api/v1/legal/discover`).
+- **TinyFish Monitor Mode (`POST /v1/monitors`, `POST /v1/monitors/{id}/runs`)** persisted in `LegalMonitor` (`GET/POST /api/v1/legal/monitors`, `POST /api/v1/legal/monitors/{id}/run`) for tracking official page (`fetch`) and topic (`search`) updates and queuing changed revisions as `PENDING` for human reviewer approval.
+- **Tavily Search (`POST /search`)** restricted to allowlisted official domains for discovery and secondary question-answering fallback (`TAVILY_FALLBACK`).
+- **Deterministic Backup Fallback (`SOURCES_ONLY`)** serving seeded/approved Central and Haryana reference packs directly from SQLite when external providers are unconfigured, unreachable, or return ungrounded text.

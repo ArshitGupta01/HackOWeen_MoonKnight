@@ -28,6 +28,11 @@ CREATE TABLE LegalSource (
  language TEXT NOT NULL, content TEXT NOT NULL, hash TEXT NOT NULL, retrievedAt INTEGER NOT NULL,
  status TEXT NOT NULL, reviewedBy TEXT, supersedes TEXT
 );
+CREATE TABLE LegalMonitor (
+ id TEXT NOT NULL PRIMARY KEY, remoteMonitorId TEXT, name TEXT NOT NULL, monitorType TEXT NOT NULL,
+ target TEXT NOT NULL, jurisdiction TEXT NOT NULL, language TEXT NOT NULL, scheduleCron TEXT NOT NULL,
+ status TEXT NOT NULL, lastCheckedAt INTEGER, lastStatus TEXT
+);
 
 allCases:
 SELECT * FROM PilotCase ORDER BY updatedAt DESC;
@@ -57,4 +62,10 @@ saveSource:
 INSERT INTO LegalSource VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 reviewSource:
 UPDATE LegalSource SET status = ?, reviewedBy = ? WHERE id = ?;
+legalMonitors:
+SELECT * FROM LegalMonitor ORDER BY rowid DESC;
+legalMonitorById:
+SELECT * FROM LegalMonitor WHERE id = ?;
+saveMonitor:
+INSERT OR REPLACE INTO LegalMonitor VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
