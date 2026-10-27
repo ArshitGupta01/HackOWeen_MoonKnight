@@ -1,6 +1,11 @@
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+/**
+ * Presentation layer (MVVM) + composition root (Koin).
+ *
+ * Targets: Android, iOS, Desktop (JVM). Web is built separately with native web code and
+ * talks to the Ktor `:server` through the REST contract in `:core`.
+ */
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidMultiplatformLibrary)
@@ -19,15 +24,6 @@ kotlin {
         }
     }
     jvm()
-    js {
-        browser()
-        binaries.executable()
-    }
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-        browser()
-        binaries.executable()
-    }
     android {
        namespace = "com.example.theekhai.app.shared"
        compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -54,6 +50,8 @@ kotlin {
         }
         commonMain.dependencies {
             api(project(":core"))
+            implementation(project(":domain"))
+            implementation(project(":data"))
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
@@ -62,12 +60,16 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+
+            // Dependency injection. `api`: apps call initKoin(...) with a KoinApplication lambda.
+            api(libs.koin.core)
+            implementation(libs.koin.coreViewmodel)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.composeViewmodel)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
-        }
-        jsMain.dependencies {
-            implementation(libs.wrappers.browser)
+            implementation(libs.kotlinx.coroutines.test)
         }
         getByName("androidDeviceTest").dependencies {
             implementation(libs.androidx.testRunner)

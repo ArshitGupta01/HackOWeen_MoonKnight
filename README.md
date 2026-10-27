@@ -1,4 +1,4 @@
-This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM), Server.
+This is a Kotlin Multiplatform project targeting Android, iOS, Desktop (JVM), Server (web is built separately with native web code).
 
 * [/app/iosApp](./app/iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
   you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
@@ -27,9 +27,6 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
   - Hot reload: `./gradlew :app:desktopApp:hotRun --auto`
   - Standard run: `./gradlew :app:desktopApp:run`
 - Server: `./gradlew :server:run`
-- Web app:
-  - Wasm target (faster, modern browsers): `./gradlew :app:webApp:wasmJsBrowserDevelopmentRun`
-  - JS target (slower, supports older browsers): `./gradlew :app:webApp:jsBrowserDevelopmentRun`
 - iOS app: open the [/app/iosApp](./app/iosApp) directory in Xcode and run it from there.
 
 ### Running tests
@@ -39,16 +36,22 @@ Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 - Android tests: `./gradlew :app:shared:testAndroidHostTest`
 - Desktop tests: `./gradlew :app:shared:jvmTest`
 - Server tests: `./gradlew :server:test`
-- Web tests:
-  - Wasm target: `./gradlew :app:shared:wasmJsTest`
-  - JS target: `./gradlew :app:shared:jsTest`
 - iOS tests: `./gradlew :app:shared:iosSimulatorArm64Test`
 
 ---
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
-[Compose Multiplatform](https://kotlinlang.org/compose-multiplatform/),
-[Kotlin/Wasm](https://kotl.in/wasm/)…
+Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html) and
+[Compose Multiplatform](https://kotlinlang.org/compose-multiplatform/).
 
-We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
-If you face any issues, please report them on [YouTrack](https://youtrack.jetbrains.com/newIssue?project=CMP).
+
+
+
+---
+
+## Architecture
+
+This project follows Clean Architecture + MVVM with Koin DI, SQLite (SQLDelight) on Android/iOS/Desktop and a
+Ktor backend. Modules: `:core` (shared contract), `:domain`, `:data`, `:app:shared`, `:server`.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the module rules, DI setup and the new-feature checklist.
+
+Extra test commands: `./gradlew :domain:jvmTest`, `./gradlew :data:jvmTest`.
