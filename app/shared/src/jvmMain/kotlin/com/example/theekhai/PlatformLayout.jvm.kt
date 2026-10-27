@@ -131,7 +131,7 @@ private fun DesktopSidebar(
                     Surface(
                         modifier = Modifier.size(32.dp),
                         shape = RoundedCornerShape(6.dp),
-                        color = TheekHaiColors.Green
+                        color = ext.green
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
@@ -355,7 +355,7 @@ private fun DesktopTopBar(
                     text = if (language == AppLanguage.EN) "हिन्दी" else "English",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TheekHaiColors.Green
+                    color = ext.green
                 )
             }
 
@@ -395,7 +395,7 @@ private fun DesktopTopBar(
             Button(
                 onClick = onReportClick,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = TheekHaiColors.Green,
+                    containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = Color(0xFFFFFDF5)
                 ),
                 shape = RoundedCornerShape(4.dp),

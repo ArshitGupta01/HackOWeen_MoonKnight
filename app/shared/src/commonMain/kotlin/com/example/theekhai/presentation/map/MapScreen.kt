@@ -666,11 +666,11 @@ fun MapScreen() {
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     OutlinedButton(
-                                        onClick = {},
-                                        enabled = false,
+                                        onClick = { navigator.navigateTo(Route.CaseDetail(pin.id)) },
+                                        enabled = true,
                                         modifier = Modifier.weight(1.3f),
                                         shape = RoundedCornerShape(6.dp)
-                                    ) { Text(t("Sample only", "केवल नमूना"), fontSize = 12.sp, color = ext.muted) }
+                                    ) { Text(t("Inspect Case →", "केस देखें →"), fontSize = 12.sp, color = ext.green) }
                                     OutlinedButton(
                                         onClick = { navigator.navigateTo(Route.Report) },
                                         modifier = Modifier.weight(1f),

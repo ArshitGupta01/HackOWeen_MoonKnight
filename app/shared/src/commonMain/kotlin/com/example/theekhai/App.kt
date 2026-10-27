@@ -51,7 +51,7 @@ fun AppContent(route: Route) {
         Route.Login -> LoginScreen()
         Route.Signup -> SignupScreen()
         Route.Report -> ReportScreen()
-        Route.Workspace -> WorkspaceScreen()
+        Route.Workspace -> { val vm = koinViewModel<CommandCenterViewModel>(); val st by vm.uiState.collectAsState(); WorkspaceScreen(complaints = st.filteredComplaints) }
         Route.Map -> MapScreen()
         is Route.CaseDetail -> CaseDetailScreen(caseId = route.caseId)
         Route.Account -> AccountScreen()

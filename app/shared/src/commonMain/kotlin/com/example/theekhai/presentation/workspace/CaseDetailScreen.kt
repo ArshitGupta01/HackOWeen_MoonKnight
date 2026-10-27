@@ -500,8 +500,8 @@ private fun ActionPanel(
             modifier = Modifier.fillMaxWidth().height(110.dp),
             shape = RoundedCornerShape(4.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
+                focusedContainerColor = ext.inputBg,
+                unfocusedContainerColor = ext.inputBg,
                 focusedBorderColor = ext.green,
                 unfocusedBorderColor = ext.line
             )

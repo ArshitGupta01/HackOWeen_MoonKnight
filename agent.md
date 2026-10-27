@@ -12,7 +12,7 @@ Current user instruction: implement the accepted English/Hindi civic pilot, comm
 
 Repository: https://github.com/ArshitGupta01/HackOWeen_MoonKnight
 
-The project is Kotlin Multiplatform + Compose Multiplatform, Clean Architecture + MVVM, Koin, SQLDelight, a Ktor backend (`:server`), and a Vite + TypeScript bilingual (`en`/`hi`) web frontend (`web/`). Android, iOS, and Desktop JVM source sets exist. Native clients authenticate with Supabase through Ktor using a bearer token held in memory for the app process; native account creation/sign-in and citizen report submission use the common `/api/v1` contract.
+The project is Kotlin Multiplatform + Compose Multiplatform, Clean Architecture + MVVM, Koin, SQLDelight, a Ktor backend (`:server`), and a Vite + TypeScript + Lenis (`lenis`) bilingual (`en`/`hi`) web frontend (`web/`). Android, iOS, and Desktop JVM source sets exist. Native clients authenticate with Supabase through Ktor using a bearer token held in memory for the app process; native account creation/sign-in and citizen report submission use the common `/api/v1` contract.
 
 The connected Supabase project is named `TheekHai` (project ref `ffmcurazxvygsifbglwy`, active in `ap-northeast-1`, URL `https://ffmcurazxvygsifbglwy.supabase.co`). Following the TenderLens architecture (`supabase/schema.sql`), Supabase provides:
 - Authentication (`/auth/v1/token`, `/auth/v1/signup`, `/auth/v1/recover`, `/auth/v1/user`) with 4 pre-confirmed shared pilot demo accounts (`citizen@theekhai.in`, `pwd@theekhai.in`, `reviewer@theekhai.in`, `admin@theekhai.in` — password `TheekHai@2026`) and an automatic confirmation trigger (`auto_confirm_pilot_user_trigger`) for newly registered pilot accounts.

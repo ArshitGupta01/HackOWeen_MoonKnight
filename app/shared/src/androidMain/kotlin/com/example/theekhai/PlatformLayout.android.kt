@@ -3,6 +3,8 @@ package com.example.theekhai
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -340,7 +342,7 @@ private fun AndroidDrawerContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(18.dp),
+            .verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Column {
@@ -368,7 +370,7 @@ private fun AndroidDrawerContent(
                 }
 
                 Surface(
-                    color = TheekHaiColors.GreenSurface,
+                    color = ext.greenSurface,
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Row(
@@ -377,7 +379,7 @@ private fun AndroidDrawerContent(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         DotIndicator()
-                        Text("Pilot", style = MaterialTheme.typography.labelSmall, color = TheekHaiColors.Green)
+                        Text("Pilot", style = MaterialTheme.typography.labelSmall, color = ext.green)
                     }
                 }
             }

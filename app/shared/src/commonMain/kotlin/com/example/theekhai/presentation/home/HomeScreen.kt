@@ -283,7 +283,7 @@ private fun HeroCopy(
         Text(
             text = buildAnnotatedString {
                 append("A better city\nstarts with ")
-                withStyle(SpanStyle(color = Color(0xFF4D7563), fontStyle = FontStyle.Italic)) {
+                withStyle(SpanStyle(color = ext.green, fontStyle = FontStyle.Italic)) {
                     append("you.")
                 }
             },
@@ -382,7 +382,7 @@ private fun CityIllustration(ext: com.example.theekhai.ui.theme.TheekHaiExtended
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                color = Color(0xFFFCFBF3).copy(alpha = 0.94f),
+                color = ext.paper.copy(alpha = 0.94f),
                 shape = RoundedCornerShape(4.dp),
                 border = ButtonDefaults.outlinedButtonBorder(enabled = true),
             ) {

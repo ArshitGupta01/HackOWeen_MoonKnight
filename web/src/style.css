@@ -115,3 +115,15 @@
 :root[data-theme="dark"] .geo-zone-pill{background:#1b2420;border-color:#45564c;color:var(--ink)}
 :root[data-theme="dark"] .geo-zone-pill:hover{background:#293a32;border-color:#72c3a5}
 @media(max-width:900px){.civic-map-shell{grid-template-columns:1fr}}
+
+/* Lenis Smooth Scrolling & Enhanced UI Polish */
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+.lenis.lenis-smooth [data-lenis-prevent]{overscroll-behavior:contain}
+.lenis.lenis-stopped{overflow:hidden}
+.lenis.lenis-smooth iframe{pointer-events:none}
+.caption-map-link{display:block;margin-left:14px;letter-spacing:.9px;font-size:9px;font-weight:700;color:var(--green);text-decoration:underline;text-underline-offset:3px}
+.footer-top-btn{min-height:auto;padding:4px 8px;font-weight:600}
+:root[data-theme="dark"] .ward-picker-svg,:root[data-theme="dark"] .civic-map-svg,:root[data-theme="dark"] .city-art svg{filter:brightness(.86) contrast(1.05) saturate(.92)}
+:root[data-theme="dark"] .map-picker-canvas{background:#222d27;border-color:#45564c}
+@media(max-width:850px){.nav{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}.nav::-webkit-scrollbar{display:none}.nav-item{white-space:nowrap;flex-shrink:0}}

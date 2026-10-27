@@ -87,7 +87,7 @@ fun LoginScreen() {
                             onNavigateSignup = { navigator.navigateTo(Route.Signup) },
                             onSelectDemo = { _, selectedEmail ->
                                 email = selectedEmail
-                                password = ""
+                                password = "TheekHai@2026"
                             },
                             ext = ext
                         )
@@ -115,7 +115,7 @@ fun LoginScreen() {
                         onNavigateSignup = { navigator.navigateTo(Route.Signup) },
                         onSelectDemo = { _, selectedEmail ->
                             email = selectedEmail
-                            password = ""
+                            password = "TheekHai@2026"
                         },
                         ext = ext
                     )

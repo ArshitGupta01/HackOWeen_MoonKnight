@@ -84,6 +84,8 @@ data class TheekHaiExtendedColors(
     val greenLight: Color,
     val greenSurface: Color,
     val cardBg: Color,
+    val inputBg: Color = paper,
+    val inputBorder: Color = line,
 )
 
 val LocalTheekHaiColors = staticCompositionLocalOf {
@@ -130,8 +132,8 @@ private val LightColorScheme = lightColorScheme(
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = TheekHaiColors.CyanLight,
-    onPrimary = TheekHaiColors.DarkBg,
+    primary = Color(0xFF23614E),
+    onPrimary = Color(0xFFF2FFF8),
     primaryContainer = TheekHaiColors.DarkSurface,
     onPrimaryContainer = TheekHaiColors.DarkText,
     secondary = TheekHaiColors.Amber,

@@ -238,12 +238,12 @@ fun TheekHaiButton(
         colors = if (isSecondary) {
             ButtonDefaults.outlinedButtonColors(
                 containerColor = Color.Transparent,
-                contentColor = TheekHaiColors.Green,
+                contentColor = LocalTheekHaiColors.current.green,
             )
         } else {
             ButtonDefaults.buttonColors(
-                containerColor = TheekHaiColors.Green,
-                contentColor = Color(0xFFFFFDF5),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             )
         },
         border = if (isSecondary) {

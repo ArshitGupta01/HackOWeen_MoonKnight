@@ -143,9 +143,9 @@ fun WorkspaceScreen(
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ext.muted) },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = ext.green,
-                                unfocusedBorderColor = Color(0xFFCDD4C9),
-                                focusedContainerColor = Color(0xFFFFFEF9),
-                                unfocusedContainerColor = Color(0xFFFFFEF9),
+                                unfocusedBorderColor = ext.inputBorder,
+                                focusedContainerColor = ext.inputBg,
+                                unfocusedContainerColor = ext.inputBg,
                             )
                         )
                     }
@@ -168,9 +168,9 @@ fun WorkspaceScreen(
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ext.muted) },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = ext.green,
-                                unfocusedBorderColor = Color(0xFFCDD4C9),
-                                focusedContainerColor = Color(0xFFFFFEF9),
-                                unfocusedContainerColor = Color(0xFFFFFEF9),
+                                unfocusedBorderColor = ext.inputBorder,
+                                focusedContainerColor = ext.inputBg,
+                                unfocusedContainerColor = ext.inputBg,
                             )
                         )
                     }
