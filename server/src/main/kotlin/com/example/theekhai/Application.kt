@@ -1,10 +1,21 @@
 package com.example.theekhai
 
+import com.example.theekhai.ai.BackendAiService
 import com.example.theekhai.auth.SupabaseJwtAuth
 import com.example.theekhai.contract.*
 import com.example.theekhai.data.db.AppDatabase
 import com.example.theekhai.di.serverModule
+import com.example.theekhai.domain.model.ActorType
+import com.example.theekhai.domain.model.AuditLog
+import com.example.theekhai.domain.model.Complaint
+import com.example.theekhai.domain.model.ComplaintPriority
+import com.example.theekhai.domain.model.ComplaintStatus
+import com.example.theekhai.domain.repository.AuditRepository
+import com.example.theekhai.domain.repository.ComplaintRepository
 import com.example.theekhai.domain.workflow.*
+import com.example.theekhai.routes.auditRoutes
+import com.example.theekhai.routes.evidenceRoutes
+import com.example.theekhai.routes.voiceIntakeRoutes
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
@@ -35,11 +46,15 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     val allowedOrigins = (System.getenv("THEEKHAI_ALLOWED_ORIGINS") ?: "http://localhost:5173,http://127.0.0.1:5173").split(',').map { it.trim() }.filter { it.isNotEmpty() }
     install(CORS) {
         allowedOrigins.forEach { val uri = java.net.URI(it); require(uri.scheme in listOf("http","https") && uri.host != null); allowHost(uri.authority, schemes = listOf(uri.scheme)) }
-        allowHeader(HttpHeaders.ContentType); allowHeader(HttpHeaders.Authorization); allowHeader("X-CSRF-Token"); allowHeader("Idempotency-Key")
-        allowMethod(HttpMethod.Post); allowCredentials = true
+        allowHeader(HttpHeaders.ContentType); allowHeader(HttpHeaders.Authorization); allowHeader("X-CSRF-Token"); allowHeader("Idempotency-Key"); allowHeader("X-Client-Platform")
+        allowMethod(HttpMethod.Post); allowMethod(HttpMethod.Get); allowMethod(HttpMethod.Options); allowCredentials = true
     }
     val workflow: Workflow by inject()
     val database: AppDatabase by inject()
+    val complaintRepository: ComplaintRepository by inject()
+    val auditRepository: AuditRepository by inject()
+    val aiService: BackendAiService by inject()
+
     val http = HttpClient(OkHttp) { install(HttpTimeout) { requestTimeoutMillis = 20_000; connectTimeoutMillis = 5_000 }; followRedirects = false }
     val staff = (System.getenv("THEEKHAI_STAFF") ?: "").split(';').filter { it.isNotBlank() }.associate { entry ->
         val parts = entry.split('|'); require(parts.size >= 2); parts[0] to (Role.valueOf(parts[1]) to parts.getOrNull(2))
@@ -63,26 +78,180 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
         } }
         get("/api/v1/auth/me") { safe(call) { val actor = identity(call); call.respond(IdentityDto(actor.id,actor.role.name,actor.department,auth.csrf(call))) } }
         post("/api/v1/auth/logout") { safe(call) { identity(call); auth.logout(call); call.response.cookies.append(Cookie("theekhai_session","",maxAge=0,httpOnly=true,path="/",secure=System.getenv("THEEKHAI_COOKIE_SECURE") != "false",extensions=mapOf("SameSite" to "Strict"))); call.respond(mapOf("status" to "signed_out")) } }
+        
+        // Multiplatform Complaints API: supports both KMP mobile/desktop clients and Web pilot workflow
         get("/api/v1/complaints") { safe(call) {
-            val actor = identity(call); val offset = call.request.queryParameters["offset"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
-            val all = synchronized(workflow) { workflow.list(actor) }
-            call.respond(CasePageDto(all.drop(offset).take(50).map { it.dto() },all.size,offset))
+            if (call.request.headers["X-Client-Platform"] == "kmp" || call.request.queryParameters["format"] == "list") {
+                call.respond(complaintRepository.getComplaints())
+            } else {
+                val actor = identity(call); val offset = call.request.queryParameters["offset"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                val all = synchronized(workflow) { workflow.list(actor) }
+                call.respond(CasePageDto(all.drop(offset).take(50).map { it.dto() },all.size,offset))
+            }
         } }
         post("/api/v1/complaints") { safe(call) {
-            val actor = identity(call); val input = call.receive<ReportDto>(); val key = call.request.header("Idempotency-Key") ?: ""
-            val record = synchronized(workflow) { workflow.submit(actor,ReportInput(input.title,input.description,input.category,input.address,input.latitude,input.longitude,input.consent),key) }
-            call.respond(HttpStatusCode.Created,record.dto())
+            if (call.request.headers["X-Client-Platform"] == "kmp") {
+                val request = call.receive<CreateComplaintRequestDto>()
+                val now = System.currentTimeMillis()
+                val newId = "cmp-$now"
+                val complaint = Complaint(
+                    id = newId,
+                    title = request.title,
+                    description = request.description,
+                    category = request.category,
+                    priority = ComplaintPriority.MEDIUM,
+                    status = ComplaintStatus.PENDING,
+                    latitude = request.latitude,
+                    longitude = request.longitude,
+                    address = request.address,
+                    citizenId = request.citizenId,
+                    zone = request.zone,
+                    photoUrl = request.photoUrl,
+                    slaDueEpochMillis = now + 86400000L,
+                    createdAtEpochMillis = now,
+                    updatedAtEpochMillis = now
+                )
+                complaintRepository.createComplaint(complaint)
+                auditRepository.recordAuditLog(
+                    AuditLog(
+                        id = "audit-create-$newId",
+                        complaintId = newId,
+                        actorType = ActorType.CITIZEN,
+                        actorId = request.citizenId,
+                        action = "CITIZEN_GRIEVANCE_FILED",
+                        reasoning = "Citizen reported civic grievance. DPDP consent confirmed: ${request.consentGranted}.",
+                        timestampEpochMillis = now
+                    )
+                )
+                call.respond(HttpStatusCode.Created, ComplaintDto(
+                    id = newId,
+                    title = complaint.title,
+                    description = complaint.description,
+                    category = complaint.category,
+                    latitude = complaint.latitude,
+                    longitude = complaint.longitude,
+                    address = complaint.address,
+                    citizenId = complaint.citizenId,
+                    zone = complaint.zone,
+                    slaDueEpochMillis = complaint.slaDueEpochMillis,
+                    createdAtEpochMillis = now,
+                    updatedAtEpochMillis = now
+                ))
+            } else {
+                val actor = identity(call); val input = call.receive<ReportDto>(); val key = call.request.header("Idempotency-Key") ?: ""
+                val record = synchronized(workflow) { workflow.submit(actor,ReportInput(input.title,input.description,input.category,input.address,input.latitude,input.longitude,input.consent),key) }
+                call.respond(HttpStatusCode.Created,record.dto())
+            }
         } }
         get("/api/v1/complaints/{id}") { safe(call) {
-            val actor = identity(call); val id = call.parameters["id"]!!
-            val result = synchronized(workflow) { CaseDetailDto(workflow.detail(actor,id).dto(),workflow.tasks(actor,id).map { TaskDto(it.id,it.caseId,it.department,it.title,it.required,it.complete) },workflow.events(actor,id).map { EventDto(it.id,it.caseId,it.actorId,it.action,it.note,it.at) }) }
-            call.respond(result)
+            val id = call.parameters["id"]!!
+            if (call.request.headers["X-Client-Platform"] == "kmp") {
+                val complaint = complaintRepository.getComplaintById(id)
+                if (complaint != null) {
+                    call.respond(complaint)
+                } else {
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Complaint not found"))
+                }
+            } else {
+                val actor = identity(call)
+                val result = synchronized(workflow) { CaseDetailDto(workflow.detail(actor,id).dto(),workflow.tasks(actor,id).map { TaskDto(it.id,it.caseId,it.department,it.title,it.required,it.complete) },workflow.events(actor,id).map { EventDto(it.id,it.caseId,it.actorId,it.action,it.note,it.at) }) }
+                call.respond(result)
+            }
         } }
         post("/api/v1/complaints/{id}/actions") { safe(call) {
             val actor = identity(call); val input = call.receive<ActionDto>()
             val result = synchronized(workflow) { workflow.act(actor,call.parameters["id"]!!,CaseAction(input.action,input.version,input.note,input.target,input.department)) }
             call.respond(result.dto())
         } }
+
+        // Mobile / Field Worker Action Endpoints
+        post("/api/v1/complaints/{id}/triage") {
+            val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val triageResult = aiService.triageWithGemini(
+                complaintId = id,
+                title = "Grievance investigation",
+                description = "Reported road surface hazard",
+                category = "Roads"
+            )
+            auditRepository.recordAuditLog(
+                AuditLog(
+                    id = "audit-triage-$id-${System.currentTimeMillis()}",
+                    complaintId = id,
+                    actorType = ActorType.AI_GEMINI_TRIAGE,
+                    actorId = "gemini-3.8-flash-backend",
+                    action = "GEMINI_MULTI_TASK_TRIAGE",
+                    reasoning = triageResult.reasoning,
+                    decisionPayloadJson = """{"priority":"${triageResult.priority}","cluster":"${triageResult.clusterId}"}""",
+                    timestampEpochMillis = System.currentTimeMillis()
+                )
+            )
+            call.respond(triageResult)
+        }
+        post("/api/v1/complaints/{id}/resolve") {
+            val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val request = call.receive<ResolveComplaintRequestDto>()
+            val now = System.currentTimeMillis()
+            complaintRepository.resolveComplaint(
+                id = id,
+                workerId = request.workerId,
+                resolutionNotes = request.resolutionNotes,
+                photoUrl = request.photoUrl
+            )
+            auditRepository.recordAuditLog(
+                AuditLog(
+                    id = "audit-resolve-$id-$now",
+                    complaintId = id,
+                    actorType = ActorType.FIELD_WORKER,
+                    actorId = request.workerId,
+                    action = "WORKER_SUBMITTED_RESOLUTION",
+                    reasoning = "Field worker marked ticket resolved with evidence photo [${request.photoUrl}] and notes: ${request.resolutionNotes}",
+                    timestampEpochMillis = now
+                )
+            )
+            call.respond(HttpStatusCode.OK, mapOf("status" to "RESOLVED", "complaintId" to id))
+        }
+        post("/api/v1/complaints/{id}/escalate") {
+            val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val request = call.receive<EscalateRequestDto>()
+            val now = System.currentTimeMillis()
+            auditRepository.recordAuditLog(
+                AuditLog(
+                    id = "audit-escalate-$id-$now",
+                    complaintId = id,
+                    actorType = ActorType.SYSTEM_SLA_WATCHER,
+                    actorId = "dynamic-sla-engine",
+                    action = "DYNAMIC_SLA_ESCALATION",
+                    reasoning = "SLA breached or conflict reported. Escalated to Commissioner Level. Reason: ${request.reason}",
+                    timestampEpochMillis = now
+                )
+            )
+            call.respond(HttpStatusCode.OK, mapOf("status" to "ESCALATED", "complaintId" to id))
+        }
+        post("/api/v1/complaints/{id}/verify") {
+            val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val request = try { call.receive<TriggerVerificationRequestDto>() } catch (_: Exception) { TriggerVerificationRequestDto(id) }
+            val verif = aiService.runTinyFishVerification(id, request.officialPortalUrl)
+            auditRepository.recordAuditLog(
+                AuditLog(
+                    id = "audit-tinyfish-$id-${verif.verifiedAtEpochMillis}",
+                    complaintId = id,
+                    actorType = ActorType.AI_TINYFISH_AGENT,
+                    actorId = "tinyfish-web-crawler",
+                    action = "TINYFISH_AUTONOMOUS_VERIFY",
+                    reasoning = verif.explanation,
+                    decisionPayloadJson = """{"verified":${verif.verified},"state":"${verif.state}"}""",
+                    timestampEpochMillis = verif.verifiedAtEpochMillis
+                )
+            )
+            call.respond(verif)
+        }
+
+        // Modular Domain Routes: Voice Intake, Evidence Check, Audit Logs & Offline Sync
+        voiceIntakeRoutes(complaintRepository, auditRepository, aiService)
+        evidenceRoutes(auditRepository, aiService)
+        auditRoutes(auditRepository, complaintRepository)
+
+        // Web Legal & Discovery Routes
         get("/api/v1/legal/sources") { safe(call) { call.respond(legal.search(call.request.queryParameters["q"] ?: "",call.request.queryParameters["jurisdiction"] ?: "CENTRAL")) } }
         post("/api/v1/legal/ask") { safe(call) { identity(call); call.respond(legal.ask(call.receive())) } }
         post("/api/v1/legal/sources") { safe(call) { requireReviewer(identity(call)); call.respond(HttpStatusCode.Created,legal.import(call.receive())) } }

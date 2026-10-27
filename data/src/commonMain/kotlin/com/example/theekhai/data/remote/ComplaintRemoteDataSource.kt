@@ -18,6 +18,7 @@ import com.example.theekhai.contract.VoiceIntakeResponseDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -45,17 +46,22 @@ class KtorComplaintRemoteDataSource(
     private fun url(path: String): String = "${baseUrl.trimEnd('/')}$path"
 
     override suspend fun getComplaints(): List<ComplaintDto> =
-        client.get(url(ApiRoutes.COMPLAINTS)).body()
+        client.get(url(ApiRoutes.COMPLAINTS)) {
+            header("X-Client-Platform", "kmp")
+        }.body()
 
     override suspend fun getComplaintById(id: String): ComplaintDto? =
         try {
-            client.get(url(ApiRoutes.COMPLAINTS) + "/$id").body()
+            client.get(url(ApiRoutes.COMPLAINTS) + "/$id") {
+                header("X-Client-Platform", "kmp")
+            }.body()
         } catch (_: Exception) {
             null
         }
 
     override suspend fun createComplaint(request: CreateComplaintRequestDto): ComplaintDto =
         client.post(url(ApiRoutes.COMPLAINTS)) {
+            header("X-Client-Platform", "kmp")
             contentType(ContentType.Application.Json)
             setBody(request)
         }.body()
