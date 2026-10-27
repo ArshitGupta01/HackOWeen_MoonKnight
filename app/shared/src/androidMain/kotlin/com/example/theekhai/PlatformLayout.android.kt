@@ -474,8 +474,8 @@ private fun AndroidDrawerContent(
             ) {
                 AvatarCircle(initials = "?", size = 32.dp, bgColor = ext.green)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Account preview", style = MaterialTheme.typography.labelMedium, color = ext.ink, fontWeight = FontWeight.Bold)
-                    Text("Sign-in not connected", style = MaterialTheme.typography.bodySmall, color = ext.muted, fontSize = 11.sp)
+                    Text("Your account", style = MaterialTheme.typography.labelMedium, color = ext.ink, fontWeight = FontWeight.Bold)
+                    Text("Profile and saved references", style = MaterialTheme.typography.bodySmall, color = ext.muted, fontSize = 11.sp)
                 }
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ExitToApp,

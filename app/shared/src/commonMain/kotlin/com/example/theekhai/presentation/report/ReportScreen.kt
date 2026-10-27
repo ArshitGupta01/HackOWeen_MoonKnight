@@ -68,6 +68,18 @@ fun ReportScreen() {
     var recordingSeconds by remember { mutableStateOf(0) }
     var voiceProviderLabel by remember { mutableStateOf<String?>(null) }
 
+    LaunchedEffect(connectState.location) {
+        connectState.location?.let { resolved -> address = resolved.address; wardLabel = resolved.ward }
+    }
+    LaunchedEffect(connectState.triage) {
+        connectState.triage?.let { suggestion ->
+            if (title.isBlank() && suggestion.title.isNotBlank()) title = suggestion.title
+            if (suggestion.category in setOf("ROADS", "WATER", "WASTE", "LIGHTING", "OTHER")) selectedCategory = suggestion.category
+            statusMessage = suggestion.summary + if (suggestion.similarCaseIds.isNotEmpty()) " Similar reports: ${suggestion.similarCaseIds.size}." else ""
+            isError = false
+        }
+    }
+
     LaunchedEffect(connectState.message, connectState.error) {
         connectState.message?.let { statusMessage = it; isError = false; isSubmitting = false }
         connectState.error?.let { statusMessage = it; isError = true; isSubmitting = false }
@@ -89,6 +101,7 @@ fun ReportScreen() {
             longitude = geo.longitude
             wardLabel = geo.ward
             address = geo.address
+            connectViewModel.reverseGeocode(geo.latitude, geo.longitude, "en")
             isError = false
             statusMessage = "Geotag attached (${formatCoord(geo.latitude)}° N, ${formatCoord(geo.longitude)}° E · ${geo.ward})."
         }.onFailure { err ->
@@ -104,7 +117,7 @@ fun ReportScreen() {
         onResult = { result ->
             result.onSuccess { voice ->
                 hasRecording = true
-                voiceProviderLabel = voice.provider
+                voiceProviderLabel = "Speech-to-text"
                 description = voice.transcript
                 if (title.isBlank() && voice.suggestedTitle.isNotBlank()) {
                     title = voice.suggestedTitle
@@ -113,7 +126,7 @@ fun ReportScreen() {
                     selectedCategory = voice.suggestedCategory
                 }
                 isError = false
-                statusMessage = "Voice note transcribed (${voice.provider}). Review and edit before submitting."
+                statusMessage = "Voice note transcribed. Review and edit before submitting."
             }.onFailure { err ->
                 isError = true
                 statusMessage = err.message ?: "Voice capture could not complete. You can type your report directly."
@@ -133,6 +146,7 @@ fun ReportScreen() {
         latitude = lat
         longitude = lon
         address = resolvedAddr
+        connectViewModel.reverseGeocode(lat, lon, "en")
         isError = false
         statusMessage = "Pinned location on Ward 4 Map (${formatCoord(lat)}° N, ${formatCoord(lon)}° E)."
     }
@@ -239,6 +253,7 @@ fun ReportScreen() {
                                 isError = isError,
                                 isSubmitting = isSubmitting || connectState.isLoading,
                                 onSubmit = handleSubmit,
+                                onReview = { if (description.trim().length >= 10) connectViewModel.triage(title, description, address, "en") else { statusMessage = errDescMsg; isError = true } },
                                 onSaveDraft = handleSaveDraft,
                             )
                         }
@@ -276,6 +291,7 @@ fun ReportScreen() {
                         isError = isError,
                         isSubmitting = isSubmitting || connectState.isLoading,
                         onSubmit = handleSubmit,
+                        onReview = { if (description.trim().length >= 10) connectViewModel.triage(title, description, address, "en") else { statusMessage = errDescMsg; isError = true } },
                         onSaveDraft = handleSaveDraft,
                     )
 
@@ -331,6 +347,7 @@ private fun ReportForm(
     isError: Boolean,
     isSubmitting: Boolean,
     onSubmit: () -> Unit,
+    onReview: () -> Unit,
     onSaveDraft: () -> Unit,
 ) {
     val ext = LocalTheekHaiColors.current
@@ -614,6 +631,9 @@ private fun ReportForm(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                OutlinedButton(onClick = onReview, enabled = !isSubmitting, shape = RoundedCornerShape(6.dp)) {
+                    Text(t("Review", "जाँचें"), fontSize = 12.sp, color = ext.ink)
+                }
                 TheekHaiButton(
                     text = if (isSubmitting) t("Submitting...", "भेजा जा रहा है...") else t("Review & submit report  ↗", "जाँचें और रिपोर्ट भेजें  ↗"),
                     onClick = onSubmit,

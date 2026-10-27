@@ -23,6 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.theekhai.navigation.LocalNavigator
 import com.example.theekhai.navigation.Route
+import com.example.theekhai.domain.model.CivicProfile
+import com.example.theekhai.presentation.nativeconnect.NativeConnectViewModel
+import org.koin.compose.viewmodel.koinViewModel
 import com.example.theekhai.ui.components.*
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
@@ -38,6 +41,8 @@ data class SavedLegalSource(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountScreen() {
+    val viewModel = koinViewModel<NativeConnectViewModel>()
+    val state by viewModel.state.collectAsState()
     val navigator = LocalNavigator.current
     val ext = LocalTheekHaiColors.current
 
@@ -48,10 +53,16 @@ fun AccountScreen() {
     var selectedLanguage by remember { mutableStateOf("English") }
     var langExpanded by remember { mutableStateOf(false) }
 
-    var saveFeedback by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
-
-    var savedSources by remember { mutableStateOf<List<SavedLegalSource>>(emptyList()) }
+    LaunchedEffect(Unit) { viewModel.loadAccount() }
+    LaunchedEffect(state.profile) {
+        state.profile?.let { profile ->
+            fullName = profile.fullName; email = profile.email; organization = profile.organization; ward = profile.ward
+            selectedLanguage = if (profile.preferredLanguage == "hi") "हिन्दी (Hindi)" else "English"
+        }
+    }
+    val saveFeedback = state.error ?: state.message
+    val savedSources = state.savedSources.map { SavedLegalSource(it.id, it.title, it.jurisdiction, it.snippet, it.sourceUrl) }
+    val saveProfile = { viewModel.saveProfile(CivicProfile(state.profile?.userId.orEmpty(), email, fullName, organization, state.profile?.role ?: "CITIZEN", state.profile?.department, ward, if (selectedLanguage.startsWith("हिन्दी")) "hi" else "en")) }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isWide = maxWidth >= 850.dp
@@ -73,7 +84,7 @@ fun AccountScreen() {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Native preview only. Account syncing is not connected, so profile edits are temporary and are not sent.",
+                text = "Your profile and saved references sync to your account.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = ext.muted
             )
@@ -100,13 +111,9 @@ fun AccountScreen() {
                             onLanguageChange = { selectedLanguage = it },
                             langExpanded = langExpanded,
                             onLangExpandedChange = { langExpanded = it },
-                            isSaving = isSaving,
+                            isSaving = state.isLoading,
                             saveFeedback = saveFeedback,
-                            onSave = {
-                                isSaving = true
-                                saveFeedback = "No profile was synced. Native profile integration is not connected yet."
-                                isSaving = false
-                            },
+                            onSave = saveProfile,
                             ext = ext
                         )
                     }
@@ -115,9 +122,7 @@ fun AccountScreen() {
                     Column(modifier = Modifier.weight(0.9f)) {
                         SavedSourcesPanel(
                             sources = savedSources,
-                            onRemove = { sourceId ->
-                                savedSources = savedSources.filter { it.id != sourceId }
-                            },
+                            onRemove = viewModel::removeSavedSource,
                             onExploreLibrary = { navigator.navigateTo(Route.Library) },
                             ext = ext
                         )
@@ -138,13 +143,9 @@ fun AccountScreen() {
                         onLanguageChange = { selectedLanguage = it },
                         langExpanded = langExpanded,
                         onLangExpandedChange = { langExpanded = it },
-                        isSaving = isSaving,
+                        isSaving = state.isLoading,
                         saveFeedback = saveFeedback,
-                        onSave = {
-                            isSaving = true
-                            saveFeedback = "No profile was saved. Native profile integration is not connected yet."
-                            isSaving = false
-                        },
+                        onSave = saveProfile,
                         ext = ext
                     )
 
@@ -152,14 +153,19 @@ fun AccountScreen() {
 
                     SavedSourcesPanel(
                         sources = savedSources,
-                        onRemove = { sourceId ->
-                            savedSources = savedSources.filter { it.id != sourceId }
-                        },
+                        onRemove = viewModel::removeSavedSource,
                         onExploreLibrary = { navigator.navigateTo(Route.Library) },
                         ext = ext
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(24.dp))
+            TheekHaiButton(
+                text = if (state.isLoading) "Working…" else "Sign out",
+                onClick = { viewModel.signOut(); navigator.resetTo(Route.Login) },
+                enabled = !state.isLoading,
+                isSecondary = true
+            )
         }
     }
 }
@@ -192,9 +198,9 @@ private fun ProfileFormPanel(
             AvatarCircle(initials = fullName, size = 52.dp, bgColor = TheekHaiColors.Green)
             Column {
                 StatusChip(
-                    label = "Native account preview",
-                    containerColor = TheekHaiColors.StatusClosed,
-                    contentColor = TheekHaiColors.StatusClosedText
+                    label = "Connected account",
+                    containerColor = TheekHaiColors.GreenSurface,
+                    contentColor = TheekHaiColors.Green
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(fullName, style = MaterialTheme.typography.titleLarge, color = ext.ink)

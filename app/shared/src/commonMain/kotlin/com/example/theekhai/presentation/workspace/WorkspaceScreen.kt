@@ -27,7 +27,12 @@ import com.example.theekhai.ui.theme.TheekHaiColors
 
 @Composable
 fun WorkspaceScreen(
-    complaints: List<Complaint> = emptyList()
+    complaints: List<Complaint> = emptyList(),
+    isLoading: Boolean = false,
+    error: String? = null,
+    onRetry: () -> Unit = {},
+    heading: String = "My workspace",
+    description: String = "Track the departments, field workers and deadlines assigned to your reports."
 ) {
     val navigator = LocalNavigator.current
     val ext = LocalTheekHaiColors.current
@@ -57,17 +62,28 @@ fun WorkspaceScreen(
                     Eyebrow("CITIZEN CASE TRACKING")
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "My workspace",
+                        text = heading,
                         style = if (isWide) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = ext.ink,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Track the departments, field workers and deadlines assigned to your reports.",
+                        text = description,
                         style = MaterialTheme.typography.bodyMedium,
                         color = ext.muted,
                     )
+                }
+
+                if (isLoading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = ext.green)
+                if (error != null) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(error, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = onRetry) { Text("Retry") }
+                    }
+                }
+                if (!isLoading && error == null && complaints.isEmpty()) {
+                    Text("No reports are linked to this account yet. Submit a report to see its progress here.", color = ext.muted, style = MaterialTheme.typography.bodyMedium)
                 }
 
                 // Stats Row

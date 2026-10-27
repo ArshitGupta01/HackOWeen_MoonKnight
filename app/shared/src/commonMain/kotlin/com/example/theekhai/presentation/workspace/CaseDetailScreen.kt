@@ -39,6 +39,91 @@ import com.example.theekhai.navigation.Route
 import com.example.theekhai.ui.components.*
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
+import com.example.theekhai.presentation.nativeconnect.NativeConnectViewModel
+import org.koin.compose.viewmodel.koinViewModel
+
+@Composable
+fun LiveCaseDetailScreen(caseId: String) {
+    val viewModel = koinViewModel<NativeConnectViewModel>()
+    val state by viewModel.state.collectAsState()
+    val ext = LocalTheekHaiColors.current
+    val navigator = LocalNavigator.current
+    LaunchedEffect(caseId) { viewModel.loadCase(caseId) }
+    val detail = state.caseDetail?.takeIf { it.complaint.id == caseId }
+
+    if (detail == null) {
+        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(if (state.isLoading) "Loading report…" else state.error ?: "This report is not available to your account.", color = ext.ink)
+            if (state.error != null) TheekHaiButton("Try again", onClick = { viewModel.loadCase(caseId) })
+        }
+        return
+    }
+
+    var note by remember(caseId) { mutableStateOf("") }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        TextButton(onClick = { navigator.navigateTo(Route.Workspace) }) { Text("← My workspace") }
+        PanelCard(Modifier.fillMaxWidth()) {
+            Eyebrow("${detail.complaint.category} · ${detail.complaint.id.take(8)}")
+            Spacer(Modifier.height(8.dp))
+            Text(detail.complaint.title, style = MaterialTheme.typography.headlineMedium, color = ext.ink, fontWeight = FontWeight.Bold)
+            Text(detail.complaint.address, style = MaterialTheme.typography.bodyMedium, color = ext.muted)
+            Spacer(Modifier.height(12.dp))
+            StatusChip(detail.complaint.status.name.replace('_', ' '))
+            Spacer(Modifier.height(12.dp))
+            Text(detail.complaint.description, style = MaterialTheme.typography.bodyLarge, color = ext.ink)
+            if (detail.complaint.latitude != 0.0 && detail.complaint.longitude != 0.0) {
+                Spacer(Modifier.height(10.dp))
+                Text("${detail.complaint.latitude}, ${detail.complaint.longitude}", style = MaterialTheme.typography.bodySmall, color = ext.muted)
+            }
+        }
+
+        PanelCard(Modifier.fillMaxWidth()) {
+            Text("Work and evidence", style = MaterialTheme.typography.titleLarge, color = ext.ink)
+            Spacer(Modifier.height(8.dp))
+            if (detail.tasks.isEmpty()) Text("No work items have been assigned.", color = ext.muted)
+            detail.tasks.forEach { task ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Checkbox(checked = task.complete, onCheckedChange = { if (!task.complete) viewModel.actOnCase(caseId, "COMPLETE_TASK", detail.complaint.version, "Task completed by assigned staff.", target = task.id) })
+                    Column(Modifier.weight(1f)) {
+                        Text(task.title, color = ext.ink, style = MaterialTheme.typography.bodyMedium)
+                        Text(task.department + if (task.required) " · Required" else "", color = ext.muted, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+
+        PanelCard(Modifier.fillMaxWidth()) {
+            Text("Case history", style = MaterialTheme.typography.titleLarge, color = ext.ink)
+            Spacer(Modifier.height(8.dp))
+            if (detail.events.isEmpty()) Text("No history has been recorded yet.", color = ext.muted)
+            detail.events.sortedByDescending { it.at }.forEach { event ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Text(event.action.replace('_', ' '), color = ext.green, style = MaterialTheme.typography.labelLarge)
+                    Text(event.note, color = ext.ink, style = MaterialTheme.typography.bodyMedium)
+                    Text(event.at.toString(), color = ext.muted, style = MaterialTheme.typography.bodySmall)
+                }
+                TheekHaiDivider()
+            }
+        }
+
+        PanelCard(Modifier.fillMaxWidth()) {
+            Text("Next action", style = MaterialTheme.typography.titleLarge, color = ext.ink)
+            OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("Add a short reason") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            state.message?.let { Text(it, color = ext.green) }
+            val actions = when (detail.complaint.status.name) {
+                "ASSIGNED", "REOPENED" -> listOf("START" to "Start work")
+                "IN_PROGRESS" -> listOf("REQUEST_CLOSURE" to "Request closure review")
+                "PENDING_VERIFICATION" -> listOf("APPROVE_CLOSURE" to "Approve closure", "REJECT_CLOSURE" to "Return for more work")
+                "CLOSED" -> listOf("CHALLENGE" to "Challenge closure", "REOPEN" to "Reopen case")
+                else -> emptyList()
+            }
+            actions.forEach { (action, label) ->
+                TheekHaiButton(label, onClick = { if (note.trim().length >= 3) { viewModel.actOnCase(caseId, action, detail.complaint.version, note.trim()); note = "" } }, enabled = !state.isLoading && note.trim().length >= 3, modifier = Modifier.fillMaxWidth(), isSecondary = action != actions.firstOrNull()?.first)
+            }
+        }
+    }
+}
 
 data class CaseTask(
     val id: String,
