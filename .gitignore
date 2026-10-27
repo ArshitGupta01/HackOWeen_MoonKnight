@@ -25,5 +25,13 @@ node_modules/
 # Environment variables & secrets
 .env
 .env.*
+!.env.example
+**/dist/
+**/test-results/
+**/playwright-report/
+models/
+runtime/
+*.db-wal
+*.db-shm
 repomix-output.xml
 repomix-output.txt
