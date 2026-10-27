@@ -5,8 +5,9 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.Geocoder
 import android.location.LocationManager
+import android.os.Build
+import android.os.CancellationSignal
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +23,24 @@ actual fun rememberLocationFetcher(
 ): () -> Unit {
     val context = LocalContext.current
 
+    fun reportLocation(location: android.location.Location?) {
+        if (location == null) {
+            onResult(Result.failure(IllegalStateException("A current location could not be found. Move outdoors and try again, or choose a point on the map.")))
+            return
+        }
+        onResult(
+            Result.success(
+                GeotagResult(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    address = "",
+                    ward = "",
+                    source = "DEVICE_LOCATION",
+                )
+            )
+        )
+    }
+
     fun resolveDeviceLocation() {
         try {
             val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
@@ -33,45 +52,23 @@ actual fun rememberLocationFetcher(
             }
 
             val providers = listOf(
-                LocationManager.GPS_PROVIDER,
                 LocationManager.NETWORK_PROVIDER,
+                LocationManager.GPS_PROVIDER,
                 LocationManager.PASSIVE_PROVIDER,
-            )
-            val lastKnown = providers.firstNotNullOfOrNull { provider ->
-                runCatching { locationManager?.getLastKnownLocation(provider) }.getOrNull()
-            }
-
-            if (lastKnown == null) {
-                onResult(Result.failure(IllegalStateException("No recent device location is available. Try again outdoors or pin the location on the Ward Map.")))
+            ).filter { provider -> runCatching { locationManager?.isProviderEnabled(provider) == true }.getOrDefault(false) }
+            if (locationManager == null || providers.isEmpty()) {
+                onResult(Result.failure(IllegalStateException("Location services are turned off. Enable them or choose a point on the map.")))
                 return
             }
-            val lat = lastKnown.latitude
-            val lon = lastKnown.longitude
-            val sourceLabel = "ANDROID_GPS"
-
-            val geocodedAddress = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                locationManager.getCurrentLocation(providers.first(), CancellationSignal(), context.mainExecutor) { reportLocation(it) }
+            } else {
                 @Suppress("DEPRECATION")
-                val addresses = Geocoder(context, Locale.getDefault()).getFromLocation(lat, lon, 1)
-                val first = addresses?.firstOrNull()
-                if (first != null) {
-                    listOfNotNull(first.thoroughfare ?: first.featureName, first.subLocality ?: "Ward 4", first.locality)
-                        .distinct()
-                        .joinToString(", ")
-                        .takeIf { it.length >= 5 }
-                } else null
-            }.getOrNull() ?: "Main Market Road near Ward 4 Primary School, Ward 4 (${String.format(Locale.US, "%.4f° N, %.4f° E", lat, lon)})"
-
-            onResult(
-                Result.success(
-                    GeotagResult(
-                        latitude = lat,
-                        longitude = lon,
-                        address = geocodedAddress,
-                        ward = "Ward 4",
-                        source = sourceLabel,
-                    )
-                )
-            )
+                val lastKnown = providers.mapNotNull { provider -> runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull() }
+                    .filter { System.currentTimeMillis() - it.time <= 2 * 60 * 1000L }
+                    .maxByOrNull { it.time }
+                reportLocation(lastKnown)
+            }
         } catch (e: Exception) {
             onResult(Result.failure(e))
         }
@@ -89,7 +86,7 @@ actual fun rememberLocationFetcher(
         }
     }
 
-    return remember(context) {
+    return remember(context, permissionLauncher) {
         {
             val fineGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
             val coarseGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED

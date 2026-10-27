@@ -6,10 +6,12 @@ The Ktor API is JSON at `/api/v1`, defined by `:core`'s `PilotDto.kt` and mounte
 
 - `GET /api/v1/providers` -> `ProviderStatusDto` (`supabaseConfigured`, `tinyFishConfigured`, `tavilyConfigured`, `openRouterConfigured`, `sarvamConfigured`, `groqConfigured`).
 - `GET /api/v1/auth/config` -> `AuthConfigDto` (`supabaseUrl`, `publishableKey`, `configured`).
-- `POST /api/v1/auth/login` -> Authenticates via Supabase `/auth/v1/token?grant_type=password` or verified one-time email code, resolves role/profile from `public.profiles`, sets an `HttpOnly` cookie (`theekhai_session`), and returns `accessToken` for Bearer fallback.
-- `POST /api/v1/auth/login/request-code` -> Dispatches a secure 6-digit one-time login verification code to the specified email via Gmail API (`GmailService`, sender: `arshitgupta34@gmail.com`) and Supabase Auth OTP (`/auth/v1/otp`), valid for 10 minutes. Returns `RequestLoginCodeResponseDto`.
-- `POST /api/v1/auth/login/verify-code` -> Verifies the 6-digit code against pending verifications / Supabase OTP, creates an authenticated session with `theekhai_session` HttpOnly cookie and Bearer token, and returns `{ status: "signed_in", accessToken: "..." }`.
-- `POST /api/v1/auth/register` -> Registers a citizen account via Supabase `/auth/v1/signup`, auto-provisions `public.profiles` (including `organization`, `ward`, `preferredLanguage`), and sets `theekhai_session`.
+- `POST /api/v1/auth/login` -> Authenticates directly via email and password (or instant demo credentials), resolves role/profile from `public.profiles` or local database, sets an `HttpOnly` cookie (`theekhai_session`), and returns `accessToken` for Bearer fallback.
+- `POST /api/v1/auth/register` -> Validates email syntax and deliverability, prevents disposable/fake domains, dispatches an official email verification link via Gmail API (`GmailService`, sender strictly `arshitgupta34@gmail.com`) and Supabase `/auth/v1/signup`, stores pending registration, and returns `RegisterResponseDto` (`status: "verification_sent"`).
+- `POST /api/v1/auth/verify-email` -> Verifies the registration token, creates the citizen account in SQLDelight and Supabase, issues the authenticated `theekhai_session` HttpOnly cookie and Bearer token, and returns `VerifyEmailResponseDto`.
+- `GET /api/v1/auth/verify-email?token=...` -> Direct link verification endpoint from email click; sets session cookie and redirects browser to `/verify-email?token=...&status=success` or responds with JSON.
+- `POST /api/v1/auth/resend-verification` -> Resends the email verification link to an unverified registration email address.
+- `POST /api/v1/auth/instant-login` -> 1-click instant login for the 10 pre-seeded pilot demo accounts (`Mohit`, `Arshit`, `Atri`, etc.).
 - `POST /api/v1/auth/recover` -> Triggers a Supabase password reset email via `/auth/v1/recover`.
 - `GET /api/v1/auth/me` -> Returns `IdentityDto` (`id`, `role`, `department`, `csrf`, `email`, `fullName`, `organization`, `ward`, `preferredLanguage`).
 - `POST /api/v1/auth/logout` -> Invalidates the server session and clears `theekhai_session` (requires `X-CSRF-Token`).

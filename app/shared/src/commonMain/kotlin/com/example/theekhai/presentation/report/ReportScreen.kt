@@ -22,11 +22,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +38,7 @@ import com.example.theekhai.ui.localization.t
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
 import com.example.theekhai.presentation.nativeconnect.NativeConnectViewModel
+import com.example.theekhai.presentation.map.NeighborhoodMapData
 import org.koin.compose.viewmodel.koinViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -56,7 +57,7 @@ fun ReportScreen() {
     var address by remember { mutableStateOf("") }
     var latitude by remember { mutableStateOf<Double?>(null) }
     var longitude by remember { mutableStateOf<Double?>(null) }
-    var wardLabel by remember { mutableStateOf("Ward 4") }
+    var wardLabel by remember { mutableStateOf("") }
     var showMapPicker by remember { mutableStateOf(false) }
 
     var consentGranted by remember { mutableStateOf(false) }
@@ -103,7 +104,7 @@ fun ReportScreen() {
             address = geo.address
             connectViewModel.reverseGeocode(geo.latitude, geo.longitude, "en")
             isError = false
-            statusMessage = "Geotag attached (${formatCoord(geo.latitude)}° N, ${formatCoord(geo.longitude)}° E · ${geo.ward})."
+            statusMessage = "Location attached. Resolving its address…"
         }.onFailure { err ->
             showMapPicker = true
             isError = true
@@ -660,19 +661,17 @@ private fun InteractiveWardMapPicker(
     modifier: Modifier = Modifier
 ) {
     val ext = LocalTheekHaiColors.current
-    var pinFraction by remember(selectedLat, selectedLon) {
-        val fx = if (selectedLon != null) ((selectedLon - 77.0200) / 0.0180).toFloat().coerceIn(0.08f, 0.92f) else 0.5f
-        val fy = if (selectedLat != null) ((28.4720 - selectedLat) / 0.0180).toFloat().coerceIn(0.08f, 0.92f) else 0.5f
-        mutableStateOf(Offset(fx, fy))
-    }
-
-    val presets = remember {
-        listOf(
-            Triple("Ward 4 School", 28.4595 to 77.0266, "Main Market Road near Ward 4 Primary School, Ward 4"),
-            Triple("Central Park", 28.4612 to 77.0289, "5th Cross Road near Central Park East Gate, Ward 4"),
-            Triple("Sector 14 Rotary", 28.4680 to 77.0310, "12th Main Road Junction, Sector 14 Crossing, Ward 4"),
-            Triple("Main Market", 28.4645 to 77.0342, "Sector 14 Main Market Lane, Ward 4"),
-        )
+    val darkMap = ext.paper.luminance() < .5f
+    val hasSelectedPoint = selectedLat != null && selectedLon != null &&
+        selectedLat in NeighborhoodMapData.MIN_LAT..NeighborhoodMapData.MAX_LAT &&
+        selectedLon in NeighborhoodMapData.MIN_LON..NeighborhoodMapData.MAX_LON
+    val fx = if (hasSelectedPoint) ((selectedLon - NeighborhoodMapData.MIN_LON) / (NeighborhoodMapData.MAX_LON - NeighborhoodMapData.MIN_LON)).toFloat() else .5f
+    val fy = if (hasSelectedPoint) ((NeighborhoodMapData.MAX_LAT - selectedLat) / (NeighborhoodMapData.MAX_LAT - NeighborhoodMapData.MIN_LAT)).toFloat() else .5f
+    val landmarks = remember {
+        NeighborhoodMapData.landmarks.filter {
+            it.lat in NeighborhoodMapData.MIN_LAT..NeighborhoodMapData.MAX_LAT &&
+                it.lon in NeighborhoodMapData.MIN_LON..NeighborhoodMapData.MAX_LON && it.name.isNotBlank()
+        }.distinctBy { it.name }.take(4)
     }
 
     Surface(
@@ -683,7 +682,7 @@ private fun InteractiveWardMapPicker(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
-                text = t("TAP ANYWHERE ON WARD 4 MAP TO PIN GEOTAG", "जियोटैग पिन करने के लिए वार्ड 4 मानचित्र पर कहीं भी टैप करें"),
+                text = t("TAP ANYWHERE ON THE MURTHAL MAP TO PIN A LOCATION", "स्थान पिन करने के लिए मुरथल मानचित्र पर कहीं भी टैप करें"),
                 style = MaterialTheme.typography.labelSmall,
                 color = ext.muted,
                 fontSize = 10.sp
@@ -699,110 +698,64 @@ private fun InteractiveWardMapPicker(
                         detectTapGestures { offset ->
                             val fx = (offset.x / size.width.toFloat()).coerceIn(0.05f, 0.95f)
                             val fy = (offset.y / size.height.toFloat()).coerceIn(0.05f, 0.95f)
-                            pinFraction = Offset(fx, fy)
-                            val lat = 28.4720 - fy * 0.0180
-                            val lon = 77.0200 + fx * 0.0180
-                            val resolved = resolveNearestWardAddress(lat, lon)
-                            onPinSelected(lat, lon, resolved)
+                            val lat = NeighborhoodMapData.MAX_LAT - fy * (NeighborhoodMapData.MAX_LAT - NeighborhoodMapData.MIN_LAT)
+                            val lon = NeighborhoodMapData.MIN_LON + fx * (NeighborhoodMapData.MAX_LON - NeighborhoodMapData.MIN_LON)
+                            onPinSelected(lat, lon, "Resolving address…")
                         }
                     }
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val w = size.width
-                    val h = size.height
-                    drawRect(color = Color(0xFFEEF2E8))
-
-                    // Park & Civic Zones
-                    drawRoundRect(
-                        color = Color(0xFFD4E6CD),
-                        topLeft = Offset(w * 0.06f, h * 0.08f),
-                        size = Size(w * 0.32f, h * 0.36f),
-                        cornerRadius = CornerRadius(12f, 12f)
-                    )
-                    drawRoundRect(
-                        color = Color(0xFFE5EDE0),
-                        topLeft = Offset(w * 0.60f, h * 0.08f),
-                        size = Size(w * 0.33f, h * 0.32f),
-                        cornerRadius = CornerRadius(12f, 12f)
-                    )
-                    drawRoundRect(
-                        color = Color(0xFFEDE8DA),
-                        topLeft = Offset(w * 0.60f, h * 0.56f),
-                        size = Size(w * 0.34f, h * 0.36f),
-                        cornerRadius = CornerRadius(12f, 12f)
-                    )
-                    drawRoundRect(
-                        color = Color(0xFFE2EBE0),
-                        topLeft = Offset(w * 0.07f, h * 0.58f),
-                        size = Size(w * 0.30f, h * 0.34f),
-                        cornerRadius = CornerRadius(12f, 12f)
-                    )
-
-                    // Arterial Roads
-                    drawRect(
-                        color = Color(0xFFB8C5B2),
-                        topLeft = Offset(0f, h * 0.44f),
-                        size = Size(w, h * 0.12f)
-                    )
-                    drawLine(
-                        color = Color(0xFFFBBF24),
-                        start = Offset(0f, h * 0.50f),
-                        end = Offset(w, h * 0.50f),
-                        strokeWidth = 3f,
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f))
-                    )
-                    drawRect(
-                        color = Color(0xFFB8C5B2),
-                        topLeft = Offset(w * 0.46f, 0f),
-                        size = Size(w * 0.08f, h)
-                    )
-                    drawCircle(
-                        color = Color(0xFF9FB996),
-                        radius = 16f,
-                        center = Offset(w * 0.50f, h * 0.50f)
-                    )
-
-                    // Active Pin Marker
-                    val px = pinFraction.x * w
-                    val py = pinFraction.y * h
-                    drawCircle(
-                        color = Color(0xFF123E39).copy(alpha = 0.25f),
-                        radius = 24f,
-                        center = Offset(px, py)
-                    )
-                    drawCircle(
-                        color = Color.White,
-                        radius = 12f,
-                        center = Offset(px, py)
-                    )
-                    drawCircle(
-                        color = Color(0xFF123E39),
-                        radius = 9f,
-                        center = Offset(px, py)
-                    )
+                    drawRect(color = ext.sidebarBg)
+                    val sx = size.width / 2000f
+                    val sy = size.height / 2000f
+                    NeighborhoodMapData.roads.forEach { road ->
+                        if (road.points.size >= 2) {
+                            val path = Path().apply {
+                                moveTo(road.points.first().first * sx, road.points.first().second * sy)
+                                road.points.drop(1).forEach { (x, y) -> lineTo(x * sx, y * sy) }
+                            }
+                            val roadColor = if (road.isMajor) {
+                                if (darkMap) Color(0xFF737A68) else Color(0xFFB9B3A0)
+                            } else {
+                                if (darkMap) Color(0xFF3D4A42) else Color(0xFFB9B3A0)
+                            }
+                            drawPath(path, roadColor, style = Stroke(if (road.isMajor) 8f else 3f))
+                            if (road.isMajor) drawPath(path, if (darkMap) Color(0xFF26322B) else Color(0xFFF8F6EF), style = Stroke(2.5f))
+                        }
+                    }
+                    landmarks.forEach { landmark ->
+                        drawCircle(Color(0xFF74816D), radius = 3f, center = Offset(landmark.x * sx, landmark.y * sy))
+                    }
+                    val px = fx * size.width
+                    val py = fy * size.height
+                    if (hasSelectedPoint) {
+                        drawCircle(Color(0xFF123E39).copy(alpha = .2f), 22f, Offset(px, py))
+                        drawCircle(Color.White, 11f, Offset(px, py))
+                        drawCircle(Color(0xFF123E39), 8f, Offset(px, py))
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Quick Landmark Chips
+            // Nearby landmarks from the same offline map data.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                presets.forEach { (label, coords, fullAddr) ->
+                landmarks.forEach { landmark ->
                     Surface(
                         modifier = Modifier
                             .clip(RoundedCornerShape(999.dp))
                             .clickable {
-                                onPinSelected(coords.first, coords.second, fullAddr)
+                                onPinSelected(landmark.lat, landmark.lon, "Resolving address…")
                             },
                         color = ext.paper,
                         shape = RoundedCornerShape(999.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, ext.line)
                     ) {
                         Text(
-                            text = "📍 $label",
+                            text = "📍 ${landmark.name}",
                             fontSize = 10.sp,
                             color = ext.ink,
                             fontWeight = FontWeight.Medium,
@@ -813,19 +766,6 @@ private fun InteractiveWardMapPicker(
             }
         }
     }
-}
-
-private fun resolveNearestWardAddress(lat: Double, lon: Double): String {
-    data class Zone(val lat: Double, val lon: Double, val addr: String)
-    val zones = listOf(
-        Zone(28.4595, 77.0266, "Main Market Road near Ward 4 Primary School, Ward 4"),
-        Zone(28.4612, 77.0289, "5th Cross Road near Central Park East Gate, Ward 4"),
-        Zone(28.4680, 77.0310, "12th Main Road Junction, Sector 14 Crossing, Ward 4"),
-        Zone(28.4645, 77.0342, "Sector 14 Main Market Lane, Ward 4"),
-        Zone(28.4630, 77.0240, "West Colony Road near Primary Health Center, Ward 4"),
-    )
-    val closest = zones.minByOrNull { (it.lat - lat) * (it.lat - lat) + (it.lon - lon) * (it.lon - lon) } ?: zones.first()
-    return "${closest.addr} (${formatCoord(lat)}° N, ${formatCoord(lon)}° E)"
 }
 
 private fun formatCoord(v: Double): String {

@@ -10,6 +10,8 @@ class CivicBackendUseCases(private val repository: NativeCivicRepository) {
     suspend fun instantSignIn(email: String) = repository.instantSignIn(email.trim())
     suspend fun dummyUsers() = repository.getDummyUsers()
     suspend fun leaderboard(roleFilter: String = "ALL") = repository.getLeaderboard(roleFilter)
+    suspend fun verifyEmail(token: String, email: String? = null) = repository.verifyEmail(token.trim(), email?.trim())
+    suspend fun resendVerification(email: String) = repository.resendVerification(email.trim())
     suspend fun profile() = repository.getProfile()
     suspend fun saveProfile(profile: CivicProfile) = repository.saveProfile(profile)
     suspend fun savedSources() = repository.getSavedSources()

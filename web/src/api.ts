@@ -164,6 +164,23 @@ export interface VerifyLoginCodeResponse {
   message?: string;
 }
 
+export interface RegisterResponse {
+  status: string;
+  email: string;
+  message: string;
+  verificationSent: boolean;
+  devVerificationLink?: string | null;
+  devToken?: string | null;
+  accessToken?: string | null;
+}
+
+export interface VerifyEmailResponse {
+  status: string;
+  accessToken: string;
+  email: string;
+  message: string;
+}
+
 export async function requestLoginCode(email: string, password?: string): Promise<RequestLoginCodeResponse> {
   return api<RequestLoginCodeResponse>('/auth/login/request-code', {
     method: 'POST',
@@ -189,13 +206,32 @@ export async function signIn(email: string, password: string = '', code?: string
   return loadIdentity();
 }
 
-export async function registerAccount(input: RegisterInput) {
-  const res = await api<{ status: string; accessToken?: string }>('/auth/register', {
+export async function registerAccount(input: RegisterInput): Promise<RegisterResponse> {
+  const res = await api<RegisterResponse>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(input),
   });
+  if (res?.accessToken) {
+    setStoredToken(res.accessToken);
+    await loadIdentity();
+  }
+  return res;
+}
+
+export async function verifyEmail(token: string, email?: string): Promise<Identity | null> {
+  const res = await api<VerifyEmailResponse>('/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ token, email }),
+  });
   if (res?.accessToken) setStoredToken(res.accessToken);
   return loadIdentity();
+}
+
+export async function resendVerification(email: string): Promise<RegisterResponse> {
+  return api<RegisterResponse>('/auth/resend-verification', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
 }
 
 export async function requestPasswordReset(email: string) {

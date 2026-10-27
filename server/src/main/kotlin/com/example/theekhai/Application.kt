@@ -215,9 +215,41 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
         post("/api/v1/auth/register") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)
             if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")
-            val (id, session) = auth.register(call.receive<RegisterDto>())
+            val host = call.request.header("X-Forwarded-Host") ?: call.request.header(HttpHeaders.Host) ?: "localhost:5173"
+            val proto = call.request.header("X-Forwarded-Proto") ?: if (host.contains("ngrok") || host.contains("https")) "https" else "http"
+            val defaultOrigin = origin?.takeIf { it.isNotBlank() } ?: "$proto://$host"
+            val resp = auth.register(call.receive<RegisterDto>(), defaultOrigin)
+            call.respond(HttpStatusCode.Created, resp)
+        } }
+        post("/api/v1/auth/verify-email") { safe(call) {
+            val origin = call.request.header(HttpHeaders.Origin)
+            if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")
+            val req = call.receive<VerifyEmailDto>()
+            val (id, session, email) = auth.verifyEmail(req.token, req.email)
             call.response.cookies.append(Cookie("theekhai_session",id,httpOnly=true,secure=cookieSecure,path="/",extensions=mapOf("SameSite" to "Lax")))
-            call.respond(HttpStatusCode.Created, mapOf("status" to "registered", "accessToken" to session.token))
+            call.respond(VerifyEmailResponseDto("verified", session.token, email, "Email successfully verified. Your account is active."))
+        } }
+        get("/api/v1/auth/verify-email") { safe(call) {
+            val token = call.request.queryParameters["token"] ?: throw WorkflowFailure("INVALID_INPUT", "Missing verification token.")
+            val email = call.request.queryParameters["email"]
+            val (id, session, verifiedEmail) = auth.verifyEmail(token, email)
+            call.response.cookies.append(Cookie("theekhai_session",id,httpOnly=true,secure=cookieSecure,path="/",extensions=mapOf("SameSite" to "Lax")))
+            val accept = call.request.header(HttpHeaders.Accept) ?: ""
+            if (accept.contains("text/html")) {
+                call.respondRedirect("/verify-email?token=$token&status=success")
+            } else {
+                call.respond(VerifyEmailResponseDto("verified", session.token, verifiedEmail, "Email successfully verified. Your account is active."))
+            }
+        } }
+        post("/api/v1/auth/resend-verification") { safe(call) {
+            val origin = call.request.header(HttpHeaders.Origin)
+            if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")
+            val req = call.receive<ResendVerificationDto>()
+            val host = call.request.header("X-Forwarded-Host") ?: call.request.header(HttpHeaders.Host) ?: "localhost:5173"
+            val proto = call.request.header("X-Forwarded-Proto") ?: if (host.contains("ngrok") || host.contains("https")) "https" else "http"
+            val defaultOrigin = origin?.takeIf { it.isNotBlank() } ?: "$proto://$host"
+            val resp = auth.resendVerification(req.email, defaultOrigin)
+            call.respond(resp)
         } }
         post("/api/v1/auth/recover") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)

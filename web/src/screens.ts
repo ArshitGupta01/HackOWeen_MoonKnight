@@ -3,6 +3,8 @@ import {
   identity,
   signIn,
   registerAccount,
+  verifyEmail,
+  resendVerification,
   requestPasswordReset,
   getProfile,
   saveProfile,
@@ -239,220 +241,125 @@ export function report(parent:HTMLElement):()=>void {
 export function login(parent:HTMLElement) {
   heading(
     parent,
-    t('CIVIC ACCOUNT ACCESS · EMAIL VERIFICATION', 'नागरिक खाता पहुँच · ईमेल सत्यापन'),
+    t('CIVIC ACCOUNT ACCESS', 'नागरिक खाता पहुँच'),
     t('Keep the conversation going.', 'बात आगे बढ़ाएँ।'),
-    t('Sign in with your verified account or authenticate using a 6-digit email verification code.', 'अपने सत्यापित खाते से साइन इन करें या 6-अंकीय ईमेल सत्यापन कोड से लॉगिन करें।'),
+    t('Sign in directly with your email and password, or choose a pre-seeded pilot demo user.', 'अपने ईमेल और पासवर्ड से सीधे साइन इन करें, या पूर्व-कॉन्फ़िगर पायलट डेमो खाता चुनें।'),
   );
   const shell = el('div', 'auth-shell');
   const form = el('form', 'panel login-form');
   const alert = el('div');
 
-  let step: 'EMAIL' | 'VERIFY' = 'EMAIL';
-  let pendingEmail = '';
-  let currentDevCode: string | null = null;
+  const email = field(t('Email address', 'ईमेल पता'), 'email', 'email');
+  email.input.autocomplete = 'email';
+  email.input.placeholder = 'citizen@theekhai.in';
 
-  function renderForm() {
-    form.replaceChildren();
-    alert.replaceChildren();
-
-    if (step === 'EMAIL') {
-      const email = field(t('Email address', 'ईमेल पता'), 'email', 'email');
-      email.input.autocomplete = 'email';
-      email.input.placeholder = 'citizen@theekhai.in';
-      if (pendingEmail) email.input.value = pendingEmail;
-
-      const password = passwordField(t('Password (Optional / Pilot Access)', 'पासवर्ड (वैकल्पिक / पायलट पहुँच)'), 'password', 'current-password');
-      if (email.input.value.includes('@theekhai.in') && !password.input.value) {
-        password.input.value = 'TheekHai@2026';
-      }
-
-      const metaRow = el('div', 'auth-meta-row');
-      const forgotBtn = button(
-        t('Forgot password?', 'पासवर्ड भूल गए?'),
-        () => {
-          if (!email.input.value.trim()) {
-            notice(alert, t('Enter your email address first so we can send a reset link.', 'रीसेट लिंक भेजने के लिए पहले अपना ईमेल पता लिखें।'), true);
-            email.input.focus();
-            return;
-          }
-          forgotBtn.disabled = true;
-          void requestPasswordReset(email.input.value.trim())
-            .then(() => notice(alert, t('Password recovery email requested via Supabase Auth.', 'सुपाबेस ऑथ के माध्यम से पासवर्ड रीसेट ईमेल भेजा गया।')))
-            .catch(err => notice(alert, errorMessage(err), true))
-            .finally(() => { forgotBtn.disabled = false; });
-        },
-        'quiet',
-      );
-      metaRow.append(el('span', 'microcopy', t('Verified via Gmail · HttpOnly session', 'जीमेल द्वारा सत्यापित · HttpOnly सत्र')), forgotBtn);
-
-      const submit = el('button', 'button', t('✉️ Send Verification Code to Email  →', '✉️ ईमेल पर सत्यापन कोड भेजें  →'));
-      submit.type = 'submit';
-
-      // Shared Demo Accounts (inspired by TenderLens signin.html)
-      const demoBox = el('div', 'demo-credential-card');
-      demoBox.append(
-        el('span', 'label', t('10 DUMMY PILOT ACCOUNTS · 1-CLICK EMAIL VERIFIED LOGIN', '10 डेमो पायलट खाते · 1-क्लिक ईमेल सत्यापित लॉगिन')),
-        el('p', 'microcopy', t('Click any user below to authenticate with email login verification (Password: TheekHai@2026):', 'ईमेल सत्यापन के साथ साइन-इन करने के लिए नीचे किसी भी उपयोगकर्ता पर क्लिक करें (पासवर्ड: TheekHai@2026):')),
-      );
-      const demoGrid = el('div', 'demo-grid demo-grid-10');
-      const dummyUsers: [string, string, string, string, string][] = [
-        ['mohit@theekhai.in', 'Mohit Sharma', t('Citizen (Ward 4)', 'नागरिक (वार्ड 4)'), 'CITIZEN', '395 pts'],
-        ['arshit@theekhai.in', 'Arshit Gupta', t('Municipal Admin', 'नगरपालिका व्यवस्थापक'), 'ADMIN', '485 pts'],
-        ['atri@theekhai.in', 'Atri Chatterjee', t('Civic Reviewer', 'स्वतंत्र समीक्षक'), 'REVIEWER', '430 pts'],
-        ['himanshu@theekhai.in', 'Himanshu Verma', t('PWD Division', 'लोक निर्माण विभाग'), 'DEPARTMENT', '360 pts'],
-        ['priya@theekhai.in', 'Priya Nair', t('Citizen (Ward 4)', 'नागरिक (वार्ड 4)'), 'CITIZEN', '290 pts'],
-        ['rohan@theekhai.in', 'Rohan Deshmukh', t('Electrical Ops', 'विद्युत सेवाएं'), 'DEPARTMENT', '310 pts'],
-        ['ananya@theekhai.in', 'Ananya Iyer', t('Citizen (Ward 2)', 'नागरिक (वार्ड 2)'), 'CITIZEN', '235 pts'],
-        ['vikram@theekhai.in', 'Vikramaditya Singh', t('Water Services', 'जल आपूर्ति विभाग'), 'DEPARTMENT', '265 pts'],
-        ['neha@theekhai.in', 'Neha Kapoor', t('Citizen (Ward 4)', 'नागरिक (वार्ड 4)'), 'CITIZEN', '185 pts'],
-        ['kabir@theekhai.in', 'Kabir Mehta', t('Citizen (Ward 3)', 'नागरिक (वार्ड 3)'), 'CITIZEN', '135 pts'],
-      ];
-      for (const [demoEmail, name, roleTitle, badge, pts] of dummyUsers) {
-        const btn = el('button', 'demo-role-btn');
-        btn.type = 'button';
-        btn.append(
-          el('strong', '', `${name} (${pts})`),
-          el('small', '', `${roleTitle} · ${badge}`),
-        );
-        btn.addEventListener('click', async () => {
-          btn.disabled = true;
-          notice(alert, t(`Sending email verification code to ${demoEmail}…`, `${demoEmail} पर सत्यापन कोड भेजा जा रहा है…`));
-          try {
-            const res = await requestLoginCode(demoEmail, 'TheekHai@2026');
-            pendingEmail = demoEmail;
-            currentDevCode = res.devCode || null;
-            step = 'VERIFY';
-            renderForm();
-          } catch (err) {
-            notice(alert, errorMessage(err), true);
-            btn.disabled = false;
-          }
-        });
-        demoGrid.append(btn);
-      }
-      demoBox.append(demoGrid);
-
-      const switchRow = el('p', 'microcopy');
-      switchRow.append(
-        document.createTextNode(t('New to TheekHai? ', 'ठीकहै पर नए हैं? ')),
-        link(t('Create a citizen account  →', 'नया नागरिक खाता बनाएँ  →'), '/signup', 'text-link'),
-      );
-
-      form.append(email.wrapper, password.wrapper, metaRow, alert, submit, demoBox, switchRow);
-
-      form.onsubmit = async e => {
-        e.preventDefault();
-        const em = email.input.value.trim();
-        if (!em) {
-          notice(alert, t('Please enter your email address.', 'कृपया अपना ईमेल पता लिखें।'), true);
-          return;
-        }
-        submit.disabled = true;
-        notice(alert, t('Sending 6-digit login verification code via email…', 'ईमेल के माध्यम से 6-अंकीय सत्यापन कोड भेजा जा रहा है…'));
-        try {
-          const res = await requestLoginCode(em, password.input.value.trim() || undefined);
-          pendingEmail = em;
-          currentDevCode = res.devCode || null;
-          step = 'VERIFY';
-          renderForm();
-        } catch (error) {
-          notice(alert, errorMessage(error), true);
-          submit.disabled = false;
-        }
-      };
-    } else {
-      // Step 2: 6-digit Email Verification Code
-      const verifyHeading = el('div', 'verify-step-header');
-      verifyHeading.append(
-        el('span', 'label', t('🔒 TWO-FACTOR EMAIL AUTHENTICATION', '🔒 दो-कारक ईमेल प्रमाणीकरण')),
-        el('h2', '', t('Enter Verification Code', 'सत्यापन कोड दर्ज करें')),
-        el('p', '', t('We dispatched an official 6-digit login verification code to: ', 'हमने आधिकारिक 6-अंकीय सत्यापन कोड इस पते पर भेजा है: ')),
-        el('strong', 'target-email-badge', pendingEmail),
-        el('p', 'microcopy', t('Dispatched via Gmail from arshitgupta34@gmail.com · Valid for 10 minutes', 'arshitgupta34@gmail.com से जीमेल द्वारा प्रेषित · 10 मिनट के लिए मान्य'))
-      );
-
-      if (currentDevCode) {
-        const devBadge = el('div', 'geo-badge');
-        devBadge.style.margin = '8px 0 12px';
-        devBadge.append(document.createTextNode(`🔑 Auto-dispatched Code: ${currentDevCode} (Pre-filled for fast verification)`));
-        verifyHeading.append(devBadge);
-      }
-
-      const codeField = field(t('6-Digit Verification Code', '6-अंकीय सत्यापन कोड'), 'otpCode', 'text');
-      codeField.input.maxLength = 6;
-      codeField.input.placeholder = '• • • • • •';
-      codeField.input.style.letterSpacing = '10px';
-      codeField.input.style.fontSize = '24px';
-      codeField.input.style.textAlign = 'center';
-      codeField.input.style.fontWeight = 'bold';
-      codeField.input.autocomplete = 'one-time-code';
-      if (currentDevCode) codeField.input.value = currentDevCode;
-
-      const verifySubmit = el('button', 'button', t('🚀 Verify & Sign In to Workspace  →', '🚀 कोड सत्यापित करें और साइन इन करें  →'));
-      verifySubmit.type = 'submit';
-
-      const navRow = el('div', 'auth-meta-row');
-      navRow.style.marginTop = '12px';
-      const backBtn = button(t('← Change Email', '← ईमेल बदलें'), () => {
-        step = 'EMAIL';
-        renderForm();
-      }, 'quiet');
-
-      const resendBtn = button(t('🔄 Resend Code', '🔄 कोड पुनः भेजें'), async () => {
-        resendBtn.disabled = true;
-        notice(alert, t('Resending verification code to ', 'सत्यापन कोड पुनः भेजा जा रहा है: ') + pendingEmail);
-        try {
-          const res = await requestLoginCode(pendingEmail);
-          currentDevCode = res.devCode || null;
-          if (currentDevCode) codeField.input.value = currentDevCode;
-          notice(alert, t('✓ A new verification code has been dispatched.', '✓ नया सत्यापन कोड भेज दिया गया है।'));
-        } catch (err) {
-          notice(alert, errorMessage(err), true);
-        } finally {
-          resendBtn.disabled = false;
-        }
-      }, 'quiet');
-
-      navRow.append(backBtn, resendBtn);
-
-      form.append(verifyHeading, codeField.wrapper, alert, verifySubmit, navRow);
-
-      form.onsubmit = async e => {
-        e.preventDefault();
-        const code = codeField.input.value.trim();
-        if (code.length < 4) {
-          notice(alert, t('Enter the complete 6-digit verification code.', 'कृपया पूरा 6-अंकीय कोड दर्ज करें।'), true);
-          codeField.input.focus();
-          return;
-        }
-        verifySubmit.disabled = true;
-        notice(alert, t('Verifying email code with authentication server…', 'सत्यापन कोड की जाँच हो रही है…'));
-        try {
-          const user = await verifyLoginCode(pendingEmail, code);
-          if (!user) throw new Error('Session could not be established.');
-          notice(alert, t('✓ Email verification successful! Loading workspace…', '✓ ईमेल सत्यापन सफल! कार्यक्षेत्र लोड हो रहा है…'));
-          navigate('/workspace');
-        } catch (error) {
-          notice(alert, errorMessage(error), true);
-          verifySubmit.disabled = false;
-        }
-      };
-
-      setTimeout(() => codeField.input.focus(), 50);
-    }
+  const password = passwordField(t('Password', 'पासवर्ड'), 'password', 'current-password');
+  if (email.input.value.includes('@theekhai.in') && !password.input.value) {
+    password.input.value = 'TheekHai@2026';
   }
 
-  renderForm();
+  const metaRow = el('div', 'auth-meta-row');
+  const forgotBtn = button(
+    t('Forgot password?', 'पासवर्ड भूल गए?'),
+    () => {
+      if (!email.input.value.trim()) {
+        notice(alert, t('Enter your email address first so we can send a reset link.', 'रीसेट लिंक भेजने के लिए पहले अपना ईमेल पता लिखें।'), true);
+        email.input.focus();
+        return;
+      }
+      forgotBtn.disabled = true;
+      void requestPasswordReset(email.input.value.trim())
+        .then(() => notice(alert, t('Password recovery email requested via Supabase Auth.', 'सुपाबेस ऑथ के माध्यम से पासवर्ड रीसेट ईमेल भेजा गया।')))
+        .catch(err => notice(alert, errorMessage(err), true))
+        .finally(() => { forgotBtn.disabled = false; });
+    },
+    'quiet',
+  );
+  metaRow.append(el('span', 'microcopy', t('Direct Sign-In · HttpOnly Session', 'सीधा साइन-इन · HttpOnly सत्र')), forgotBtn);
+
+  const submit = el('button', 'button', t('Sign in to workspace  →', 'कार्यक्षेत्र में साइन इन करें  →'));
+  submit.type = 'submit';
+
+  // Shared Demo Accounts (1-Click Instant Sign-In)
+  const demoBox = el('div', 'demo-credential-card');
+  demoBox.append(
+    el('span', 'label', t('10 PILOT DEMO ACCOUNTS · 1-CLICK INSTANT SIGN-IN', '10 पायलट डेमो खाते · 1-क्लिक त्वरित साइन-इन')),
+    el('p', 'microcopy', t('Click any account below to sign in instantly without entering password:', 'बिना पासवर्ड दर्ज किए तुरंत साइन इन करने के लिए नीचे किसी भी खाते पर क्लिक करें:')),
+  );
+  const demoGrid = el('div', 'demo-grid demo-grid-10');
+  const dummyUsers: [string, string, string, string, string][] = [
+    ['mohit@theekhai.in', 'Mohit Sharma', t('Citizen (Ward 4)', 'नागरिक (वार्ड 4)'), 'CITIZEN', '395 pts'],
+    ['arshit@theekhai.in', 'Arshit Gupta', t('Municipal Admin', 'नगरपालिका व्यवस्थापक'), 'ADMIN', '485 pts'],
+    ['atri@theekhai.in', 'Atri Chatterjee', t('Civic Reviewer', 'स्वतंत्र समीक्षक'), 'REVIEWER', '430 pts'],
+    ['himanshu@theekhai.in', 'Himanshu Verma', t('PWD Division', 'लोक निर्माण विभाग'), 'DEPARTMENT', '360 pts'],
+    ['priya@theekhai.in', 'Priya Nair', t('Citizen (Ward 4)', 'नागरिक (वार्ड 4)'), 'CITIZEN', '290 pts'],
+    ['rohan@theekhai.in', 'Rohan Deshmukh', t('Electrical Ops', 'विद्युत सेवाएं'), 'DEPARTMENT', '310 pts'],
+    ['ananya@theekhai.in', 'Ananya Iyer', t('Citizen (Ward 2)', 'नागरिक (वार्ड 2)'), 'CITIZEN', '235 pts'],
+    ['vikram@theekhai.in', 'Vikramaditya Singh', t('Water Services', 'जल आपूर्ति विभाग'), 'DEPARTMENT', '265 pts'],
+    ['neha@theekhai.in', 'Neha Kapoor', t('Citizen (Ward 4)', 'नागरिक (वार्ड 4)'), 'CITIZEN', '185 pts'],
+    ['kabir@theekhai.in', 'Kabir Mehta', t('Citizen (Ward 3)', 'नागरिक (वार्ड 3)'), 'CITIZEN', '135 pts'],
+  ];
+  for (const [demoEmail, name, roleTitle, badge, pts] of dummyUsers) {
+    const btn = el('button', 'demo-role-btn');
+    btn.type = 'button';
+    btn.append(
+      el('strong', '', `${name} (${pts})`),
+      el('small', '', `${roleTitle} · ${badge}`),
+    );
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      notice(alert, t(`Signing in as ${name}…`, `${name} के रूप में साइन इन किया जा रहा है…`));
+      try {
+        const user = await instantSignIn(demoEmail);
+        if (!user) throw new Error('Could not establish session.');
+        notice(alert, t('✓ Signed in successfully! Loading workspace…', '✓ सफलतापूर्वक साइन इन हुआ! कार्यक्षेत्र लोड हो रहा है…'));
+        navigate('/workspace');
+      } catch (err) {
+        notice(alert, errorMessage(err), true);
+        btn.disabled = false;
+      }
+    });
+    demoGrid.append(btn);
+  }
+  demoBox.append(demoGrid);
+
+  const switchRow = el('p', 'microcopy');
+  switchRow.append(
+    document.createTextNode(t('New to TheekHai? ', 'ठीकहै पर नए हैं? ')),
+    link(t('Create a citizen account  →', 'नया नागरिक खाता बनाएँ  →'), '/signup', 'text-link'),
+  );
+
+  form.append(email.wrapper, password.wrapper, metaRow, alert, submit, demoBox, switchRow);
+
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const em = email.input.value.trim();
+    if (!em) {
+      notice(alert, t('Please enter your email address.', 'कृपया अपना ईमेल पता लिखें।'), true);
+      return;
+    }
+    submit.disabled = true;
+    notice(alert, t('Signing in…', 'साइन इन किया जा रहा है…'));
+    try {
+      const user = await signIn(em, password.input.value);
+      if (!user) throw new Error('Session could not be established.');
+      notice(alert, t('✓ Signed in successfully! Loading workspace…', '✓ सफलतापूर्वक साइन इन हुआ! कार्यक्षेत्र लोड हो रहा है…'));
+      navigate('/workspace');
+    } catch (error) {
+      notice(alert, errorMessage(error), true);
+      submit.disabled = false;
+    }
+  };
 
   const aside = el('aside', 'panel auth-aside');
   aside.append(
-    el('span', 'label', t('SECURE CIVIC AUTHENTICATION ARCHITECTURE', 'सुरक्षित नागरिक प्रमाणीकरण संरचना')),
-    el('h2', '', t('Email-Verified Identity\nBacked by Supabase RLS.', 'ईमेल-सत्यापित पहचान\nसुपाबेस RLS द्वारा सुरक्षित।')),
-    el('p', '', t('Every login requires authenticating with a dynamic 6-digit one-time verification code dispatched directly to your registered email.', 'प्रत्येक लॉगिन के लिए आपके पंजीकृत ईमेल पर भेजे गए गतिशील 6-अंकीय सत्यापन कोड से प्रमाणीकरण आवश्यक है।')),
+    el('span', 'label', t('CIVIC AUTHENTICATION ARCHITECTURE', 'नागरिक प्रमाणीकरण संरचना')),
+    el('h2', '', t('Direct Access & Verified Identity\nBacked by Supabase RLS.', 'सीधी पहुँच और सत्यापित पहचान\nसुपाबेस RLS द्वारा सुरक्षित।')),
+    el('p', '', t('Direct sign-in for registered accounts. New citizen registrations verify email validity with an activation link dispatched from arshitgupta34@gmail.com.', 'पंजीकृत खातों के लिए सीधा साइन-इन। नए पंजीकरण ईमेल की वैधता की पुष्टि के लिए आधिकारिक लिंक का उपयोग करते हैं।')),
   );
   const pillars = el('div', 'trust-pillars');
   for (const [title, desc] of [
-    [t('Email-Verified Multi-Factor Auth', 'ईमेल-सत्यापित बहु-कारक प्रमाणीकरण'), t('Official 6-digit login codes dispatched via Gmail API (arshitgupta34@gmail.com) prevent credential stuffing and unauthorized access.', 'जीमेल एपीआई द्वारा भेजे गए 6-अंकीय कोड अनधिकृत पहुँच को रोकते हैं।')],
+    [t('Sign-Up Email Verification Link', 'साइन-अप ईमेल सत्यापन लिंक'), t('All new registrations verify email validity with an activation link dispatched via Gmail API (arshitgupta34@gmail.com).', 'सभी नए पंजीकरण ईमेल की वैधता की पुष्टि के लिए जीमेल द्वारा भेजे गए लिंक का उपयोग करते हैं।')],
     [t('PostgreSQL Row-Level Security', 'PostgreSQL रो-लेवल सुरक्षा (RLS)'), t('Profiles and saved legal references enforce `(select auth.uid()) = user_id` at the database layer.', 'प्रोफ़ाइल और सहेजे गए कानूनी संदर्भ डेटाबेस स्तर पर `(select auth.uid()) = user_id` लागू करते हैं।')],
     [t('HttpOnly Session + CSRF Protection', 'HttpOnly सत्र + CSRF सुरक्षा'), t('Browser sessions stay in strict HttpOnly cookies rather than exposing tokens to scripts.', 'ब्राउज़र सत्र सुरक्षित HttpOnly कुकीज़ में रहते हैं।')],
     [t('Separation of Duties', 'जिम्मेदारियों का पृथक्करण'), t('Department staff can request closure, but only an independent reviewer can approve or reopen a case.', 'विभागीय कर्मचारी बंद करने का अनुरोध कर सकते हैं, लेकिन केवल स्वतंत्र समीक्षक ही स्वीकृति दे सकता है।')],
@@ -471,7 +378,7 @@ export function signup(parent:HTMLElement) {
     parent,
     t('CREATE YOUR CIVIC ACCOUNT', 'अपना नागरिक खाता बनाएँ'),
     t('Join your neighbourhood workspace.', 'अपने पड़ोस के कार्यक्षेत्र से जुड़ें।'),
-    t('Create a verified citizen account backed by Supabase Auth and RLS-protected profile storage.', 'सुपाबेस ऑथ और RLS-सुरक्षित प्रोफ़ाइल के साथ अपना नागरिक खाता बनाएँ।'),
+    t('Register your account. We will send an official verification link to confirm your email is valid.', 'अपना खाता पंजीकृत करें। आपका ईमेल मान्य है या नहीं, इसकी पुष्टि के लिए हम एक आधिकारिक सत्यापन लिंक भेजेंगे।'),
   );
   const shell = el('div', 'auth-shell');
   const form = el('form', 'panel login-form');
@@ -516,7 +423,7 @@ export function signup(parent:HTMLElement) {
 
   const confirmPassword = passwordField(t('Confirm password', 'पासवर्ड की पुष्टि करें'), 'confirmPassword', 'new-password');
   const alert = el('div');
-  const submit = el('button', 'button', t('Create account & continue  →', 'खाता बनाएँ और आगे बढ़ें  →'));
+  const submit = el('button', 'button', t('Create Account & Send Verification Link  →', 'खाता बनाएँ और सत्यापन लिंक भेजें  →'));
   submit.type = 'submit';
 
   const switchRow = el('p', 'microcopy');
@@ -526,7 +433,80 @@ export function signup(parent:HTMLElement) {
   );
 
   form.append(fullName.wrapper, email.wrapper, ward.wrapper, organization.wrapper, password.wrapper, strengthWrap, confirmPassword.wrapper, alert, submit, switchRow);
-  form.addEventListener('submit', e => {
+
+  function showVerificationCard(res: { email: string; message: string; devVerificationLink?: string | null; devToken?: string | null }) {
+    form.replaceChildren();
+    alert.replaceChildren();
+
+    const card = el('div', 'verify-step-header');
+    card.append(
+      el('span', 'label', t('✉️ SIGN-UP EMAIL VERIFICATION LINK SENT', '✉️ साइन-अप ईमेल सत्यापन लिंक भेजा गया')),
+      el('h2', '', t('Verify Your Email Address', 'अपना ईमेल पता सत्यापित करें')),
+      el('p', '', t('We sent an official email verification link to confirm this email is valid: ', 'यह ईमेल मान्य है या नहीं, इसकी पुष्टि के लिए हमने सत्यापन लिंक भेजा है: ')),
+      el('strong', 'target-email-badge', res.email),
+      el('p', 'microcopy', t('Dispatched via Gmail API from arshitgupta34@gmail.com · Valid for 24 hours', 'arshitgupta34@gmail.com से प्रेषित · 24 घंटे के लिए मान्य'))
+    );
+
+    if (res.devVerificationLink) {
+      const devCard = el('div', 'geo-badge');
+      devCard.style.margin = '12px 0 16px';
+      devCard.style.display = 'block';
+      devCard.append(
+        el('strong', '', '🔑 Development Verification Fast-Track:'),
+        el('p', 'microcopy', 'Click below to verify this email address directly without opening inbox:'),
+        link(t('⚡ Verify Email Now (Dev Link)  →', '⚡ ईमेल अभी सत्यापित करें (डेव लिंक)  →'), res.devVerificationLink, 'button small'),
+      );
+      card.append(devCard);
+    }
+
+    const tokenField = field(t('Or enter verification token from email:', 'या ईमेल से प्राप्त सत्यापन टोकन दर्ज करें:'), 'tokenInput', 'text');
+    tokenField.input.placeholder = 'Paste verification token here';
+    if (res.devToken) tokenField.input.value = res.devToken;
+
+    const verifyBtn = el('button', 'button', t('Verify Email & Activate Account  →', 'ईमेल सत्यापित करें और खाता सक्रिय करें  →'));
+    verifyBtn.type = 'button';
+
+    const resendBtn = button(t('🔄 Resend Verification Link', '🔄 सत्यापन लिंक पुनः भेजें'), async () => {
+      resendBtn.disabled = true;
+      notice(alert, t('Resending verification email to ', 'सत्यापन ईमेल पुनः भेजा जा रहा है: ') + res.email);
+      try {
+        const fresh = await resendVerification(res.email);
+        notice(alert, t('✓ A new verification link has been sent to your email.', '✓ नया सत्यापन लिंक आपके ईमेल पर भेज दिया गया है।'));
+        if (fresh.devToken) tokenField.input.value = fresh.devToken;
+      } catch (err) {
+        notice(alert, errorMessage(err), true);
+      } finally {
+        resendBtn.disabled = false;
+      }
+    }, 'quiet');
+
+    verifyBtn.addEventListener('click', async () => {
+      const tok = tokenField.input.value.trim();
+      if (!tok) {
+        notice(alert, t('Please enter the verification token.', 'कृपया सत्यापन टोकन दर्ज करें।'), true);
+        return;
+      }
+      verifyBtn.disabled = true;
+      notice(alert, t('Validating token and activating your civic account…', 'टोकन की जाँच हो रही है…'));
+      try {
+        const user = await verifyEmail(tok, res.email);
+        if (!user) throw new Error('Account verification could not be confirmed.');
+        notice(alert, t('✓ Email successfully verified! Welcome to TheekHai.', '✓ ईमेल सफलतापूर्वक सत्यापित! ठीकहै में आपका स्वागत है।'));
+        navigate('/workspace');
+      } catch (err) {
+        notice(alert, errorMessage(err), true);
+        verifyBtn.disabled = false;
+      }
+    });
+
+    const linksRow = el('div', 'auth-meta-row');
+    linksRow.style.marginTop = '16px';
+    linksRow.append(resendBtn, link(t('Sign in instead  →', 'साइन इन करें  →'), '/login', 'text-link'));
+
+    form.append(card, tokenField.wrapper, alert, verifyBtn, linksRow);
+  }
+
+  form.addEventListener('submit', async e => {
     e.preventDefault();
     if (password.input.value.length < 8) {
       notice(alert, t('Password must be at least 8 characters long.', 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए।'), true);
@@ -537,20 +517,25 @@ export function signup(parent:HTMLElement) {
       return;
     }
     submit.disabled = true;
-    void registerAccount({
-      fullName: fullName.input.value.trim(),
-      email: email.input.value.trim(),
-      password: password.input.value,
-      organization: organization.input.value.trim() || 'Citizen Resident',
-      ward: ward.input.value.trim() || 'Ward 1',
-      preferredLanguage: document.documentElement.lang || 'en',
-    })
-      .then(user => {
-        if (!user) throw new Error('Account created, please sign in.');
+    notice(alert, t('Checking email validity and sending verification link…', 'ईमेल की वैधता की पुष्टि और सत्यापन लिंक भेजा जा रहा है…'));
+    try {
+      const res = await registerAccount({
+        fullName: fullName.input.value.trim(),
+        email: email.input.value.trim(),
+        password: password.input.value,
+        organization: organization.input.value.trim() || 'Citizen Resident',
+        ward: ward.input.value.trim() || 'Ward 1',
+        preferredLanguage: document.documentElement.lang || 'en',
+      });
+      if (res.verificationSent) {
+        showVerificationCard(res);
+      } else {
         navigate('/account');
-      })
-      .catch(err => notice(alert, errorMessage(err), true))
-      .finally(() => { submit.disabled = false; });
+      }
+    } catch (err) {
+      notice(alert, errorMessage(err), true);
+      submit.disabled = false;
+    }
   });
 
   const aside = el('aside', 'panel auth-aside');
@@ -562,6 +547,96 @@ export function signup(parent:HTMLElement) {
   );
   shell.append(form, aside);
   parent.append(shell);
+}
+
+export async function verifyEmailScreen(parent: HTMLElement) {
+  heading(
+    parent,
+    t('EMAIL VERIFICATION', 'ईमेल सत्यापन'),
+    t('Confirm your email address.', 'अपने ईमेल पते की पुष्टि करें।'),
+    t('Verifying that your email address is valid and activating your civic citizen account.', 'जाँच की जा रही है कि आपका ईमेल पता मान्य है और आपका नागरिक खाता सक्रिय किया जा रहा है।'),
+  );
+
+  const container = el('div', 'auth-shell');
+  const panel = el('div', 'panel');
+  panel.style.maxWidth = '580px';
+  panel.style.margin = '0 auto';
+
+  const alert = el('div');
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token') || '';
+  const emailParam = params.get('email') || '';
+  const isAlreadySuccess = params.get('status') === 'success';
+
+  if (isAlreadySuccess || token) {
+    const statusBox = el('div', 'verify-step-header');
+    statusBox.append(
+      el('span', 'label', t('VERIFYING ACCOUNT', 'खाते का सत्यापन')),
+      el('h2', '', t('Validating Email Address…', 'ईमेल पते की पुष्टि हो रही है…')),
+      el('p', '', t('Please wait while we confirm your email and issue your secure session.', 'कृपया प्रतीक्षा करें जब तक हम आपके ईमेल की पुष्टि करते हैं।'))
+    );
+    panel.append(statusBox, alert);
+    container.append(panel);
+    parent.append(container);
+
+    try {
+      const user = token ? await verifyEmail(token, emailParam || undefined) : identity;
+      statusBox.replaceChildren(
+        el('span', 'label', '✓ ' + t('EMAIL VERIFIED', 'ईमेल सत्यापित')),
+        el('h2', '', t('Email Address Successfully Verified!', 'ईमेल पता सफलतापूर्वक सत्यापित हुआ!')),
+        el('p', '', t('Your email is valid and your citizen account is now active. Loading your civic workspace…', 'आपका ईमेल मान्य है और आपका नागरिक खाता अब सक्रिय है। कार्यक्षेत्र लोड हो रहा है…')),
+      );
+      const actionRow = el('div', 'button-row');
+      actionRow.style.marginTop = '16px';
+      actionRow.append(link(t('Open Workspace Now  →', 'अभी कार्यक्षेत्र खोलें  →'), '/workspace', 'button'));
+      panel.append(actionRow);
+
+      setTimeout(() => navigate('/workspace'), 1800);
+    } catch (err) {
+      statusBox.replaceChildren(
+        el('span', 'label', '✕ ' + t('VERIFICATION FAILED', 'सत्यापन विफल')),
+        el('h2', '', t('Invalid or Expired Link', 'अमान्य या समाप्त लिंक')),
+        el('p', '', errorMessage(err)),
+      );
+      const actionRow = el('div', 'button-row');
+      actionRow.style.marginTop = '16px';
+      actionRow.append(
+        link(t('Sign Up Again  →', 'पुनः खाता बनाएँ  →'), '/signup', 'button'),
+        link(t('Go to Sign In', 'साइन इन पर जाएँ'), '/login', 'quiet')
+      );
+      panel.append(actionRow);
+    }
+  } else {
+    const header = el('div', 'verify-step-header');
+    header.append(
+      el('span', 'label', t('MANUAL VERIFICATION', 'मैनुअल सत्यापन')),
+      el('h2', '', t('Enter Verification Token', 'सत्यापन टोकन दर्ज करें')),
+      el('p', '', t('Enter the token from the email sent by arshitgupta34@gmail.com to activate your account:', 'खाता सक्रिय करने के लिए ईमेल से प्राप्त टोकन दर्ज करें:'))
+    );
+    const tokenField = field(t('Verification token', 'सत्यापन टोकन'), 'manualToken', 'text');
+    const submitBtn = el('button', 'button', t('Verify Email & Continue  →', 'ईमेल सत्यापित करें और आगे बढ़ें  →'));
+    submitBtn.addEventListener('click', async () => {
+      const tok = tokenField.input.value.trim();
+      if (!tok) {
+        notice(alert, t('Please enter the token.', 'कृपया टोकन दर्ज करें।'), true);
+        return;
+      }
+      submitBtn.disabled = true;
+      notice(alert, t('Verifying…', 'जाँच हो रही है…'));
+      try {
+        const user = await verifyEmail(tok);
+        if (!user) throw new Error('Verification failed.');
+        navigate('/workspace');
+      } catch (err) {
+        notice(alert, errorMessage(err), true);
+        submitBtn.disabled = false;
+      }
+    });
+
+    panel.append(header, tokenField.wrapper, alert, submitBtn);
+    container.append(panel);
+    parent.append(container);
+  }
 }
 
 export async function account(parent:HTMLElement) {

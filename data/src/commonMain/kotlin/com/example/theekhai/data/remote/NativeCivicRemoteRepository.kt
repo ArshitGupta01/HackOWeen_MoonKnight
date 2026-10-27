@@ -80,9 +80,34 @@ class NativeCivicRemoteRepository(
             setBody(RegisterDto(email, password, fullName, ward = ward))
         }
         requireSuccess(httpResponse)
-        val response: Map<String, String> = httpResponse.body()
-        session.value = response["accessToken"] ?: error("The server did not return a sign-in token.")
+        val response: com.example.theekhai.contract.RegisterResponseDto = httpResponse.body()
+        if (response.accessToken != null) {
+            session.value = response.accessToken
+            return currentUser()
+        }
+        response.devToken?.let { token -> return verifyEmail(token, email) }
+        error("Email verification link dispatched to $email. Please verify your email to continue.")
+    }
+
+    override suspend fun verifyEmail(token: String, email: String?): SignedInUser {
+        val httpResponse = client.post(url("/auth/verify-email")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.VerifyEmailDto(token, email))
+        }
+        requireSuccess(httpResponse)
+        val response: com.example.theekhai.contract.VerifyEmailResponseDto = httpResponse.body()
+        session.value = response.accessToken
         return currentUser()
+    }
+
+    override suspend fun resendVerification(email: String): String {
+        val httpResponse = client.post(url("/auth/resend-verification")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.ResendVerificationDto(email))
+        }
+        requireSuccess(httpResponse)
+        val response: com.example.theekhai.contract.RegisterResponseDto = httpResponse.body()
+        return response.message
     }
 
     private suspend fun currentUser(): SignedInUser {

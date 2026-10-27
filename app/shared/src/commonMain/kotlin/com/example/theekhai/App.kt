@@ -50,29 +50,30 @@ private fun AppNavHost(currentRoute: Route) {
         Route.Login -> LoginScreen()
         Route.Signup -> SignupScreen()
         Route.Report -> ReportScreen()
-        Route.Workspace -> {
+        Route.Workspace, Route.Map, Route.CommandCenter, Route.FieldWorker -> {
             val vm = koinViewModel<NativeConnectViewModel>()
             val st by vm.state.collectAsState()
             LaunchedEffect(vm) { vm.loadCases() }
-            WorkspaceScreen(complaints = st.cases, isLoading = st.isLoading, error = st.error, onRetry = vm::loadCases)
-        }
-        Route.Map -> {
-            val vm = koinViewModel<NativeConnectViewModel>()
-            val st by vm.state.collectAsState()
-            LaunchedEffect(vm) { vm.loadCases() }
-            MapScreen(st.cases)
+            if (route == Route.Map) {
+                MapScreen(st.cases, st.isLoading, st.error, vm::loadCases)
+            } else {
+                WorkspaceScreen(
+                    complaints = st.cases,
+                    isLoading = st.isLoading,
+                    error = st.error,
+                    onRetry = vm::loadCases,
+                    heading = when (route) {
+                        Route.CommandCenter -> "Case operations"
+                        Route.FieldWorker -> "Field work"
+                        else -> "My workspace"
+                    },
+                    description = "Live cases and workflow actions are provided by your account permissions."
+                )
+            }
         }
         Route.Leaderboard -> LeaderboardScreen()
         is Route.CaseDetail -> LiveCaseDetailScreen(caseId = route.caseId)
         Route.Account -> AccountScreen()
         Route.Library -> LibraryScreen()
-        Route.CommandCenter -> {
-            val vm = koinViewModel<com.example.theekhai.presentation.admin.CommandCenterViewModel>()
-            com.example.theekhai.presentation.admin.CommandCenterRoute(viewModel = vm)
-        }
-        Route.FieldWorker -> {
-            val vm = koinViewModel<com.example.theekhai.presentation.fieldworker.FieldWorkerViewModel>()
-            com.example.theekhai.presentation.fieldworker.FieldWorkerRoute(viewModel = vm)
-        }
     }
 }

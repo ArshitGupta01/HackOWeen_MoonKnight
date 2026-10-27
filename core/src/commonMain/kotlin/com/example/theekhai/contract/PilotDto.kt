@@ -29,6 +29,23 @@ import kotlinx.serialization.Serializable
     val message: String
 )
 @Serializable data class RegisterDto(val email: String, val password: String, val fullName: String, val organization: String = "Citizen Resident", val ward: String = "Ward 1", val preferredLanguage: String = "en")
+@Serializable data class RegisterResponseDto(
+    val status: String,
+    val email: String,
+    val message: String,
+    val verificationSent: Boolean = true,
+    val devVerificationLink: String? = null,
+    val devToken: String? = null,
+    val accessToken: String? = null
+)
+@Serializable data class VerifyEmailDto(val token: String, val email: String? = null)
+@Serializable data class VerifyEmailResponseDto(
+    val status: String,
+    val accessToken: String,
+    val email: String,
+    val message: String
+)
+@Serializable data class ResendVerificationDto(val email: String)
 @Serializable data class RecoverPasswordDto(val email: String)
 @Serializable data class ProfileDto(val userId: String = "", val email: String = "", val fullName: String, val organization: String = "", val role: String = "CITIZEN", val department: String? = null, val ward: String = "Ward 1", val preferredLanguage: String = "en")
 @Serializable data class SavedSourceDto(val id: String, val userId: String, val title: String, val sourceUrl: String, val jurisdiction: String, val snippet: String, val createdAt: String = "")

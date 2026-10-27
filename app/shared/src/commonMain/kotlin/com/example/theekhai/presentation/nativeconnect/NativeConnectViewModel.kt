@@ -38,7 +38,11 @@ data class NativeConnectState(
     val dummyUsers: List<com.example.theekhai.contract.DummyUserCredentialDto> = emptyList(),
     val loginCodeSent: Boolean = false,
     val pendingLoginEmail: String? = null,
-    val loginDevCode: String? = null
+    val loginDevCode: String? = null,
+    val signupVerificationSent: Boolean = false,
+    val pendingSignupEmail: String? = null,
+    val signupDevToken: String? = null,
+    val signupDevLink: String? = null
 )
 
 class NativeConnectViewModel(
@@ -87,6 +91,25 @@ class NativeConnectViewModel(
     fun register(email: String, password: String, fullName: String, ward: String) = runRequest {
         val user = registerUseCase(email, password, fullName, ward)
         _state.update { it.copy(user = user, message = "Account created successfully.") }
+    }
+
+    fun verifyEmail(token: String, email: String? = null) = runRequest {
+        val user = backend.verifyEmail(token, email)
+        _state.update {
+            it.copy(
+                user = user,
+                signupVerificationSent = false,
+                pendingSignupEmail = null,
+                signupDevToken = null,
+                signupDevLink = null,
+                message = "Email successfully verified. Welcome to TheekHai!"
+            )
+        }
+    }
+
+    fun resendVerification(email: String) = runRequest {
+        val msg = backend.resendVerification(email)
+        _state.update { it.copy(message = msg) }
     }
 
     fun submitReport(title: String, description: String, category: String, address: String, latitude: Double?, longitude: Double?, consent: Boolean) = runRequest {

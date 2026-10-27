@@ -86,6 +86,74 @@ fun SignupScreen() {
                     horizontalArrangement = Arrangement.spacedBy(40.dp)
                 ) {
                     Column(modifier = Modifier.weight(1.1f)) {
+                        if (connectState.signupVerificationSent) {
+                            SignupEmailVerificationPending(
+                                email = connectState.pendingSignupEmail ?: email,
+                                devToken = connectState.signupDevToken,
+                                isLoading = connectState.isLoading,
+                                errorMessage = connectState.error ?: errorMessage,
+                                onVerifyToken = { tok -> connectViewModel.verifyEmail(tok, connectState.pendingSignupEmail ?: email) },
+                                onResend = { connectViewModel.resendVerification(connectState.pendingSignupEmail ?: email) },
+                                onNavigateLogin = { navigator.navigateTo(Route.Login) },
+                                ext = ext
+                            )
+                        } else {
+                            SignupForm(
+                                fullName = fullName,
+                                onFullNameChange = { fullName = it },
+                                email = email,
+                                onEmailChange = { email = it },
+                                ward = ward,
+                                onWardChange = { ward = it },
+                                password = password,
+                                onPasswordChange = { password = it },
+                                confirmPassword = confirmPassword,
+                                onConfirmPasswordChange = { confirmPassword = it },
+                                passwordVisible = passwordVisible,
+                                onTogglePassword = { passwordVisible = !passwordVisible },
+                                passwordStrength = passwordStrength,
+                                consentChecked = consentChecked,
+                                onConsentChange = { consentChecked = it },
+                                isLoading = connectState.isLoading,
+                                errorMessage = connectState.error ?: errorMessage,
+                                onSubmit = {
+                                    if (password != confirmPassword) {
+                                        errorMessage = "Passwords do not match."
+                                        return@SignupForm
+                                    }
+                                    if (!consentChecked) {
+                                        errorMessage = "Please accept the privacy consent to proceed."
+                                        return@SignupForm
+                                    }
+                                    connectViewModel.register(email, password, fullName, ward)
+                                },
+                                onNavigateLogin = { navigator.navigateTo(Route.Login) },
+                                ext = ext
+                            )
+                        }
+                    }
+
+                    Column(modifier = Modifier.weight(0.9f)) {
+                        CitizenBenefitsPanel(ext = ext)
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    if (connectState.signupVerificationSent) {
+                        SignupEmailVerificationPending(
+                            email = connectState.pendingSignupEmail ?: email,
+                            devToken = connectState.signupDevToken,
+                            isLoading = connectState.isLoading,
+                            errorMessage = connectState.error ?: errorMessage,
+                            onVerifyToken = { tok -> connectViewModel.verifyEmail(tok, connectState.pendingSignupEmail ?: email) },
+                            onResend = { connectViewModel.resendVerification(connectState.pendingSignupEmail ?: email) },
+                            onNavigateLogin = { navigator.navigateTo(Route.Login) },
+                            ext = ext
+                        )
+                    } else {
                         SignupForm(
                             fullName = fullName,
                             onFullNameChange = { fullName = it },
@@ -119,48 +187,6 @@ fun SignupScreen() {
                             ext = ext
                         )
                     }
-
-                    Column(modifier = Modifier.weight(0.9f)) {
-                        CitizenBenefitsPanel(ext = ext)
-                    }
-                }
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
-                ) {
-                    SignupForm(
-                        fullName = fullName,
-                        onFullNameChange = { fullName = it },
-                        email = email,
-                        onEmailChange = { email = it },
-                        ward = ward,
-                        onWardChange = { ward = it },
-                        password = password,
-                        onPasswordChange = { password = it },
-                        confirmPassword = confirmPassword,
-                        onConfirmPasswordChange = { confirmPassword = it },
-                        passwordVisible = passwordVisible,
-                        onTogglePassword = { passwordVisible = !passwordVisible },
-                        passwordStrength = passwordStrength,
-                        consentChecked = consentChecked,
-                        onConsentChange = { consentChecked = it },
-                        isLoading = connectState.isLoading,
-                        errorMessage = connectState.error ?: errorMessage,
-                        onSubmit = {
-                            if (password != confirmPassword) {
-                                errorMessage = "Passwords do not match."
-                                return@SignupForm
-                            }
-                            if (!consentChecked) {
-                                errorMessage = "Please accept the privacy consent to proceed."
-                                return@SignupForm
-                            }
-                            connectViewModel.register(email, password, fullName, ward)
-                        },
-                        onNavigateLogin = { navigator.navigateTo(Route.Login) },
-                        ext = ext
-                    )
 
                     CitizenBenefitsPanel(ext = ext)
                 }
@@ -389,5 +415,100 @@ private fun CitizenBenefitsPanel(ext: com.example.theekhai.ui.theme.TheekHaiExte
         Text("Notice", style = MaterialTheme.typography.labelSmall, color = TheekHaiColors.Amber)
         Spacer(modifier = Modifier.height(4.dp))
         Text("This portal is intended for non-emergency municipal civic issues (roads, lighting, water, sanitation). For emergency services, contact 112.", style = MaterialTheme.typography.bodySmall, color = ext.muted)
+    }
+}
+
+@Composable
+private fun SignupEmailVerificationPending(
+    email: String,
+    devToken: String?,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onVerifyToken: (String) -> Unit,
+    onResend: () -> Unit,
+    onNavigateLogin: () -> Unit,
+    ext: com.example.theekhai.ui.theme.TheekHaiExtendedColors
+) {
+    var tokenInput by remember(devToken) { mutableStateOf(devToken ?: "") }
+
+    PanelCard(modifier = Modifier.fillMaxWidth()) {
+        Text("✉️ VERIFY YOUR EMAIL ADDRESS", style = MaterialTheme.typography.labelSmall, color = ext.green, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Check your email inbox", style = MaterialTheme.typography.titleMedium, color = ext.ink, fontWeight = FontWeight.Bold)
+        Text(
+            text = "An official verification link has been dispatched to $email via Gmail API (arshitgupta34@gmail.com) to confirm that your email address is valid.",
+            style = MaterialTheme.typography.bodySmall,
+            color = ext.muted
+        )
+        if (devToken != null) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Surface(color = Color(0xFFE8F5E9), shape = RoundedCornerShape(4.dp)) {
+                Text(
+                    text = "🔑 Dev Token: $devToken",
+                    color = Color(0xFF2E7D32),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+        Text("Verification Token", style = MaterialTheme.typography.labelMedium, color = ext.ink)
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = tokenInput,
+            onValueChange = { tokenInput = it },
+            placeholder = { Text("Enter verification token") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(4.dp),
+            singleLine = true
+        )
+
+        errorMessage?.let { msg ->
+            Spacer(modifier = Modifier.height(14.dp))
+            Surface(
+                color = Color(0xFFF9EDE1),
+                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = msg,
+                    color = Color(0xFF8A3D24),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        TheekHaiButton(
+            text = if (isLoading) "Verifying..." else "Verify Email & Activate Account →",
+            onClick = { onVerifyToken(tokenInput) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = tokenInput.isNotBlank() && !isLoading
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Resend Link",
+                style = MaterialTheme.typography.bodySmall,
+                color = ext.green,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable { onResend() }
+            )
+            Text(
+                text = "Back to Sign In →",
+                style = MaterialTheme.typography.bodySmall,
+                color = ext.muted,
+                modifier = Modifier.clickable { onNavigateLogin() }
+            )
+        }
     }
 }

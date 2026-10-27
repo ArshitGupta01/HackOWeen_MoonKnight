@@ -1,7 +1,7 @@
 import './style.css';
 import {identity,loadIdentity,signOut} from './api';
 import {el,link,button,t,switchLanguage,language,theme,switchTheme,scrollToTop,refreshScroll} from './ui';
-import {home,report,workspace,detail,login,signup,account,library,information,civicMap,leaderboard} from './screens';
+import {home,report,workspace,detail,login,signup,account,library,information,civicMap,leaderboard,verifyEmailScreen} from './screens';
 
 function initialsForUser(name?: string | null, email?: string | null): string {
   const source = (name || email || 'TH').trim();
@@ -66,6 +66,7 @@ export async function render() {
   else if(route.startsWith('/cases/'))await detail(main,route.split('/')[2]);
   else if(route==='/login')login(main);
   else if(route==='/signup')signup(main);
+  else if(route==='/verify-email')await verifyEmailScreen(main);
   else if(route==='/account')await account(main);
   else if(route==='/map') await civicMap(main);
   else if(route==='/leaderboard') await leaderboard(main);

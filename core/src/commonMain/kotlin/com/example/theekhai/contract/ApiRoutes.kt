@@ -34,6 +34,8 @@ object ApiRoutes {
     const val LEADERBOARD = "$VERSION_PREFIX/leaderboard"
     const val DUMMY_USERS = "$VERSION_PREFIX/auth/dummy-users"
     const val INSTANT_LOGIN = "$VERSION_PREFIX/auth/instant-login"
+    const val VERIFY_EMAIL = "$VERSION_PREFIX/auth/verify-email"
+    const val RESEND_VERIFICATION = "$VERSION_PREFIX/auth/resend-verification"
 
     // Health
     const val HEALTH = "/health"

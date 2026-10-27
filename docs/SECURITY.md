@@ -23,5 +23,6 @@ This document adapts the user's security reference to TheekHai. Before public de
 - [x] Resource access tested for citizen, department, reviewer, and cross-case requests (`WorkflowTest`).
 - [x] Cookie and CSRF behavior tested on state-changing browser requests (`WorkflowTest`).
 - [x] Supabase RLS enabled and verified on `public.profiles` and `public.saved_sources`, with `protect_profile_role()` trigger preventing privilege escalation.
-- [x] Login authentication secured with two-factor email verification (6-digit OTP dispatched via Gmail API / Supabase Auth OTP, verified via `/auth/login/verify-code`).
+- [x] Sign-up email verification link and deliverability validation: registrations dispatch an official activation link via Gmail API (arshitgupta34@gmail.com) and Supabase Auth, blocking unverified logins until verified via `/auth/verify-email`.
+- [x] Direct sign-in for registered accounts with 1-click instant login for pilot demo accounts.
 - [ ] Production malware scanning for evidence uploads before public launch.

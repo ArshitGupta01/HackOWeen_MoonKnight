@@ -15,6 +15,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <meta-data
+            android:name="com.example.theekhai.BACKEND_BASE_URL"
+            android:value="${theekhaiBackendUrl}" />
         <activity
             android:exported="true"
             android:name=".MainActivity">
