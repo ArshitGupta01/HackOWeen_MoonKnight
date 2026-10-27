@@ -39,7 +39,6 @@ fun LoginScreen() {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -238,7 +237,7 @@ private fun LoginForm(
             Column(modifier = Modifier.padding(18.dp)) {
                 Text("Demo account examples", style = MaterialTheme.typography.titleSmall, color = ext.ink)
                 Text(
-                    "These examples only fill the email field. Native sign-in is not connected; no account will be authenticated.",
+                    "Choose an account email, enter its password, and sign in through the civic pilot service.",
                     style = MaterialTheme.typography.bodySmall,
                     color = ext.muted,
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
@@ -249,8 +248,8 @@ private fun LoginForm(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     QuickRoleButton("Citizen", "citizen@theekhai.in", Modifier.weight(1f), onSelectDemo)
-                    QuickRoleButton("Officer", "officer@theekhai.in", Modifier.weight(1f), onSelectDemo)
-                    QuickRoleButton("Inspector", "inspector@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                    QuickRoleButton("Department", "pwd@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                    QuickRoleButton("Reviewer", "reviewer@theekhai.in", Modifier.weight(1f), onSelectDemo)
                 }
             }
         }
