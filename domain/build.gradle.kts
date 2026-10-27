@@ -12,8 +12,6 @@ plugins {
 }
 
 kotlin {
-    iosArm64()
-    iosSimulatorArm64()
     jvm()
     android {
         namespace = "com.example.theekhai.domain"
@@ -28,6 +26,7 @@ kotlin {
     }
     sourceSets {
         commonMain.dependencies {
+            api(project(":core"))
             api(libs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {

@@ -1,8 +1,35 @@
 package com.example.theekhai.contract
 
-/** Single source of truth for backend paths, shared by the Ktor server and Ktor clients. */
+/**
+ * Single source of truth for backend HTTP and WebSocket endpoints,
+ * shared by the Ktor server and multiplatform clients (Android, Desktop, Web).
+ */
 object ApiRoutes {
     const val VERSION_PREFIX = "/api/v1"
-    const val GREETING = "$VERSION_PREFIX/greeting"
-    const val GREETING_PLATFORM_PARAM = "platform"
+
+    // Complaints
+    const val COMPLAINTS = "$VERSION_PREFIX/complaints"
+    const val COMPLAINT_BY_ID = "$VERSION_PREFIX/complaints/{id}"
+    const val COMPLAINT_TRIAGE = "$VERSION_PREFIX/complaints/{id}/triage"
+    const val COMPLAINT_RESOLVE = "$VERSION_PREFIX/complaints/{id}/resolve"
+    const val COMPLAINT_ESCALATE = "$VERSION_PREFIX/complaints/{id}/escalate"
+
+    // Autonomous Verification (TinyFish agent)
+    const val VERIFICATION = "$VERSION_PREFIX/verification"
+    const val VERIFY_COMPLAINT = "$VERSION_PREFIX/complaints/{id}/verify"
+
+    // Multilingual Voice Intake (Groq Whisper / Sarvam STT)
+    const val VOICE_INTAKE = "$VERSION_PREFIX/voice/intake"
+
+    // Evidence Verification (Groq Vision + Geofencing)
+    const val EVIDENCE_CHECK = "$VERSION_PREFIX/evidence/verify"
+
+    // Audit Logs (DPDP 2026 Explainable AI trail)
+    const val AUDIT_LOGS = "$VERSION_PREFIX/audit/logs"
+
+    // Offline Sync
+    const val SYNC_BATCH = "$VERSION_PREFIX/sync/batch"
+
+    // Health
+    const val HEALTH = "/health"
 }

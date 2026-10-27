@@ -1,0 +1,32 @@
+CREATE TABLE AuditLogEntity (
+    id TEXT PRIMARY KEY NOT NULL,
+    complaintId TEXT NOT NULL,
+    actorType TEXT NOT NULL,
+    actorId TEXT NOT NULL,
+    action TEXT NOT NULL,
+    reasoning TEXT NOT NULL,
+    decisionPayloadJson TEXT,
+    timestampEpochMillis INTEGER NOT NULL,
+    isSynced INTEGER NOT NULL DEFAULT 1
+);
+
+selectAll:
+SELECT * FROM AuditLogEntity ORDER BY timestampEpochMillis DESC;
+
+selectByComplaintId:
+SELECT * FROM AuditLogEntity WHERE complaintId = :complaintId ORDER BY timestampEpochMillis ASC;
+
+selectUnsynced:
+SELECT * FROM AuditLogEntity WHERE isSynced = 0;
+
+insertAuditLog:
+INSERT OR REPLACE INTO AuditLogEntity(
+    id, complaintId, actorType, actorId, action,
+    reasoning, decisionPayloadJson, timestampEpochMillis, isSynced
+) VALUES (
+    ?, ?, ?, ?, ?,
+    ?, ?, ?, ?
+);
+
+markSynced:
+UPDATE AuditLogEntity SET isSynced = 1 WHERE id = :id;

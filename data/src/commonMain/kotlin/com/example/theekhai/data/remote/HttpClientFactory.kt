@@ -7,7 +7,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
 /** The engine (OkHttp / Darwin) is picked per platform from the classpath. */
-internal fun createHttpClient(): HttpClient = HttpClient {
+fun createHttpClient(): HttpClient = HttpClient {
     install(ContentNegotiation) {
         json(Json { ignoreUnknownKeys = true })
     }

@@ -19,8 +19,6 @@ plugins {
 }
 
 kotlin {
-    iosArm64()
-    iosSimulatorArm64()
     jvm()
     android {
         namespace = "com.example.theekhai.data"
@@ -52,10 +50,6 @@ kotlin {
             implementation(libs.sqldelight.androidDriver)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.koin.android)
-        }
-        iosMain.dependencies {
-            implementation(libs.sqldelight.nativeDriver)
-            implementation(libs.ktor.client.darwin)
         }
         jvmMain.dependencies {
             implementation(libs.sqldelight.sqliteDriver)

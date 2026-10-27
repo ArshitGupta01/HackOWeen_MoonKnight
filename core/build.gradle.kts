@@ -7,8 +7,6 @@ plugins {
 }
 
 kotlin {
-    iosArm64()
-    iosSimulatorArm64()
     jvm()
     android {
        namespace = "com.example.theekhai.core"

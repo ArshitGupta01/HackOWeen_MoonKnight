@@ -7,8 +7,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.theekhai.presentation.greeting.GreetingScreen
-import com.example.theekhai.presentation.greeting.GreetingUiState
+import com.example.theekhai.presentation.fieldworker.FieldWorkerScreen
+import com.example.theekhai.presentation.fieldworker.FieldWorkerUiState
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,11 +21,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Previews use the stateless screen: `App()` needs Koin, which only exists at runtime.
 @Preview
 @Composable
 fun AppAndroidPreview() {
     MaterialTheme {
-        GreetingScreen(state = GreetingUiState(), onGreetClick = {})
+        FieldWorkerScreen(
+            state = FieldWorkerUiState(),
+            onToggleRecording = {},
+            onConsentChanged = {},
+            onSubmitVoiceGrievance = {},
+            onSelectComplaint = {},
+            onResolveComplaint = { _, _ -> },
+            onSyncOffline = {}
+        )
     }
 }
