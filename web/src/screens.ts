@@ -24,7 +24,7 @@ import {render} from './main';
 function heading(parent:HTMLElement,eyebrow:string,title:string,subtitle:string) { const block=el('div','page-heading');block.append(el('p','eyebrow',eyebrow),el('h1','',title),el('p','subtitle',subtitle));parent.append(block); }
 function navigate(path:string) {history.pushState({},'',path);void render();window.scrollTo(0,0)}
 function errorMessage(error:unknown) {return error instanceof Error?error.message:t('Something went wrong. Try again.','कुछ गलत हुआ। फिर कोशिश करें।')}
-function authGate(parent:HTMLElement) {if(identity)return false;const block=el('div','empty-state');block.append(el('h2','',t('Your work, in one place.','आपका काम, एक जगह।')),el('p','',t('Sign in to submit a report or see your case history. You can prepare a draft first.','रिपोर्ट भेजने या इतिहास देखने के लिए साइन इन करें। पहले ड्राफ्ट तैयार कर सकते हैं।')),el('div','actions'),link(t('Sign in','साइन इन'),'/login','button'),link(t('Create account','खाता बनाएँ'),'/signup','button secondary'));parent.append(block);return true;}
+function authGate(parent:HTMLElement) {if(identity)return false;const block=el('div','empty-state'),actions=el('div','actions');actions.style.justifyContent='center';actions.append(link(t('Sign in','साइन इन'),'/login','button'),link(t('Create account','खाता बनाएँ'),'/signup','button secondary'));block.append(el('h2','',t('Your work, in one place.','आपका काम, एक जगह।')),el('p','',t('Sign in to submit a report or see your case history. You can prepare a draft first.','रिपोर्ट भेजने या इतिहास देखने के लिए साइन इन करें। पहले ड्राफ्ट तैयार कर सकते हैं।')),actions);parent.append(block);return true;}
 
 function passwordField(label: string, name: string, autocomplete: AutoFill = 'current-password') {
   const wrapper = el('label', 'field');
@@ -431,8 +431,7 @@ export async function account(parent:HTMLElement) {
         const removeBtn = button(
           t('Remove', 'हटाएँ'),
           () => {
-            void removeSavedSource(item.id).then(() => account(parent.parentElement ? parent : parent));
-            row.remove();
+            void removeSavedSource(item.id).then(() => { const idx = items.findIndex(x => x.id === item.id); if (idx !== -1) items.splice(idx, 1); drawBookmarks(items); });
           },
           'quiet',
         );
@@ -475,7 +474,8 @@ export async function detail(parent:HTMLElement,id:string) {
 }
 
 export function library(parent:HTMLElement){
-  const provBanner=el('div','stats');
+  heading(parent,t('THE REFERENCE LIBRARY','संदर्भ लाइब्रेरी'),t('Know your next step.','अपना अगला कदम जानें।'),t('Approved civic guidance powered by TinyFish Agent & Monitor, OpenRouter grounded synthesis, Tavily official-domain discovery, and local source backup fallback.','टाइनीफिश एजेंट और मॉनिटर, ओपनराउटर संश्लेषण, टैविली खोज तथा स्थानीय स्वीकृत स्रोत बैकअप के साथ नागरिक मार्गदर्शन।'));
+  const provBanner=el('div','stats stats-4');
   parent.append(provBanner);
   void api<{supabaseConfigured:boolean,tinyFishConfigured:boolean,tavilyConfigured:boolean,openRouterConfigured:boolean}>('/providers').then(p=>{
     provBanner.replaceChildren();
@@ -485,7 +485,6 @@ export function library(parent:HTMLElement){
       provBanner.append(item);
     }
   }).catch(()=>{});
-  heading(parent,t('THE REFERENCE LIBRARY','संदर्भ लाइब्रेरी'),t('Know your next step.','अपना अगला कदम जानें।'),t('Approved civic guidance powered by TinyFish Agent & Monitor, OpenRouter grounded synthesis, Tavily official-domain discovery, and local source backup fallback.','टाइनीफिश एजेंट और मॉनिटर, टैविली खोज तथा स्थानीय स्वीकृत स्रोत बैकअप के साथ नागरिक मार्गदर्शन।'));
   const form=el('form','panel library-form'),query=field(t('What would you like to understand?','आप क्या समझना चाहते हैं?'),'question');query.input.placeholder=t('e.g. How does the Haryana Auto Appeal System (AAS) handle overdue services?','जैसे हरियाणा ऑटो अपील सिस्टम (AAS) समय-सीमा पार होने पर कैसे काम करता है?');query.input.minLength=3;query.input.maxLength=1000;const jurisdiction=el('select');jurisdiction.setAttribute('aria-label',t('Jurisdiction','क्षेत्राधिकार'));for(const [value,label] of [['CENTRAL',t('Central guidance','केंद्रीय मार्गदर्शन')],['HARYANA',t('Haryana + central guidance','हरियाणा और केंद्रीय मार्गदर्शन')]]){const option=el('option','',label);option.value=value;jurisdiction.append(option)}const search=el('button','button',t('Find guidance','मार्गदर्शन खोजें'));search.type='submit';const answer=el('div','legal-results');form.append(query.wrapper,jurisdiction,search,el('p','microcopy',t('Uses TinyFish Agent Mode on approved official sources, with Tavily official-domain fallback and deterministic local excerpt backup (SOURCES_ONLY).','स्वीकृत आधिकारिक स्रोतों पर टाइनीफिश एजेंट मोड का उपयोग करता है, टैविली फ़ॉलबैक और स्थानीय अंश बैकअप (SOURCES_ONLY) के साथ।')));parent.append(form,answer);
   function sources(items:LegalSource[]){for(const source of items){const card=el('article','panel source-card');const a=link(source.title,source.url,'text-link');a.target='_blank';a.rel='noopener noreferrer';const foot=el('div','source-card-foot');foot.append(el('small','microcopy',t('Retrieved ','प्राप्त ')+date(source.retrievedAt)));if(identity){const saveBtn=button(t('Save to account','खाते में सहेजें'),()=>{saveBtn.disabled=true;void saveSourceBookmark({title:source.title,sourceUrl:source.url,jurisdiction:source.jurisdiction,snippet:source.content.slice(0,400)}).then(()=>{saveBtn.textContent=t('Saved ✓','सहेजा गया ✓')}).catch(()=>{saveBtn.disabled=false})},'quiet');foot.append(saveBtn)}card.append(el('span','label',source.jurisdiction+' · '+source.language),a,el('p','',source.content.slice(0,700)),foot);answer.append(card)}}
   form.addEventListener('submit',event=>{event.preventDefault();search.disabled=true;notice(answer,t('Searching approved sources via TinyFish Agent / fallback…','टाइनीफिश एजेंट / फ़ॉलबैक के माध्यम से स्वीकृत स्रोत खोजे जा रहे हैं…'));void(async()=>{try{if(identity){const result=await api<LegalAnswer>('/legal/ask',{method:'POST',body:JSON.stringify({question:query.input.value,jurisdiction:jurisdiction.value})});const badge=el('span','label',`Mode: ${result.mode}`);answer.replaceChildren(badge,el('p','legal-answer',result.answer),el('p','microcopy',result.limitation));sources(result.citations)}else{const result=await api<LegalSource[]>(`/legal/sources?q=${encodeURIComponent(query.input.value)}&jurisdiction=${jurisdiction.value}`);answer.replaceChildren();if(!result.length)notice(answer,t('No approved matching sources are installed yet.','अभी कोई संबंधित स्वीकृत स्रोत स्थापित नहीं है।'));sources(result)}}catch(error){notice(answer,errorMessage(error),true)}finally{search.disabled=false}})()});

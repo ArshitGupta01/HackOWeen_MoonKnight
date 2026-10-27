@@ -60,4 +60,4 @@ export async function render() {
 }
 document.addEventListener('click',event=>{const anchor=(event.target as Element).closest('a');if(anchor?.origin===location.origin && !anchor.hash && !anchor.target && !event.ctrlKey && !event.metaKey){event.preventDefault();history.pushState({},'',anchor.pathname+anchor.search);void render();window.scrollTo(0,0)}});
 window.addEventListener('popstate',()=>void render());
-void render();void loadIdentity().then(()=>render());
+void loadIdentity().finally(()=>render());

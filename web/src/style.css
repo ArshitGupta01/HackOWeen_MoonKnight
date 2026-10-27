@@ -40,3 +40,7 @@
 .account-avatar{width:58px;height:58px;border-radius:50%;background:var(--green);color:#fffdf5;font-family:'DM Serif Display',serif;font-size:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .source-card-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
 @media(max-width:950px){.auth-shell{grid-template-columns:1fr}.demo-grid{grid-template-columns:1fr}}
+
+.stats-4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:850px){.stats-4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:580px){.stats,.stats-4{grid-template-columns:1fr}.stats>div+div{border-left:0;border-top:1px solid var(--line)}}

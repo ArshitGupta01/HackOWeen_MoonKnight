@@ -1,71 +1,68 @@
 # Architecture
 
-The connected Supabase project named `TheekHai` is planned for authentication and private evidence storage. Ktor remains the authority for case workflow; its SQLDelight-backed SQLite database stores case records. Supabase integration and the browser-native frontend are not yet implemented. See [agent.md](agent.md) and the project guides in [docs](docs/) for current decisions and release checks.
+**TheekHai** follows **Clean Architecture + MVVM** with **Kotlin Multiplatform (KMP)**, **Compose Multiplatform**, **Koin** dependency injection, **SQLDelight** local/server SQLite databases, an authoritative **Ktor** backend, a **Vite + TypeScript** web application (`web/`), **Supabase Auth & PostgreSQL Row-Level Security (RLS)** (`TheekHai` — `ffmcurazxvygsifbglwy`), and **TinyFish + OpenRouter + Tavily** for official legal discovery, monitoring, and AI triage.
 
-Clean Architecture + MVVM, Kotlin Multiplatform, Koin for dependency injection, one SQLite schema
-(SQLDelight) on Android / iOS / Desktop, and a Ktor backend that shares contracts with the apps.
+See [agent.md](agent.md) and the project guides in [docs/](docs/) for detailed security, database, API, and design specifications.
 
-## Module graph (dependencies point inward only)
+---
+
+## 1. Module Graph (Dependencies Point Inward Only)
 
 ```
- :app:androidApp  :app:desktopApp  :app:iosApp   (platform entry points)
-              \        |            /           /
-               ---->  :app:shared  <------------                (presentation: MVVM + Koin root)
+ :app:androidApp  :app:desktopApp  app/iosApp     (platform entry points)
+              \        |            /
+               ---->  :app:shared  <----          (Compose MVVM presentation + Koin root)
                        |      \
-                       |       `---------------------------> :data   (SQLDelight, Ktor client, repo impls)
-                       v                                      |
-                    :domain  <--------------------------------'    (entities, ports, use cases)
-                       ^                          :server ---> :data (jvm) , :domain
+                       |       `----------------> :data   (SQLDelight, Ktor client, repo impls)
+                       v                            |
+                    :domain  <----------------------'     (Workflow engine, entities, ports, use cases)
+                       ^                :server ---> :data (jvm), :domain, :core
                        |
-                    :core  (shared contract: DTOs, ApiRoutes, utils)  <-- used by every module above
+                    :core  (Serializable DTOs, ApiRoutes) <-- shared by all modules
 ```
 
 | Module | Layer | May depend on | Must NOT depend on |
 |---|---|---|---|
-| `:core` | Shared contract (`GreetingDto`, `ApiRoutes`) | kotlinx.serialization | everything else |
-| `:domain` | Entities, repository interfaces, use cases | coroutines | `:data`, UI, Ktor, SQLDelight, Koin |
-| `:data` | Repository implementations, SQLite, Ktor client | `:domain`, `:core` | `:app:*`, Compose |
-| `:app:shared` | ViewModels, Compose UI, Koin composition root | `:domain`, `:core`, `:data` (wiring only, in `di/`) | - |
-| `:app:*App` | Platform entry points | `:app:shared` | `:data` directly |
-| `:server` | Ktor routes + Koin | `:domain`, `:data`, `:core` | `:app:*` |
+| `:core` | Shared contract (`PilotDto.kt`, `ComplaintDto.kt`, `ApiRoutes.kt`) | `kotlinx.serialization` | Any other module |
+| `:domain` | `Workflow` engine, entities, repository interfaces, use cases | `kotlinx.coroutines` | `:data`, UI, Ktor, SQLDelight, Koin |
+| `:data` | Repository implementations, SQLDelight (`Pilot.sq`), Ktor client (`OpenRouterApiClient`, `TinyFishApiClient`) | `:domain`, `:core` | `:app:*`, Compose |
+| `:app:shared` | ViewModels (`StateFlow<UiState>`), Compose UI, Koin composition root | `:domain`, `:core`, `:data` (in `di/` only) | `:server` |
+| `:app:*App` | Platform entry points (`androidApp`, `desktopApp`, `iosApp`) | `:app:shared` | `:data` directly |
+| `:server` | Ktor Netty routes (`Application.kt`), `SupabaseJwtAuth`, `LegalService` | `:domain`, `:data`, `:core` | `:app:*` |
+| `web/` | Browser-native Vite + TypeScript SPA consuming `/api/v1/*` | Web DOM / Fetch API | KMP SQLite directly |
 
-Gradle enforces these rules: a forbidden import will not compile because the dependency is not declared.
+---
 
-## MVVM (presentation)
+## 2. Presentation & MVVM (`:app:shared` & `web/`)
 
-`Screen (Composable)` observes `StateFlow<UiState>` from a `ViewModel`, which calls **use cases only**.
-Screens are split into a stateful `*Route` (gets the ViewModel through `koinViewModel()`) and a stateless
-`*Screen` (previewable, testable). See `presentation/greeting`.
+- **Native Clients (`:app:shared`):** `Screen (Composable)` observes `StateFlow<UiState>` from a `ViewModel`, which calls **domain use cases only**. Screens are split into stateful `*Route` (obtaining the `ViewModel` via `koinViewModel()`) and stateless `*Screen` composables.
+- **Web Client (`web/`):** Built with Vite + TypeScript (`src/main.ts`, `src/screens.ts`, `src/api.ts`, `src/ui.ts`, `src/style.css`), providing bilingual (`en`/`hi`) views for Overview (`/`), Report Intake (`/report`), Workspace (`/workspace`), Case Detail (`/cases/:id`), Reference Library (`/library`), Authentication (`/login`, `/signup`), and Supabase RLS Account (`/account`).
 
-## Dependency injection (Koin)
+---
 
-- `:domain` has no DI dependency; use cases are registered in `app/shared/.../di/AppModule.kt` (`domainModule`).
-- `:data` exposes `dataModule`, `localDataModule`, `remoteDataModule` and an `expect val platformDataModule`
-  (actuals provide the `SqlDriver` and the backend URL per platform).
-- `initKoin { ... }` is the single entry point: Android (`TheekHaiApplication`), Desktop (`main.kt`),
-  iOS (`startKoinForIos()` from `iOSApp.swift`).
-- The server uses `koin-ktor` (`serverModule` in `server/.../di`).
+## 3. Dependency Injection (Koin)
 
-## Database (SQLite everywhere)
+- `:domain` has no DI framework dependency; use cases are registered in `app/shared/.../di/AppModule.kt` (`domainModule`).
+- `:data` exposes `dataModule`, `localDataModule`, `remoteDataModule`, and `expect val platformDataModule` (actuals provide the platform `SqlDriver` and backend base URL).
+- `initKoin { ... }` is called by Android (`TheekHaiApplication`), Desktop (`main.kt`), and iOS (`startKoinForIos()` in `iOSApp.swift`).
+- `:server` uses `koin-ktor` (`serverModule` in `server/.../di/ServerModule.kt`).
 
-- Schema: `data/src/commonMain/sqldelight/.../Greeting.sq` - the only place tables are defined.
-- Drivers: Android `AndroidSqliteDriver`, iOS `NativeSqliteDriver`, Desktop + Server `JdbcSqliteDriver`.
-- Schema changes: bump by adding `data/src/commonMain/sqldelight/migrations/<n>.sqm`.
-- Web is **not** part of this KMP project: it is built separately with native web code and consumes the Ktor
-  REST API described by `:core` (`ApiRoutes`, `GreetingDto`). It never touches the SQLite layer.
+---
 
-## Common backend
+## 4. Dual-Layer Persistence: SQLDelight + Supabase PostgreSQL RLS
 
-- `:core` holds `GreetingDto` and `ApiRoutes`; server and clients compile against the same types.
-- The server runs the same `:domain` use cases and `:data` SQLite code as the apps.
-- Clients are offline-first: SQLite is the source of truth, the backend call falls back to local generation.
-- Dev URLs: Android emulator `http://10.0.2.2:8080`, iOS simulator / Desktop `http://localhost:8080`.
-  Override the server DB file with the `THEEKHAI_DB_PATH` environment variable.
+1. **SQLDelight (`Pilot.sq` + migrations `1.sqm`, `2.sqm`):**
+   - Defines `PilotCase`, `PilotTask`, `PilotEvent`, `PilotReceipt`, `PilotLink`, `LegalSource`, and `LegalMonitor`.
+   - Drivers: Android `AndroidSqliteDriver`, iOS `NativeSqliteDriver`, Desktop & Server `JdbcSqliteDriver`.
+2. **Supabase PostgreSQL (`supabase/schema.sql` — Project `ffmcurazxvygsifbglwy`):**
+   - Provides Supabase Auth (`/auth/v1/*`) and 7 RLS-enabled tables (`profiles`, `saved_sources`, `complaints`, `case_tasks`, `audit_logs`, `legal_sources`, `legal_monitors`) plus the private `evidence` Storage bucket.
+   - Ktor's `SupabaseJwtAuth` verifies user sessions, enforces `HttpOnly` cookie + `X-CSRF-Token` (with `Bearer` token fallback), and syncs workflow changes to Supabase PostgREST using the user's JWT so PostgreSQL RLS policies are enforced on every query.
 
-## Adding a feature (checklist)
+---
 
-1. `:core` - add DTO / route constants if it touches the backend.
-2. `:domain` - entity, repository interface, use case (+ unit test with a fake).
-3. `:data` - `.sq` queries, data sources, repository implementation, register in `dataModule`.
-4. `:app:shared` - UiState, ViewModel (`viewModelOf`), Route + Screen, register in `presentationModule`/`domainModule`.
-5. `:server` - route calling the use case, register in `serverModule`.
+## 5. AI, Legal Library & Official Discovery (`LegalService.kt`)
+
+- **TinyFish Agent Mode (`POST /v1/automation/run`) & Monitor Mode (`POST /v1/monitors`):** Primary engine for official page extraction, source-grounded legal Q&A (`TINYFISH_AGENT`), and scheduled change detection.
+- **Tavily Official-Domain Search (`POST /search`):** Discovers and verifies content exclusively from allowlisted official hosts (`indiacode.nic.in`, `haryana-rtsc.gov.in`, `aas.saralharyana.nic.in`, `efiling.ecourts.gov.in`, `informatics.nic.in`).
+- **OpenRouter AI (`POST /api/v1/chat/completions`):** Powers complaint intake triage & duplicate detection (`POST /api/v1/complaints/triage`) and secondary source-grounded legal synthesis (`TAVILY_AND_OPENROUTER` / `OPENROUTER_SYNTHESIS`).
+- **Deterministic Local Backup (`SOURCES_ONLY` & `LOCAL_RULE_FALLBACK`):** Guarantees offline resilience and zero hallucinated legal or workflow outcomes when external APIs are unreachable.

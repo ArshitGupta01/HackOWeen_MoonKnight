@@ -165,8 +165,14 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
 
 private fun seedPilotCasesIfEmpty(database: AppDatabase) {
     val q = database.pilotQueries
-    if (q.allCases().executeAsList().isNotEmpty()) return
     val now = System.currentTimeMillis()
+    if (q.legalMonitors().executeAsList().isEmpty()) {
+        q.transaction {
+            q.saveMonitor("mon-pilot-001", "tf-mon-rtsc-01", "Haryana RTSC & AAS Guidelines Page Monitor", "fetch", "https://haryana-rtsc.gov.in/guidelines", "HARYANA", "en", "0 0 * * *", "ACTIVE", now, "NO_CHANGES_DETECTED")
+            q.saveMonitor("mon-pilot-002", "tf-mon-ecourts-02", "eCourts & Civic Redressal Topic Monitor", "search", "civic municipal grievance escalation timelines India", "CENTRAL", "en", "0 0 * * *", "ACTIVE", now, "NO_CHANGES_DETECTED")
+        }
+    }
+    if (q.allCases().executeAsList().isNotEmpty()) return
     val hour = 3_600_000L
     val citizenId = "11111111-1111-4111-8111-111111111101"
     val pwdId = "22222222-2222-4222-8222-222222222202"
