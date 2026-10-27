@@ -33,7 +33,9 @@ data class NativeConnectState(
     val pendingSources: List<CivicGuidanceSource> = emptyList(),
     val verificationResult: com.example.theekhai.contract.VerificationResultDto? = null,
     val emailDraft: com.example.theekhai.contract.EmailDraftDto? = null,
-    val emailSendResult: com.example.theekhai.contract.SendEmailResponseDto? = null
+    val emailSendResult: com.example.theekhai.contract.SendEmailResponseDto? = null,
+    val leaderboard: com.example.theekhai.contract.LeaderboardResponseDto? = null,
+    val dummyUsers: List<com.example.theekhai.contract.DummyUserCredentialDto> = emptyList()
 )
 
 class NativeConnectViewModel(
@@ -112,6 +114,19 @@ class NativeConnectViewModel(
         val result = backend.sendComplaintEmail(caseId, recipient, subject, body)
         _state.update { it.copy(emailSendResult = result, message = "✓ ${result.message}") }
         loadCase(caseId)
+    }
+    fun instantSignIn(email: String) = runRequest {
+        val user = backend.instantSignIn(email)
+        val profile = runCatching { backend.profile() }.getOrNull()
+        _state.update { it.copy(user = user, profile = profile, message = "Signed in as ${user.fullName}.") }
+    }
+    fun loadLeaderboard(roleFilter: String = "ALL") = runRequest {
+        val board = backend.leaderboard(roleFilter)
+        _state.update { it.copy(leaderboard = board) }
+    }
+    fun loadDummyUsers() = runRequest {
+        val users = backend.dummyUsers()
+        _state.update { it.copy(dummyUsers = users) }
     }
     fun signOut() = runRequest { backend.signOut(); _state.update { NativeConnectState(message = "Signed out.") } }
 

@@ -1,6 +1,8 @@
 package com.example.theekhai.auth
 
 import com.example.theekhai.contract.*
+import com.example.theekhai.data.db.AppDatabase
+import com.example.theekhai.data.db.PilotUser
 import com.example.theekhai.domain.workflow.*
 import io.ktor.client.HttpClient
 import io.ktor.client.request.*
@@ -50,6 +52,7 @@ class SupabaseJwtAuth(
     rawUrl: String,
     rawKey: String,
     private val staff: Map<String, Pair<Role, String?>> = emptyMap(),
+    private val database: AppDatabase? = null,
 ) {
     val url: String = rawUrl.ifBlank {
         EnvConfig.get("SUPABASE_URL", "https://ffmcurazxvygsifbglwy.supabase.co")
@@ -61,7 +64,12 @@ class SupabaseJwtAuth(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    data class Session(val token: String, val csrf: String, val expiresAt: Long)
+    data class Session(
+        val token: String,
+        val csrf: String,
+        val expiresAt: Long,
+        val localUserId: String? = null
+    )
     data class VerifiedUser(
         val actor: Actor,
         val token: String,
@@ -73,6 +81,7 @@ class SupabaseJwtAuth(
     )
 
     private val sessions = ConcurrentHashMap<String, Session>()
+    private val localBearerTokens = ConcurrentHashMap<String, String>()
 
     fun config(): AuthConfigDto {
         val configured = url.startsWith("https://") && key.length > 15
@@ -83,12 +92,23 @@ class SupabaseJwtAuth(
         )
     }
 
+    fun instantLogin(email: String): Pair<String, Session> {
+        val cleanEmail = email.trim().lowercase()
+        val localUser = database?.pilotQueries?.pilotUserByEmail(cleanEmail)?.executeAsOneOrNull()
+            ?: throw WorkflowFailure("NOT_FOUND", "Dummy account '$cleanEmail' is not registered.")
+        return createLocalSession(localUser.id)
+    }
+
     suspend fun login(input: LoginDto): Pair<String, Session> {
-        if (url.isBlank() || key.isBlank()) throw WorkflowFailure("UNAVAILABLE", "Sign-in is not configured on this server.")
-        val cleanEmail = input.email.trim()
+        val cleanEmail = input.email.trim().lowercase()
         if (cleanEmail.length !in 3..254 || input.password.length !in 1..256) {
             throw WorkflowFailure("INVALID_INPUT", "Enter your email and password.")
         }
+        val localUser = database?.pilotQueries?.pilotUserByEmail(cleanEmail)?.executeAsOneOrNull()
+        if (localUser != null && localUser.passwordHash == input.password) {
+            return createLocalSession(localUser.id)
+        }
+        if (url.isBlank() || key.isBlank()) throw WorkflowFailure("UNAVAILABLE", "Sign-in is not configured on this server.")
         val response = client.post("$url/auth/v1/token?grant_type=password") {
             header("apikey", key)
             contentType(ContentType.Application.Json)
@@ -416,6 +436,23 @@ class SupabaseJwtAuth(
             if (cookie != null) sessions.remove(cookie)
             bearer ?: throw WorkflowFailure("UNAUTHORIZED", if (cookie != null) "Session expired. Sign in again." else "Sign in to continue.")
         }
+
+        val localUserId = session?.localUserId ?: localBearerTokens[token]
+        if (localUserId != null && database != null) {
+            val u = database.pilotQueries.pilotUserById(localUserId).executeAsOneOrNull()
+            if (u != null) {
+                val role = runCatching { Role.valueOf(u.role) }.getOrDefault(Role.CITIZEN)
+                return VerifiedUser(
+                    actor = Actor(u.id, role, u.department),
+                    token = token,
+                    email = u.email,
+                    fullName = u.fullName,
+                    organization = u.organization,
+                    ward = u.ward,
+                    preferredLanguage = u.preferredLanguage
+                )
+            }
+        }
         if (url.isBlank() || key.isBlank()) throw WorkflowFailure("UNAVAILABLE", "Authentication is not configured.")
         val response = client.get("$url/auth/v1/user") {
             header("apikey", key)
@@ -481,6 +518,21 @@ class SupabaseJwtAuth(
         val session = Session(token, randomToken(), System.currentTimeMillis() + expires * 1000)
         sessions[id] = session
         return id to session
+    }
+
+    private fun createLocalSession(userId: String): Pair<String, Session> {
+        sessions.entries.removeIf { it.value.expiresAt <= System.currentTimeMillis() }
+        val sessionId = randomToken()
+        val accessToken = "th_local_" + randomToken()
+        val session = Session(
+            token = accessToken,
+            csrf = randomToken(),
+            expiresAt = System.currentTimeMillis() + 12 * 3600 * 1000L,
+            localUserId = userId
+        )
+        sessions[sessionId] = session
+        localBearerTokens[accessToken] = userId
+        return sessionId to session
     }
 
     fun csrf(call: ApplicationCall) = call.request.cookies["theekhai_session"]?.let { sessions[it]?.csrf }

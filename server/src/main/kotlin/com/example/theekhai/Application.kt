@@ -49,7 +49,7 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     }
     val workflow: Workflow by inject()
     val database: AppDatabase by inject()
-    if (databasePath != null && testIdentity == null) {
+    if (testIdentity == null) {
         seedPilotCasesIfEmpty(database)
     }
     val http = HttpClient(OkHttp) {
@@ -63,7 +63,7 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     val staff = EnvConfig.get("THEEKHAI_STAFF").split(';').filter { it.isNotBlank() }.associate { entry ->
         val parts = entry.split('|'); require(parts.size >= 2); parts[0] to (Role.valueOf(parts[1]) to parts.getOrNull(2))
     }
-    val auth = SupabaseJwtAuth(http, EnvConfig.get("SUPABASE_URL"), EnvConfig.get("SUPABASE_PUBLISHABLE_KEY"), staff)
+    val auth = SupabaseJwtAuth(http, EnvConfig.get("SUPABASE_URL"), EnvConfig.get("SUPABASE_PUBLISHABLE_KEY"), staff, database)
     val legal = com.example.theekhai.legal.LegalService(database, http)
     val gmail = com.example.theekhai.mail.GmailService(http)
     val cookieSecure = EnvConfig.get("THEEKHAI_COOKIE_SECURE", "false") != "false"
@@ -74,6 +74,104 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     suspend fun identity(call: ApplicationCall): Actor = testIdentity?.invoke(call) ?: auth.authenticate(call)
     routing {
         get("/") { call.respondText("THEEKHAI Smart Cities Backend Server") }
+        get("/api/v1/auth/dummy-users") { safe(call) {
+            val users = database.pilotQueries.allPilotUsers().executeAsList().map { u ->
+                val isAuthority = u.role in setOf("DEPARTMENT", "REVIEWER", "ADMIN")
+                DummyUserCredentialDto(
+                    id = u.id,
+                    shortName = u.fullName.substringBefore(' '),
+                    fullName = u.fullName,
+                    email = u.email,
+                    password = u.passwordHash,
+                    role = u.role,
+                    userType = if (isAuthority) "AUTHORITY" else "REGULAR",
+                    department = u.department,
+                    ward = u.ward,
+                    score = u.baseScore.toInt()
+                )
+            }
+            call.respond(users)
+        } }
+
+        post("/api/v1/auth/instant-login") { safe(call) {
+            val origin = call.request.header(HttpHeaders.Origin)
+            if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN", "Origin is not allowed.")
+            val req = call.receive<InstantLoginDto>()
+            val (id, session) = auth.instantLogin(req.email)
+            call.response.cookies.append(
+                Cookie("theekhai_session", id, httpOnly = true, secure = cookieSecure, path = "/", extensions = mapOf("SameSite" to "Lax"))
+            )
+            call.respond(mapOf("status" to "signed_in", "accessToken" to session.token))
+        } }
+
+        get("/api/v1/leaderboard") { safe(call) {
+            val roleFilter = call.request.queryParameters["role"]?.uppercase() ?: "ALL"
+            val allUsers = database.pilotQueries.allPilotUsers().executeAsList()
+            val userMap = allUsers.associateBy { it.id }
+
+            val filtered = allUsers.filter { u ->
+                val isAuthority = u.role in setOf("DEPARTMENT", "REVIEWER", "ADMIN")
+                when (roleFilter) {
+                    "AUTHORITY" -> isAuthority
+                    "CITIZEN", "REGULAR" -> !isAuthority
+                    else -> true
+                }
+            }.sortedWith(compareByDescending<com.example.theekhai.data.db.PilotUser> { it.baseScore }.thenBy { it.fullName })
+
+            val entries = filtered.mapIndexed { idx, u ->
+                val isAuthority = u.role in setOf("DEPARTMENT", "REVIEWER", "ADMIN")
+                val score = u.baseScore.toInt()
+                val badge = when {
+                    isAuthority && score >= 450 -> "Civic Champion ★"
+                    isAuthority && score >= 350 -> "Watchdog Auditor"
+                    isAuthority && score >= 280 -> "Rapid Responder"
+                    isAuthority -> "Field Specialist"
+                    score >= 350 -> "Lead Civic Sentinel"
+                    score >= 250 -> "Ward Guardian"
+                    score >= 170 -> "Active Reporter"
+                    else -> "Rising Citizen"
+                }
+                LeaderboardEntryDto(
+                    rank = idx + 1,
+                    userId = u.id,
+                    fullName = u.fullName,
+                    email = u.email,
+                    role = u.role,
+                    userType = if (isAuthority) "AUTHORITY" else "REGULAR",
+                    department = u.department,
+                    ward = u.ward,
+                    score = score,
+                    actionsTakenCount = u.actionsTakenCount.toInt(),
+                    complaintsSubmittedCount = u.complaintsSubmittedCount.toInt(),
+                    complaintsApprovedCount = u.complaintsApprovedCount.toInt(),
+                    badge = badge
+                )
+            }
+
+            val recentLogs = database.pilotQueries.allScoreLogs().executeAsList().take(25).map { log ->
+                ScoreEventDto(
+                    id = log.id,
+                    userId = log.userId,
+                    userName = userMap[log.userId]?.fullName ?: "Civic Member",
+                    caseId = log.caseId,
+                    reasonCode = log.reasonCode,
+                    pointsDelta = log.pointsDelta.toInt(),
+                    description = log.description,
+                    createdAt = log.createdAt
+                )
+            }
+
+            call.respond(
+                LeaderboardResponseDto(
+                    entries = entries,
+                    recentActivity = recentLogs,
+                    totalParticipants = allUsers.size,
+                    totalPointsAwarded = allUsers.sumOf { it.baseScore.toInt() },
+                    updatedAtEpochMillis = System.currentTimeMillis()
+                )
+            )
+        } }
+
         get("/health") {
             val ps = legal.providerStatus(auth.config().configured)
             call.respond(
@@ -270,10 +368,8 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
                         AuditLogDto(it.id, it.caseId, runCatching { ActorTypeDto.valueOf(actor.role.name) }.getOrDefault(ActorTypeDto.CITIZEN), it.actorId, it.action, it.note, null, it.at)
                     }
                 } else {
-                    workflow.list(actor).flatMap { c ->
-                        workflow.events(actor, c.id).map {
-                            AuditLogDto(it.id, it.caseId, runCatching { ActorTypeDto.valueOf(actor.role.name) }.getOrDefault(ActorTypeDto.CITIZEN), it.actorId, it.action, it.note, null, it.at)
-                        }
+                    database.pilotQueries.allEvents().executeAsList().map {
+                        AuditLogDto(it.id, it.caseId, runCatching { ActorTypeDto.valueOf(actor.role.name) }.getOrDefault(ActorTypeDto.CITIZEN), it.actorId, it.action, it.note, null, it.at)
                     }
                 }
             }
@@ -370,6 +466,71 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     }
 }
 
+private fun recordCitizenSubmissionPoints(database: AppDatabase, citizenId: String, caseRecord: CaseRecord) {
+    val q = database.pilotQueries
+    val user = q.pilotUserById(citizenId).executeAsOneOrNull() ?: return
+    val delta = 35L
+    q.transaction {
+        q.incrementCitizenSubmittedScore(delta, user.id)
+        q.insertScoreLog(
+            UUID.randomUUID().toString(),
+            user.id,
+            caseRecord.id,
+            "GENUINE_COMPLAINT_SUBMITTED",
+            delta,
+            "Submitted genuine civic report '${caseRecord.title.take(50)}' routed to ${caseRecord.department}",
+            System.currentTimeMillis()
+        )
+    }
+}
+
+private fun recordWorkflowActionPoints(database: AppDatabase, actor: Actor, caseRecord: CaseRecord, action: String) {
+    val q = database.pilotQueries
+    val now = System.currentTimeMillis()
+    val authorityPoints = when (action) {
+        "START" -> 15L
+        "ADD_TASK" -> 10L
+        "COMPLETE_TASK" -> 25L
+        "REQUEST_CLOSURE" -> 30L
+        "APPROVE_CLOSURE" -> 40L
+        "REJECT_CLOSURE", "REOPEN" -> 25L
+        else -> 0L
+    }
+    q.transaction {
+        if (authorityPoints > 0L && actor.role in setOf(Role.DEPARTMENT, Role.REVIEWER, Role.ADMIN)) {
+            val authUser = q.pilotUserById(actor.id).executeAsOneOrNull()
+            if (authUser != null) {
+                q.incrementAuthorityScore(authorityPoints, authUser.id)
+                q.insertScoreLog(
+                    UUID.randomUUID().toString(),
+                    authUser.id,
+                    caseRecord.id,
+                    "AUTHORITY_$action",
+                    authorityPoints,
+                    "Authority action ($action) on case #${caseRecord.id.take(8)}: ${caseRecord.title.take(45)}",
+                    now
+                )
+            }
+        }
+        if (action == "APPROVE_CLOSURE") {
+            val citizen = q.pilotUserById(caseRecord.citizenId).executeAsOneOrNull()
+            if (citizen != null) {
+                val citizenBonus = 50L
+                q.incrementCitizenApprovedScore(citizenBonus, citizen.id)
+                q.insertScoreLog(
+                    UUID.randomUUID().toString(),
+                    citizen.id,
+                    caseRecord.id,
+                    "COMPLAINT_APPROVED_BY_AUTHORITY",
+                    citizenBonus,
+                    "Complaint #${caseRecord.id.take(8)} ('${caseRecord.title.take(40)}') verified genuine and approved by authority",
+                    now
+                )
+            }
+        }
+    }
+}
+
 private fun seedPilotCasesIfEmpty(database: AppDatabase) {
     val q = database.pilotQueries
     val now = System.currentTimeMillis()
@@ -377,6 +538,30 @@ private fun seedPilotCasesIfEmpty(database: AppDatabase) {
         q.transaction {
             q.saveMonitor("mon-pilot-001", "tf-mon-rtsc-01", "Haryana RTSC & AAS Guidelines Page Monitor", "fetch", "https://haryana-rtsc.gov.in/guidelines", "HARYANA", "en", "0 0 * * *", "ACTIVE", now, "NO_CHANGES_DETECTED")
             q.saveMonitor("mon-pilot-002", "tf-mon-ecourts-02", "eCourts & Civic Redressal Topic Monitor", "search", "civic municipal grievance escalation timelines India", "CENTRAL", "en", "0 0 * * *", "ACTIVE", now, "NO_CHANGES_DETECTED")
+        }
+    }
+        if (q.allPilotUsers().executeAsList().isEmpty()) {
+        val hour = 3_600_000L
+        q.transaction {
+            q.savePilotUser("11111111-1111-4111-8111-111111111101", "mohit@theekhai.in", "TheekHai@2026", "Mohit Sharma", "Ward 4 RWA", "CITIZEN", null, "Ward 4", "en", 395L, 0L, 6L, 4L, now - 72 * hour)
+            q.savePilotUser("11111111-1111-4111-8111-111111111102", "arshit@theekhai.in", "TheekHai@2026", "Arshit Gupta", "Municipal Command Center", "ADMIN", "Municipal Command", "Ward 4", "en", 485L, 16L, 2L, 2L, now - 96 * hour)
+            q.savePilotUser("11111111-1111-4111-8111-111111111103", "atri@theekhai.in", "TheekHai@2026", "Atri Chatterjee", "Independent Civic Audit Cell", "REVIEWER", "Quality & Audit Cell", "Ward 4", "en", 430L, 12L, 1L, 1L, now - 90 * hour)
+            q.savePilotUser("11111111-1111-4111-8111-111111111104", "himanshu@theekhai.in", "TheekHai@2026", "Himanshu Verma", "PWD B&R Division", "DEPARTMENT", "Public works", "Ward 4", "en", 360L, 13L, 0L, 0L, now - 84 * hour)
+            q.savePilotUser("11111111-1111-4111-8111-111111111105", "priya@theekhai.in", "TheekHai@2026", "Priya Nair", "Murthal Citizen Forum", "CITIZEN", null, "Ward 4", "en", 290L, 0L, 4L, 3L, now - 60 * hour)
+            q.savePilotUser("11111111-1111-4111-8111-111111111106", "rohan@theekhai.in", "TheekHai@2026", "Rohan Deshmukh", "DHBVN Electrical Ops", "DEPARTMENT", "Electrical services", "Ward 2", "en", 310L, 11L, 0L, 0L, now - 78 * hour)
+            q.savePilotUser("11111111-1111-4111-8111-111111111107", "ananya@theekhai.in", "TheekHai@2026", "Ananya Iyer", "Sector 14 Residents Collective", "CITIZEN", null, "Ward 2", "en", 235L, 0L, 4L, 2L, now - 50 * hour)
+            q.savePilotUser("11111111-1111-4111-8111-111111111108", "vikram@theekhai.in", "TheekHai@2026", "Vikramaditya Singh", "MCG Water & Drainage", "DEPARTMENT", "Water services", "Ward 3", "en", 265L, 9L, 0L, 0L, now - 65 * hour)
+            q.savePilotUser("11111111-1111-4111-8111-111111111109", "neha@theekhai.in", "TheekHai@2026", "Neha Kapoor", "Citizen Resident", "CITIZEN", null, "Ward 4", "hi", 185L, 0L, 3L, 2L, now - 40 * hour)
+            q.savePilotUser("11111111-1111-4111-8111-111111111110", "kabir@theekhai.in", "TheekHai@2026", "Kabir Mehta", "Youth Civic Watch", "CITIZEN", null, "Ward 3", "en", 135L, 0L, 2L, 1L, now - 30 * hour)
+
+            q.insertScoreLog("s-log-01", "11111111-1111-4111-8111-111111111102", "case-pilot-004", "AUTHORITY_APPROVE_CLOSURE", 40L, "Approved verified road resurfacing near Murthal Chowk", now - 5 * hour)
+            q.insertScoreLog("s-log-02", "11111111-1111-4111-8111-111111111101", "case-pilot-004", "COMPLAINT_APPROVED_BY_AUTHORITY", 50L, "Complaint #case-pilot-004 verified genuine and approved by authority", now - 5 * hour)
+            q.insertScoreLog("s-log-03", "11111111-1111-4111-8111-111111111103", "case-pilot-005", "AUTHORITY_APPROVE_CLOSURE", 40L, "Independent review & sign-off on LED streetlight restoration", now - 4 * hour)
+            q.insertScoreLog("s-log-04", "11111111-1111-4111-8111-111111111105", "case-pilot-005", "COMPLAINT_APPROVED_BY_AUTHORITY", 50L, "Streetlight outage report verified genuine and resolved", now - 4 * hour)
+            q.insertScoreLog("s-log-05", "11111111-1111-4111-8111-111111111104", "case-pilot-003", "AUTHORITY_REQUEST_CLOSURE", 30L, "Completed stormwater grate re-seating and requested closure review", now - 2 * hour)
+            q.insertScoreLog("s-log-06", "11111111-1111-4111-8111-111111111106", "case-pilot-002", "AUTHORITY_COMPLETE_TASK", 25L, "Replaced faulty LED driver units on poles 14-16", now - 90 * 60_000L)
+            q.insertScoreLog("s-log-07", "11111111-1111-4111-8111-111111111108", "case-pilot-006", "AUTHORITY_START", 15L, "Dispatched jetting machine for main market sewer line", now - 60 * 60_000L)
+            q.insertScoreLog("s-log-08", "11111111-1111-4111-8111-111111111107", "case-pilot-006", "GENUINE_COMPLAINT_SUBMITTED", 35L, "Submitted verified drainage overflow report in Sector 14", now - 75 * 60_000L)
         }
     }
     if (q.allCases().executeAsList().isNotEmpty()) return

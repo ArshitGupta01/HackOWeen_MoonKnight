@@ -195,12 +195,18 @@ private fun DesktopSidebar(
             )
             WebSidebarNavItem(
                 number = "05",
+                label = t("Leaderboard", "लीडरबोर्ड"),
+                isActive = currentRoute == Route.Leaderboard,
+                onClick = { onNavigate(Route.Leaderboard) }
+            )
+            WebSidebarNavItem(
+                number = "06",
                 label = t("Know your options", "अपने विकल्प जानें"),
                 isActive = currentRoute == Route.Library,
                 onClick = { onNavigate(Route.Library) }
             )
             WebSidebarNavItem(
-                number = "06",
+                number = "07",
                 label = t("My account", "मेरा खाता"),
                 isActive = currentRoute == Route.Account,
                 onClick = { onNavigate(Route.Account) }

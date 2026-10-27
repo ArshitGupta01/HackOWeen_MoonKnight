@@ -5,6 +5,9 @@ import com.example.theekhai.domain.model.CivicProfile
 import com.example.theekhai.domain.repository.NativeCivicRepository
 
 class CivicBackendUseCases(private val repository: NativeCivicRepository) {
+    suspend fun instantSignIn(email: String) = repository.instantSignIn(email.trim())
+    suspend fun dummyUsers() = repository.getDummyUsers()
+    suspend fun leaderboard(roleFilter: String = "ALL") = repository.getLeaderboard(roleFilter)
     suspend fun profile() = repository.getProfile()
     suspend fun saveProfile(profile: CivicProfile) = repository.saveProfile(profile)
     suspend fun savedSources() = repository.getSavedSources()

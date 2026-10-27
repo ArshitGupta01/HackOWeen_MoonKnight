@@ -30,6 +30,11 @@ object ApiRoutes {
     // Offline Sync
     const val SYNC_BATCH = "$VERSION_PREFIX/sync/batch"
 
+    // Leaderboard & Dummy Instant Auth
+    const val LEADERBOARD = "$VERSION_PREFIX/leaderboard"
+    const val DUMMY_USERS = "$VERSION_PREFIX/auth/dummy-users"
+    const val INSTANT_LOGIN = "$VERSION_PREFIX/auth/instant-login"
+
     // Health
     const val HEALTH = "/health"
 }

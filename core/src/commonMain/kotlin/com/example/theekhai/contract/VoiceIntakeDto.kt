@@ -8,13 +8,13 @@ data class VoiceIntakeRequestDto(
     val audioBase64: String,
     val mimeType: String = "audio/wav",
     val languageHint: String? = null,
-    val citizenId: String,
-    val zone: String,
-    val latitude: Double,
-    val longitude: Double,
-    val address: String,
+    val citizenId: String = "11111111-1111-4111-8111-111111111101",
+    val zone: String = "Ward 4",
+    val latitude: Double = 29.0295,
+    val longitude: Double = 77.0715,
+    val address: String = "Murthal Chowk, Ward 4",
     /** Strict DPDP Act 2026 consent verification */
-    val dpdpConsentGranted: Boolean,
+    val dpdpConsentGranted: Boolean = true,
     val dpdpConsentText: String = "I explicitly consent under DPDP Act 2026 to the automated voice-to-text processing of this grievance recording for civic resolution."
 )
 

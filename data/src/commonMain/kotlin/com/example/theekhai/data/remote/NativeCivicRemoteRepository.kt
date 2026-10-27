@@ -186,6 +186,31 @@ class NativeCivicRemoteRepository(
         return response.body()
     }
 
+    override suspend fun instantSignIn(email: String): SignedInUser {
+        val httpResponse = client.post(url("/auth/instant-login")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.InstantLoginDto(email = email))
+        }
+        requireSuccess(httpResponse)
+        val response: Map<String, String> = httpResponse.body()
+        session.value = response["accessToken"] ?: error("The server did not return a sign-in token.")
+        return currentUser()
+    }
+
+    override suspend fun getDummyUsers(): List<com.example.theekhai.contract.DummyUserCredentialDto> {
+        val response = client.get(url("/auth/dummy-users"))
+        requireSuccess(response)
+        return response.body()
+    }
+
+    override suspend fun getLeaderboard(roleFilter: String): com.example.theekhai.contract.LeaderboardResponseDto {
+        val response = client.get(url("/leaderboard")) {
+            parameter("role", roleFilter)
+        }
+        requireSuccess(response)
+        return response.body()
+    }
+
     private suspend fun requireSuccess(response: HttpResponse) {
         if (response.status.isSuccess()) return
         val message = runCatching { response.body<ApiErrorDto>().message }.getOrNull()

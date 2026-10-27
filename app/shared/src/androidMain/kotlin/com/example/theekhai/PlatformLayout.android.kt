@@ -134,6 +134,7 @@ private fun AndroidTopBar(
                         val subtitle = when (currentRoute) {
                             Route.Report -> "→ Report an issue"
                             Route.Map -> "→ Civic Map"
+                            Route.Leaderboard -> "→ Leaderboard"
                             Route.Workspace -> "→ My workspace"
                             Route.Account -> "→ Resident profile"
                             Route.Library -> "→ Civic guidance"
@@ -424,12 +425,18 @@ private fun AndroidDrawerContent(
             )
             SidebarNavItem(
                 number = "05",
+                label = "Leaderboard",
+                isActive = currentRoute == Route.Leaderboard,
+                onClick = { onNavigate(Route.Leaderboard) }
+            )
+            SidebarNavItem(
+                number = "06",
                 label = "Civic guidance",
                 isActive = currentRoute == Route.Library,
                 onClick = { onNavigate(Route.Library) }
             )
             SidebarNavItem(
-                number = "06",
+                number = "07",
                 label = "Resident profile",
                 isActive = currentRoute == Route.Account,
                 onClick = { onNavigate(Route.Account) }

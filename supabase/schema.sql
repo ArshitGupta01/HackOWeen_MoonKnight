@@ -281,3 +281,60 @@ create policy "Authenticated users can read evidence"
   on storage.objects for select to authenticated
   using (bucket_id = 'evidence');
 
+
+-- ============================================================================
+-- 12. Leaderboard & Gamified Civic Accountability Schema + 10 Dummy Users Seed
+-- ============================================================================
+
+create table if not exists public.leaderboard_scores (
+  user_id uuid primary key,
+  email text not null unique,
+  full_name text not null,
+  role text not null default 'CITIZEN' check (role in ('CITIZEN', 'DEPARTMENT', 'REVIEWER', 'ADMIN')),
+  department text,
+  ward text not null default 'Ward 4',
+  score integer not null default 0,
+  actions_taken_count integer not null default 0,
+  complaints_submitted_count integer not null default 0,
+  complaints_approved_count integer not null default 0,
+  badge text not null default 'Civic Participant',
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists leaderboard_scores_rank_idx on public.leaderboard_scores (score desc, updated_at asc);
+
+alter table public.leaderboard_scores enable row level security;
+
+create policy "Anyone can read leaderboard scores"
+  on public.leaderboard_scores for select to anon, authenticated
+  using (true);
+
+create policy "Authenticated users can update leaderboard scores"
+  on public.leaderboard_scores for all to authenticated
+  using (true)
+  with check (true);
+
+grant select on table public.leaderboard_scores to anon, authenticated;
+grant all on table public.leaderboard_scores to service_role;
+
+-- Seed the 10 Dummy Users into public.leaderboard_scores
+insert into public.leaderboard_scores (user_id, email, full_name, role, department, ward, score, actions_taken_count, complaints_submitted_count, complaints_approved_count, badge)
+values
+  ('11111111-1111-4111-8111-111111111102', 'arshit@theekhai.in', 'Arshit Gupta', 'ADMIN', 'Municipal Command', 'Ward 4', 485, 16, 2, 2, 'Civic Champion ★'),
+  ('11111111-1111-4111-8111-111111111103', 'atri@theekhai.in', 'Atri Chatterjee', 'REVIEWER', 'Quality & Audit Cell', 'Ward 4', 430, 12, 1, 1, 'Watchdog Auditor'),
+  ('11111111-1111-4111-8111-111111111101', 'mohit@theekhai.in', 'Mohit Sharma', 'CITIZEN', null, 'Ward 4', 395, 0, 6, 4, 'Lead Civic Sentinel'),
+  ('11111111-1111-4111-8111-111111111104', 'himanshu@theekhai.in', 'Himanshu Verma', 'DEPARTMENT', 'Public works', 'Ward 4', 360, 13, 0, 0, 'Rapid Responder'),
+  ('11111111-1111-4111-8111-111111111106', 'rohan@theekhai.in', 'Rohan Deshmukh', 'DEPARTMENT', 'Electrical services', 'Ward 2', 310, 11, 0, 0, 'Grid Specialist'),
+  ('11111111-1111-4111-8111-111111111105', 'priya@theekhai.in', 'Priya Nair', 'CITIZEN', null, 'Ward 4', 290, 0, 4, 3, 'Ward Guardian'),
+  ('11111111-1111-4111-8111-111111111108', 'vikram@theekhai.in', 'Vikramaditya Singh', 'DEPARTMENT', 'Water services', 'Ward 3', 265, 9, 0, 0, 'Field Engineer'),
+  ('11111111-1111-4111-8111-111111111107', 'ananya@theekhai.in', 'Ananya Iyer', 'CITIZEN', null, 'Ward 2', 235, 0, 4, 2, 'Active Reporter'),
+  ('11111111-1111-4111-8111-111111111109', 'neha@theekhai.in', 'Neha Kapoor', 'CITIZEN', null, 'Ward 4', 185, 0, 3, 2, 'Neighbourhood Voice'),
+  ('11111111-1111-4111-8111-111111111110', 'kabir@theekhai.in', 'Kabir Mehta', 'CITIZEN', null, 'Ward 3', 135, 0, 2, 1, 'Rising Citizen')
+on conflict (email) do update
+set
+  score = excluded.score,
+  actions_taken_count = excluded.actions_taken_count,
+  complaints_submitted_count = excluded.complaints_submitted_count,
+  complaints_approved_count = excluded.complaints_approved_count,
+  badge = excluded.badge,
+  updated_at = now();

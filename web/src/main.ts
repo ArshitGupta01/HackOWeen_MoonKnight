@@ -1,7 +1,7 @@
 import './style.css';
 import {identity,loadIdentity,signOut} from './api';
 import {el,link,button,t,switchLanguage,language,theme,switchTheme,scrollToTop,refreshScroll} from './ui';
-import {home,report,workspace,detail,login,signup,account,library,information,civicMap} from './screens';
+import {home,report,workspace,detail,login,signup,account,library,information,civicMap,leaderboard} from './screens';
 
 function initialsForUser(name?: string | null, email?: string | null): string {
   const source = (name || email || 'TH').trim();
@@ -25,10 +25,11 @@ export async function render() {
     ['/report','02',t('Report an issue','समस्या दर्ज करें')],
     ['/workspace','03',t('My workspace','मेरा कार्यक्षेत्र')],
     ['/map','04',t('Civic Map','नागरिक मानचित्र')],
-    ['/library','05',t('Know your options','अपने विकल्प जानें')],
+    ['/leaderboard','05',t('Leaderboard','लीडरबोर्ड')],
+    ['/library','06',t('Know your options','अपने विकल्प जानें')],
   ];
   if (identity) {
-    links.push(['/account','06',t('My account','मेरा खाता')]);
+    links.push(['/account','07',t('My account','मेरा खाता')]);
   }
   for(const [path,num,label] of links) {
     const isActive = route === path || (path === '/workspace' && route.startsWith('/cases/'));
@@ -67,6 +68,7 @@ export async function render() {
   else if(route==='/signup')signup(main);
   else if(route==='/account')await account(main);
   else if(route==='/map') await civicMap(main);
+  else if(route==='/leaderboard') await leaderboard(main);
   else if(route==='/library')library(main);
   else information(main,route);
   refreshScroll();

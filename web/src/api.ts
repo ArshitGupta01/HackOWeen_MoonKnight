@@ -282,3 +282,69 @@ export function sendComplaintEmail(caseId: string, recipientEmail: string, subje
     body: JSON.stringify({ recipientEmail, subject, body }),
   });
 }
+
+
+export interface DummyUserCredential {
+  id: string;
+  shortName: string;
+  fullName: string;
+  email: string;
+  password: string;
+  role: string;
+  userType: 'AUTHORITY' | 'REGULAR';
+  department?: string | null;
+  ward: string;
+  score: number;
+}
+
+export interface ScoreEvent {
+  id: string;
+  userId: string;
+  userName: string;
+  caseId?: string | null;
+  reasonCode: string;
+  pointsDelta: number;
+  description: string;
+  createdAt: number;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  fullName: string;
+  email: string;
+  role: string;
+  userType: 'AUTHORITY' | 'REGULAR';
+  department?: string | null;
+  ward: string;
+  score: number;
+  actionsTakenCount: number;
+  complaintsSubmittedCount: number;
+  complaintsApprovedCount: number;
+  badge: string;
+}
+
+export interface LeaderboardResponse {
+  entries: LeaderboardEntry[];
+  recentActivity: ScoreEvent[];
+  totalParticipants: number;
+  totalPointsAwarded: number;
+  updatedAtEpochMillis: number;
+}
+
+export async function instantSignIn(email: string) {
+  const res = await api<{ status: string; accessToken?: string }>('/auth/instant-login', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+  if (res?.accessToken) setStoredToken(res.accessToken);
+  return loadIdentity();
+}
+
+export function getDummyUsers() {
+  return api<DummyUserCredential[]>('/auth/dummy-users');
+}
+
+export function getLeaderboard(role: string = 'ALL') {
+  return api<LeaderboardResponse>(`/leaderboard?role=${encodeURIComponent(role)}`);
+}

@@ -10,6 +10,7 @@ import com.example.theekhai.presentation.account.AccountScreen
 import com.example.theekhai.presentation.auth.LoginScreen
 import com.example.theekhai.presentation.auth.SignupScreen
 import com.example.theekhai.presentation.home.HomeScreen
+import com.example.theekhai.presentation.leaderboard.LeaderboardScreen
 import com.example.theekhai.presentation.library.LibraryScreen
 import com.example.theekhai.presentation.map.MapScreen
 import com.example.theekhai.presentation.report.ReportScreen
@@ -28,23 +29,23 @@ fun App() {
     var darkOverride by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val darkMode = darkOverride ?: systemDark
 
-    TheekHaiTheme(useDarkTheme = darkMode) {
-        CompositionLocalProvider(LocalNavigator provides navigator) {
+    CompositionLocalProvider(LocalNavigator provides navigator) {
+        TheekHaiTheme(useDarkTheme = darkMode) {
             PlatformAppScaffold(
                 navigator = navigator,
                 currentRoute = currentRoute,
                 darkMode = darkMode,
                 onToggleDarkMode = { darkOverride = !darkMode }
             ) {
-                AppContent(currentRoute)
+                AppNavHost(currentRoute = currentRoute)
             }
         }
     }
 }
 
 @Composable
-fun AppContent(route: Route) {
-    when (route) {
+private fun AppNavHost(currentRoute: Route) {
+    when (val route = currentRoute) {
         Route.Home -> HomeScreen()
         Route.Login -> LoginScreen()
         Route.Signup -> SignupScreen()
@@ -61,6 +62,7 @@ fun AppContent(route: Route) {
             LaunchedEffect(vm) { vm.loadCases() }
             MapScreen(st.cases)
         }
+        Route.Leaderboard -> LeaderboardScreen()
         is Route.CaseDetail -> LiveCaseDetailScreen(caseId = route.caseId)
         Route.Account -> AccountScreen()
         Route.Library -> LibraryScreen()

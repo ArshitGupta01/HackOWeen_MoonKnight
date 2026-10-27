@@ -88,6 +88,7 @@ fun LoginScreen() {
                             onSelectDemo = { _, selectedEmail ->
                                 email = selectedEmail
                                 password = "TheekHai@2026"
+                                connectViewModel.instantSignIn(selectedEmail)
                             },
                             ext = ext
                         )
@@ -243,13 +244,31 @@ private fun LoginForm(
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    QuickRoleButton("Citizen", "citizen@theekhai.in", Modifier.weight(1f), onSelectDemo)
-                    QuickRoleButton("Department", "pwd@theekhai.in", Modifier.weight(1f), onSelectDemo)
-                    QuickRoleButton("Reviewer", "reviewer@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                Text("Authorities & Reviewers", style = MaterialTheme.typography.labelSmall, color = ext.green, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    QuickRoleButton("Arshit (Admin)", "arshit@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                    QuickRoleButton("Atri (Reviewer)", "atri@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                    QuickRoleButton("Himanshu (PWD)", "himanshu@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    QuickRoleButton("Rohan (Electrical)", "rohan@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                    QuickRoleButton("Vikram (Water)", "vikram@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Text("Regular Citizens", style = MaterialTheme.typography.labelSmall, color = ext.amber, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    QuickRoleButton("Mohit (W4)", "mohit@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                    QuickRoleButton("Priya (W4)", "priya@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                    QuickRoleButton("Ananya (W2)", "ananya@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    QuickRoleButton("Neha (W4)", "neha@theekhai.in", Modifier.weight(1f), onSelectDemo)
+                    QuickRoleButton("Kabir (W3)", "kabir@theekhai.in", Modifier.weight(1f), onSelectDemo)
                 }
             }
         }

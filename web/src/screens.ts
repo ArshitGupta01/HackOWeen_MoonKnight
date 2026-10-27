@@ -9,7 +9,7 @@ import {
   getSavedSources,
   saveSourceBookmark,
   removeSavedSource,
-  triageComplaint, transcribeAudio, reverseGeocode, verifyCaseResolution, importLegalSource, draftComplaintEmail, sendComplaintEmail,
+  triageComplaint, transcribeAudio, reverseGeocode, verifyCaseResolution, importLegalSource, draftComplaintEmail, sendComplaintEmail, instantSignIn, getLeaderboard, getDummyUsers, LeaderboardResponse, LeaderboardEntry,
   CaseRecord,
   CaseDetail,
   LegalAnswer,
@@ -276,24 +276,40 @@ export function login(parent:HTMLElement) {
   // Shared Demo Accounts (inspired by TenderLens signin.html)
   const demoBox = el('div', 'demo-credential-card');
   demoBox.append(
-    el('span', 'label', t('SHARED PILOT DEMO ACCOUNTS (PASSWORD: TheekHai@2026)', 'साझा पायलट डेमो खाते (पासवर्ड: TheekHai@2026)')),
-    el('p', 'microcopy', t('Click any role below to fill credentials and test the full citizen → department → reviewer workflow:', 'नागरिक → विभाग → समीक्षक कार्यप्रणाली जाँचने के लिए किसी भी भूमिका पर क्लिक करें:')),
+    el('span', 'label', t('10 DUMMY PILOT ACCOUNTS · 1-CLICK INSTANT SIGN-IN', '10 डेमो पायलट खाते · 1-क्लिक त्वरित साइन-इन')),
+    el('p', 'microcopy', t('Click any user below to sign in instantly without typing (Password: TheekHai@2026):', 'बिना पासवर्ड टाइप किए तुरंत साइन-इन करने के लिए नीचे किसी भी उपयोगकर्ता पर क्लिक करें (पासवर्ड: TheekHai@2026):')),
   );
-  const demoGrid = el('div', 'demo-grid');
-  const demoRoles: [string, string, string][] = [
-    ['citizen@theekhai.in', t('Citizen (Ward 4)', 'नागरिक (वार्ड 4)'), 'CITIZEN'],
-    ['pwd@theekhai.in', t('Public Works Staff', 'लोक निर्माण विभाग'), 'DEPARTMENT'],
-    ['reviewer@theekhai.in', t('Independent Reviewer', 'स्वतंत्र समीक्षक'), 'REVIEWER'],
-    ['admin@theekhai.in', t('Operations Admin', 'संचालन व्यवस्थापक'), 'ADMIN'],
+  const demoGrid = el('div', 'demo-grid demo-grid-10');
+  const dummyUsers: [string, string, string, string, string][] = [
+    ['mohit@theekhai.in', 'Mohit Sharma', t('Citizen (Ward 4)', 'नागरिक (वार्ड 4)'), 'CITIZEN', '395 pts'],
+    ['arshit@theekhai.in', 'Arshit Gupta', t('Municipal Admin', 'नगरपालिका व्यवस्थापक'), 'ADMIN', '485 pts'],
+    ['atri@theekhai.in', 'Atri Chatterjee', t('Civic Reviewer', 'स्वतंत्र समीक्षक'), 'REVIEWER', '430 pts'],
+    ['himanshu@theekhai.in', 'Himanshu Verma', t('PWD Division', 'लोक निर्माण विभाग'), 'DEPARTMENT', '360 pts'],
+    ['priya@theekhai.in', 'Priya Nair', t('Citizen (Ward 4)', 'नागरिक (वार्ड 4)'), 'CITIZEN', '290 pts'],
+    ['rohan@theekhai.in', 'Rohan Deshmukh', t('Electrical Ops', 'विद्युत सेवाएं'), 'DEPARTMENT', '310 pts'],
+    ['ananya@theekhai.in', 'Ananya Iyer', t('Citizen (Ward 2)', 'नागरिक (वार्ड 2)'), 'CITIZEN', '235 pts'],
+    ['vikram@theekhai.in', 'Vikramaditya Singh', t('Water Services', 'जल आपूर्ति विभाग'), 'DEPARTMENT', '265 pts'],
+    ['neha@theekhai.in', 'Neha Kapoor', t('Citizen (Ward 4)', 'नागरिक (वार्ड 4)'), 'CITIZEN', '185 pts'],
+    ['kabir@theekhai.in', 'Kabir Mehta', t('Citizen (Ward 3)', 'नागरिक (वार्ड 3)'), 'CITIZEN', '135 pts'],
   ];
-  for (const [demoEmail, roleTitle, badge] of demoRoles) {
+  for (const [demoEmail, name, roleTitle, badge, pts] of dummyUsers) {
     const btn = el('button', 'demo-role-btn');
     btn.type = 'button';
-    btn.append(el('strong', '', roleTitle), el('small', '', `${demoEmail} · ${badge}`));
+    btn.append(
+      el('strong', '', `${name} (${pts})`),
+      el('small', '', `${roleTitle} · ${badge}`),
+    );
     btn.addEventListener('click', () => {
-      email.input.value = demoEmail;
-      password.input.value = 'TheekHai@2026';
-      notice(alert, t(`Filled ${roleTitle} credentials. Click Sign in to continue.`, `${roleTitle} विवरण भर दिया गया है। आगे बढ़ने के लिए साइन इन दबाएँ।`));
+      btn.disabled = true;
+      notice(alert, t(`Signing in as ${name}…`, `${name} के रूप में साइन-इन हो रहा है…`));
+      void instantSignIn(demoEmail)
+        .then(() => render())
+        .catch(() => {
+          email.input.value = demoEmail;
+          password.input.value = 'TheekHai@2026';
+          btn.disabled = false;
+          submit.click();
+        });
     });
     demoGrid.append(btn);
   }
@@ -945,4 +961,183 @@ export async function civicMap(parent: HTMLElement) {
   renderDetail();
   shell.append(canvasCard, detailCard);
   parent.append(filterBar, shell);
+}
+
+
+export async function leaderboard(parent: HTMLElement) {
+  heading(
+    parent,
+    t('CIVIC ACCOUNTABILITY LEADERBOARD', 'नागरिक जवाबदेही लीडरबोर्ड'),
+    t('Recognizing genuine reports & decisive action.', 'सच्ची शिकायतों और त्वरित कार्रवाई का सम्मान।'),
+    t('Regular citizens earn points when their complaints are verified genuine and approved by authorities (+35 to +85 pts). Authorities earn points for reviewing, resolving, and approving civic issues (+15 to +40 pts).', 'जब नागरिकों की शिकायतें सच्ची पाई जाती हैं और स्वीकृत होती हैं तो उनके अंक बढ़ते हैं। अधिकारियों को समस्याओं के समाधान और सत्यापन पर अंक मिलते हैं।'),
+  );
+
+  const filterBar = el('div', 'map-filter-bar');
+  const contentWrap = el('div');
+  parent.append(filterBar, contentWrap);
+
+  let activeFilter = 'ALL';
+
+  async function loadBoard() {
+    filterBar.replaceChildren();
+    for (const [code, label] of [
+      ['ALL', t('All Ranked (10)', 'सभी प्रतिभागी (10)')],
+      ['CITIZEN', t('Regular Citizens', 'नागरिक उपयोगकर्ता')],
+      ['AUTHORITY', t('Authorities & Reviewers', 'अधिकारी और समीक्षक')],
+    ]) {
+      filterBar.append(
+        button(
+          label,
+          () => {
+            activeFilter = code;
+            void loadBoard();
+          },
+          activeFilter === code ? 'button small' : 'button secondary small',
+        ),
+      );
+    }
+
+    notice(contentWrap, t('Loading live leaderboard rankings…', 'लीडरबोर्ड रैंकिंग लोड हो रही है…'));
+    try {
+      const data = await getLeaderboard(activeFilter);
+      contentWrap.replaceChildren();
+
+      const stats = el('div', 'stats stats-4');
+      const totalApproved = data.entries.reduce((acc, x) => acc + x.complaintsApprovedCount, 0);
+      const totalActions = data.entries.reduce((acc, x) => acc + x.actionsTakenCount, 0);
+      for (const [label, value] of [
+        [t('Ranked Participants', 'कुल प्रतिभागी'), data.totalParticipants],
+        [t('Total Civic Points', 'कुल नागरिक अंक'), data.totalPointsAwarded],
+        [t('Authority Actions', 'अधिकारी कार्रवाइयाँ'), totalActions],
+        [t('Approved Complaints', 'स्वीकृत शिकायतें'), totalApproved],
+      ]) {
+        const item = el('div');
+        item.append(el('span', 'label', String(label)), el('strong', 'stat-value', String(value)));
+        stats.append(item);
+      }
+      contentWrap.append(stats);
+
+      if (data.entries.length >= 3) {
+        const podium = el('div', 'leaderboard-podium');
+        data.entries.slice(0, 3).forEach((entry, i) => {
+          const card = el('div', `panel podium-card podium-rank-${i + 1}`);
+          const medal = i === 0 ? '🥇 #1' : i === 1 ? '🥈 #2' : '🥉 #3';
+          card.append(
+            el('span', 'podium-medal', medal),
+            el('h3', '', entry.fullName),
+            el('span', `status ${entry.userType === 'AUTHORITY' ? 'status-closed' : 'status-assigned'}`, `${entry.role}${entry.department ? ` · ${entry.department}` : ` · ${entry.ward}`}`),
+            el('strong', 'podium-score', `${entry.score} pts`),
+            el('p', 'microcopy', entry.badge),
+          );
+          podium.append(card);
+        });
+        contentWrap.append(podium);
+      }
+
+      const grid = el('div', 'detail-grid');
+      const tablePanel = el('section', 'panel');
+      tablePanel.append(
+        el('h2', '', t('Official Standings', 'आधिकारिक रैंकिंग तालिका')),
+        el('p', 'microcopy', t('Sorted by total verified civic score in descending order.', 'कुल सत्यापित नागरिक अंकों के आधार पर अवरोही क्रम में।')),
+      );
+
+      const tableWrap = el('div', 'leaderboard-table-wrap');
+      const table = el('table', 'leaderboard-table');
+      const thead = el('thead');
+      const headRow = el('tr');
+      for (const h of [
+        t('Rank', 'रैंक'),
+        t('Participant', 'प्रतिभागी'),
+        t('Role & Ward', 'भूमिका और वार्ड'),
+        t('Verified Activity', 'सत्यापित गतिविधि'),
+        t('Score', 'अंक'),
+        t('Quick Test', 'त्वरित परीक्षण'),
+      ]) {
+        headRow.append(el('th', '', h));
+      }
+      thead.append(headRow);
+      const tbody = el('tbody');
+
+      for (const item of data.entries) {
+        const tr = el('tr', identity?.email === item.email ? 'leaderboard-row-self' : '');
+        const rankCell = el('td', 'leaderboard-rank-cell', `#${item.rank}`);
+        const nameCell = el('td');
+        nameCell.append(
+          el('strong', '', item.fullName),
+          el('small', 'leaderboard-badge-sub', item.badge),
+        );
+        const roleCell = el('td');
+        roleCell.append(
+          el('span', `status ${item.userType === 'AUTHORITY' ? 'status-closed' : 'status-assigned'}`, item.role),
+          el('small', 'leaderboard-ward-sub', item.department || item.ward),
+        );
+        const activityText =
+          item.userType === 'AUTHORITY'
+            ? t(`${item.actionsTakenCount} authority actions`, `${item.actionsTakenCount} आधिकारिक कार्रवाइयाँ`)
+            : t(`${item.complaintsApprovedCount}/${item.complaintsSubmittedCount} complaints approved`, `${item.complaintsApprovedCount}/${item.complaintsSubmittedCount} शिकायतें स्वीकृत`);
+        const actCell = el('td', 'microcopy', activityText);
+        const scoreCell = el('td', 'leaderboard-score-cell', `${item.score} pts`);
+        const actionCell = el('td');
+        if (identity?.email === item.email) {
+          actionCell.append(el('span', 'status status-closed', t('Active user', 'सक्रिय')));
+        } else {
+          const switchBtn = button(
+            t('Instant Sign-In →', 'तुरंत साइन-इन →'),
+            () => {
+              switchBtn.disabled = true;
+              void instantSignIn(item.email)
+                .then(() => render())
+                .catch(() => { switchBtn.disabled = false; });
+            },
+            'quiet',
+          );
+          actionCell.append(switchBtn);
+        }
+        tr.append(rankCell, nameCell, roleCell, actCell, scoreCell, actionCell);
+        tbody.append(tr);
+      }
+
+      table.append(thead, tbody);
+      tableWrap.append(table);
+      tablePanel.append(tableWrap);
+
+      const sidePanel = el('aside', 'panel');
+      sidePanel.append(
+        el('p', 'eyebrow', t('HOW SCORING WORKS', 'अंक प्रणाली कैसे काम करती है')),
+        el('h2', '', t('Transparent Rules', 'पारदर्शी नियम')),
+      );
+      const rulesList = el('div', 'trust-pillars');
+      for (const [rTitle, rBody] of [
+        [t('Regular Citizens (+35 to +85 pts)', 'सामान्य नागरिक (+35 से +85 अंक)'), t('+35 pts when a submitted complaint is triaged as genuine; +50 pts bonus when an authority approves closure.', 'सच्ची शिकायत दर्ज करने पर +35 अंक; अधिकारी द्वारा समाधान स्वीकृत होने पर +50 बोनस अंक।')],
+        [t('Department Authorities (+15 to +30 pts)', 'विभागीय अधिकारी (+15 से +30 अंक)'), t('+15 pts for starting work, +25 pts for completing tasks, and +30 pts for submitting resolution proof.', 'कार्य शुरू करने पर +15 अंक, कार्य पूरा करने पर +25 अंक, और समाधान प्रस्तुत करने पर +30 अंक।')],
+        [t('Independent Reviewers (+40 pts)', 'स्वतंत्र समीक्षक (+40 अंक)'), t('+40 pts for independent verification and closure approval or upholding citizen challenges.', 'स्वतंत्र सत्यापन और समापन अनुमोदन पर +40 अंक।')],
+      ]) {
+        const rp = el('div', 'trust-pillar');
+        rp.append(el('strong', '', rTitle), el('p', 'microcopy', rBody));
+        rulesList.append(rp);
+      }
+      sidePanel.append(rulesList);
+
+      if (data.recentActivity.length) {
+        sidePanel.append(el('h3', 'leaderboard-feed-heading', t('Recent Point Awards', 'हाल के अंक पुरस्कार')));
+        for (const ev of data.recentActivity.slice(0, 8)) {
+          const item = el('div', 'timeline-event');
+          item.append(
+            el('span', 'label', `+${ev.pointsDelta} PTS · ${ev.userName}`),
+            el('p', '', ev.description),
+            el('time', 'microcopy', date(ev.createdAt)),
+          );
+          sidePanel.append(item);
+        }
+      }
+
+      grid.append(tablePanel, sidePanel);
+      contentWrap.append(grid);
+      refreshScroll();
+    } catch (err) {
+      notice(contentWrap, errorMessage(err), true);
+    }
+  }
+
+  await loadBoard();
 }

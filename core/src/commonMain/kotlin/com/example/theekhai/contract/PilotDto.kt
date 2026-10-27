@@ -68,3 +68,54 @@ import kotlinx.serialization.Serializable
     val senderEmail: String = "arshitgupta34@gmail.com",
     val authUrl: String? = null
 )
+
+
+@Serializable data class InstantLoginDto(val email: String)
+
+@Serializable data class DummyUserCredentialDto(
+    val id: String,
+    val shortName: String,
+    val fullName: String,
+    val email: String,
+    val password: String,
+    val role: String,
+    val userType: String, // "AUTHORITY" or "REGULAR"
+    val department: String? = null,
+    val ward: String,
+    val score: Int
+)
+
+@Serializable data class ScoreEventDto(
+    val id: String,
+    val userId: String,
+    val userName: String,
+    val caseId: String? = null,
+    val reasonCode: String,
+    val pointsDelta: Int,
+    val description: String,
+    val createdAt: Long
+)
+
+@Serializable data class LeaderboardEntryDto(
+    val rank: Int,
+    val userId: String,
+    val fullName: String,
+    val email: String,
+    val role: String,
+    val userType: String, // "AUTHORITY" or "REGULAR"
+    val department: String? = null,
+    val ward: String,
+    val score: Int,
+    val actionsTakenCount: Int,
+    val complaintsSubmittedCount: Int,
+    val complaintsApprovedCount: Int,
+    val badge: String
+)
+
+@Serializable data class LeaderboardResponseDto(
+    val entries: List<LeaderboardEntryDto>,
+    val recentActivity: List<ScoreEventDto>,
+    val totalParticipants: Int,
+    val totalPointsAwarded: Int,
+    val updatedAtEpochMillis: Long
+)

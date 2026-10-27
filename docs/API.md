@@ -45,3 +45,10 @@ The Ktor API is JSON at `/api/v1`, defined by `:core`'s `PilotDto.kt` and mounte
 - `GET /api/v1/legal/review`, `POST /api/v1/legal/sources`, `POST /api/v1/legal/sources/{id}/review` -> Reviewer approval/rejection queue.
 - `POST /api/v1/voice/transcribe` -> Transcribes and refines recorded voice notes (`TranscribeRequestDto` with `audioBase64`, `mimeType`, `language`, `transcriptHint`) via Groq Whisper / Sarvam AI / OpenRouter into structured `TranscribeResponseDto`.
 - `GET /api/v1/geo/reverse?lat=...&lon=...&lang=en|hi` -> Reverse-geocodes GPS or map-picked coordinates via OpenStreetMap Nominatim + Murthal geospatial index (`map.osm`) into `ReverseGeocodeResponseDto`.
+
+
+## Civic Accountability Leaderboard & Instant Sign-In (`/api/v1/leaderboard` & `/api/v1/auth/*`)
+
+- `GET /api/v1/leaderboard?role=ALL|CITIZEN|AUTHORITY` -> Returns ranked participants (`LeaderboardEntryDto`) with scores, action badges, and verified activity breakdown, along with the recent point-award activity ledger (`ScoreEventDto`).
+- `GET /api/v1/auth/dummy-users` -> Returns credentials and metadata for all 10 pre-seeded pilot users (`Mohit`, `Arshit`, `Atri`, `Himanshu`, `Priya`, `Rohan`, `Ananya`, `Vikram`, `Neha`, `Kabir`).
+- `POST /api/v1/auth/instant-login` -> Performs 1-click credential-free authentication for any seeded dummy account, issuing a local session cookie and `th_local_...` bearer token.
