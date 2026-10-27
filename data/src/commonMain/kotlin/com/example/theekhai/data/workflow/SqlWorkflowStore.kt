@@ -16,5 +16,6 @@ class SqlWorkflowStore(private val db: AppDatabase) : WorkflowStore {
     override fun receipt(actorId: String, key: String) = q.receipt(actorId,key).executeAsOneOrNull()?.let { it.fingerprint to it.caseId }
     override fun saveReceipt(actorId: String,key: String,fingerprint: String,caseId: String) { q.saveReceipt(actorId,key,fingerprint,caseId) }
     override fun link(caseId: String,targetId: String,kind: String) { q.link(caseId,targetId,kind) }
+    override fun links(caseId: String) = q.linksForCase(caseId, caseId).executeAsList().map { CaseLink(it.caseId, it.targetId, it.kind) }
     private fun com.example.theekhai.data.db.PilotCase.domain() = CaseRecord(id,title,description,category,address,latitude,longitude,citizenId,department,priority,CaseStatus.valueOf(status),createdAt,updatedAt,dueAt,version,escalation,closureBy)
 }

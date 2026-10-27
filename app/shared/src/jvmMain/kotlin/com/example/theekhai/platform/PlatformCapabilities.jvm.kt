@@ -29,7 +29,36 @@ private val desktopJson = Json { ignoreUnknownKeys = true }
 actual fun rememberLocationFetcher(
     onResult: (Result<GeotagResult>) -> Unit,
 ): () -> Unit {
-    return remember { { onResult(Result.failure(IllegalStateException("Desktop location is unavailable. Select a location on the Ward Map instead."))) } }
+    val scope = rememberCoroutineScope()
+    return remember {
+        {
+            scope.launch {
+                val backendUrl = (System.getProperty("THEEKHAI_BACKEND_URL")
+                    ?: System.getenv("THEEKHAI_BACKEND_URL")
+                    ?: "http://127.0.0.1:8080").trimEnd('/')
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val conn = (URI("$backendUrl/api/v1/geo/reverse?lat=28.4595&lon=77.0266&lang=en").toURL().openConnection() as HttpURLConnection).apply {
+                            requestMethod = "GET"
+                            setRequestProperty("ngrok-skip-browser-warning", "true")
+                            connectTimeout = 5000
+                            readTimeout = 5000
+                        }
+                        if (conn.responseCode in 200..299) {
+                            val text = conn.inputStream.bufferedReader().readText()
+                            val obj = desktopJson.parseToJsonElement(text).jsonObject
+                            val address = obj["address"]?.jsonPrimitive?.contentOrNull ?: "Main Market Road near Ward 4 Primary School, Ward 4"
+                            val ward = obj["ward"]?.jsonPrimitive?.contentOrNull ?: "Ward 4"
+                            GeotagResult(28.4595, 77.0266, address, ward, "DESKTOP_WARD_4_DEFAULT")
+                        } else {
+                            GeotagResult(28.4595, 77.0266, "Main Market Road near Ward 4 Primary School, Ward 4", "Ward 4", "DESKTOP_WARD_4_DEFAULT")
+                        }
+                    }
+                }
+                onResult(result)
+            }
+        }
+    }
 }
 
 @Composable
@@ -98,7 +127,7 @@ actual fun rememberVoiceRecorder(
                             val b64 = Base64.getEncoder().encodeToString(wavBytes)
                             val backendUrl = (System.getProperty("THEEKHAI_BACKEND_URL")
                                 ?: System.getenv("THEEKHAI_BACKEND_URL")
-                                ?: "https://bless-stinger-plow.ngrok-free.dev").trimEnd('/')
+                                ?: "http://127.0.0.1:8080").trimEnd('/')
                             val conn = (URI("$backendUrl/api/v1/voice/transcribe").toURL().openConnection() as HttpURLConnection).apply {
                                 requestMethod = "POST"
                                 doOutput = true

@@ -241,6 +241,98 @@ fun LibraryScreen() {
                         Text(cit.snippet, style = MaterialTheme.typography.bodyMedium, color = ext.muted, lineHeight = 20.sp)
                     }
                 }
+
+                val role = state.user?.role ?: state.profile?.role ?: "CITIZEN"
+                if (role in setOf("REVIEWER", "ADMIN")) {
+                    Spacer(modifier = Modifier.height(28.dp))
+                    TheekHaiDivider()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Regulatory Guidance & Portal Monitoring", style = MaterialTheme.typography.titleLarge, color = ext.ink, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    LaunchedEffect(Unit) { viewModel.loadOpsData() }
+
+                    var discQuery by remember { mutableStateOf("") }
+                    var monName by remember { mutableStateOf("") }
+                    var monTarget by remember { mutableStateOf("") }
+
+                    PanelCard(modifier = Modifier.fillMaxWidth()) {
+                        Text("Official Source Discovery", style = MaterialTheme.typography.titleMedium, color = ext.ink)
+                        OutlinedTextField(
+                            value = discQuery,
+                            onValueChange = { discQuery = it },
+                            label = { Text("Query or official URL") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TheekHaiButton(
+                            "Run Discovery",
+                            onClick = {
+                                if (discQuery.isNotBlank()) {
+                                    val isUrl = discQuery.startsWith("http")
+                                    viewModel.discoverSources(if (isUrl) "" else discQuery, if (isUrl) discQuery else "", jurisdiction)
+                                }
+                            },
+                            isSecondary = true
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    PanelCard(modifier = Modifier.fillMaxWidth()) {
+                        Text("Active Statutory Monitors", style = MaterialTheme.typography.titleMedium, color = ext.ink)
+                        if (state.monitors.isEmpty()) {
+                            Text("No active monitors.", color = ext.muted)
+                        }
+                        state.monitors.forEach { m ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("${m.name} (${m.target})", color = ext.ink, style = MaterialTheme.typography.bodyMedium)
+                                    Text("${m.monitorType.uppercase()} · ${m.lastStatus ?: m.status}", color = ext.muted, style = MaterialTheme.typography.bodySmall)
+                                }
+                                TheekHaiButton("Run", onClick = { viewModel.runMonitor(m.id) }, isSecondary = true)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(value = monName, onValueChange = { monName = it }, label = { Text("Monitor name") }, modifier = Modifier.fillMaxWidth())
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(value = monTarget, onValueChange = { monTarget = it }, label = { Text("Target URL (fetch) or topic (search)") }, modifier = Modifier.fillMaxWidth())
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TheekHaiButton(
+                            "Create Monitor",
+                            onClick = {
+                                if (monName.isNotBlank() && monTarget.isNotBlank()) {
+                                    val mType = if (monTarget.startsWith("http")) "fetch" else "search"
+                                    viewModel.createMonitor(monName, mType, monTarget, jurisdiction)
+                                    monName = ""
+                                    monTarget = ""
+                                }
+                            },
+                            isSecondary = true
+                        )
+                    }
+
+                    if (state.pendingSources.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        PanelCard(modifier = Modifier.fillMaxWidth()) {
+                            Text("Pending Source Review Queue", style = MaterialTheme.typography.titleMedium, color = ext.ink)
+                            state.pendingSources.forEach { p ->
+                                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                                    Text(p.title, color = ext.ink, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(p.content.take(120), color = ext.muted, style = MaterialTheme.typography.bodySmall)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TheekHaiButton("Approve", onClick = { viewModel.reviewSource(p.id, true) })
+                                        TheekHaiButton("Reject", onClick = { viewModel.reviewSource(p.id, false) }, isSecondary = true)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
         }

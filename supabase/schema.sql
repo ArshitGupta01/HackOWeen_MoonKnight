@@ -222,3 +222,62 @@ create policy "Owners can remove their saved sources"
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('evidence', 'evidence', false, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'audio/webm', 'audio/wav'])
 on conflict (id) do nothing;
+
+-- 11. RLS Policies for Workflow & Legal Tables (Required for Ktor JWT sync & client access)
+create policy "Authenticated users can read complaints"
+  on public.complaints for select to authenticated
+  using (true);
+
+create policy "Authenticated users can insert or update complaints"
+  on public.complaints for insert to authenticated
+  with check (true);
+
+create policy "Authenticated users can update complaints"
+  on public.complaints for update to authenticated
+  using (true)
+  with check (true);
+
+create policy "Authenticated users can read case tasks"
+  on public.case_tasks for select to authenticated
+  using (true);
+
+create policy "Authenticated users can insert or update case tasks"
+  on public.case_tasks for insert to authenticated
+  with check (true);
+
+create policy "Authenticated users can update case tasks"
+  on public.case_tasks for update to authenticated
+  using (true)
+  with check (true);
+
+create policy "Authenticated users can read audit logs"
+  on public.audit_logs for select to authenticated
+  using (true);
+
+create policy "Authenticated users can insert audit logs"
+  on public.audit_logs for insert to authenticated
+  with check (true);
+
+create policy "Anyone can read approved legal sources"
+  on public.legal_sources for select to anon, authenticated
+  using (status = 'APPROVED' or auth.role() = 'authenticated');
+
+create policy "Authenticated users can manage legal sources"
+  on public.legal_sources for all to authenticated
+  using (true)
+  with check (true);
+
+create policy "Authenticated users can read and manage legal monitors"
+  on public.legal_monitors for all to authenticated
+  using (true)
+  with check (true);
+
+-- Storage RLS policies for private 'evidence' bucket
+create policy "Authenticated users can upload evidence"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'evidence');
+
+create policy "Authenticated users can read evidence"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'evidence');
+

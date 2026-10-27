@@ -64,18 +64,13 @@ fun AppContent(route: Route) {
         is Route.CaseDetail -> LiveCaseDetailScreen(caseId = route.caseId)
         Route.Account -> AccountScreen()
         Route.Library -> LibraryScreen()
-        Route.CommandCenter, Route.FieldWorker -> {
-            val vm = koinViewModel<NativeConnectViewModel>()
-            val st by vm.state.collectAsState()
-            LaunchedEffect(vm) { vm.loadCases() }
-            WorkspaceScreen(
-                complaints = st.cases,
-                isLoading = st.isLoading,
-                error = st.error,
-                onRetry = vm::loadCases,
-                heading = if (route == Route.CommandCenter) "Case operations" else "Field work",
-                description = "Live cases and workflow actions are provided by your account permissions."
-            )
+        Route.CommandCenter -> {
+            val vm = koinViewModel<com.example.theekhai.presentation.admin.CommandCenterViewModel>()
+            com.example.theekhai.presentation.admin.CommandCenterRoute(viewModel = vm)
+        }
+        Route.FieldWorker -> {
+            val vm = koinViewModel<com.example.theekhai.presentation.fieldworker.FieldWorkerViewModel>()
+            com.example.theekhai.presentation.fieldworker.FieldWorkerRoute(viewModel = vm)
         }
     }
 }

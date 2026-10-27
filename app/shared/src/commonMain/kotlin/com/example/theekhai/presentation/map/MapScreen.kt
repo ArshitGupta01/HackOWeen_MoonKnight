@@ -45,6 +45,8 @@ import com.example.theekhai.ui.components.TheekHaiDivider
 import com.example.theekhai.ui.localization.t
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
+import com.example.theekhai.platform.rememberLocationFetcher
+import com.example.theekhai.platform.GeotagResult
 import org.jetbrains.compose.resources.painterResource
 import theekhai.app.shared.generated.resources.Res
 import theekhai.app.shared.generated.resources.broken_streetlight

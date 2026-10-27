@@ -54,6 +54,8 @@ saveReceipt:
 INSERT INTO PilotReceipt VALUES (?, ?, ?, ?);
 link:
 INSERT OR IGNORE INTO PilotLink VALUES (?, ?, ?);
+linksForCase:
+SELECT * FROM PilotLink WHERE caseId = ? OR targetId = ?;
 legalSources:
 SELECT * FROM LegalSource ORDER BY retrievedAt DESC;
 legalSource:

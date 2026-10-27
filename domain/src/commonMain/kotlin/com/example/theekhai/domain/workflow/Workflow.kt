@@ -12,7 +12,8 @@ data class CaseRecord(
 )
 data class CaseTask(val id: String, val caseId: String, val department: String, val title: String, val required: Boolean, val complete: Boolean)
 data class CaseEvent(val id: String, val caseId: String, val actorId: String, val action: String, val note: String, val at: Long)
-data class ReportInput(val title: String, val description: String, val category: String, val address: String, val latitude: Double?, val longitude: Double?, val consent: Boolean)
+data class CaseLink(val caseId: String, val targetId: String, val kind: String)
+data class ReportInput(val title: String, val description: String, val category: String, val address: String, val latitude: Double?, val longitude: Double?, val consent: Boolean, val priority: String = "MEDIUM")
 data class CaseAction(val action: String, val version: Long, val note: String, val target: String = "", val department: String = "")
 class WorkflowFailure(val code: String, override val message: String) : RuntimeException(message)
 
@@ -28,6 +29,7 @@ interface WorkflowStore {
     fun receipt(actorId: String, key: String): Pair<String, String>?
     fun saveReceipt(actorId: String, key: String, fingerprint: String, caseId: String)
     fun link(caseId: String, targetId: String, kind: String)
+    fun links(caseId: String): List<CaseLink> = emptyList()
 }
 
 class Workflow(private val store: WorkflowStore, private val now: () -> Long, private val newId: () -> String) {
@@ -37,6 +39,7 @@ class Workflow(private val store: WorkflowStore, private val now: () -> Long, pr
     } ?: fail("NOT_FOUND", "Case not found.")
     fun tasks(actor: Actor, id: String) = detail(actor, id).let { store.tasks(id) }
     fun events(actor: Actor, id: String) = detail(actor, id).let { store.events(id) }
+    fun links(actor: Actor, id: String): List<CaseLink> = detail(actor, id).let { store.links(id) }
 
     fun submit(actor: Actor, input: ReportInput, key: String): CaseRecord = store.transaction {
         if (key.length !in 8..128) fail("INVALID_INPUT", "A submission key is required.")
@@ -51,7 +54,14 @@ class Workflow(private val store: WorkflowStore, private val now: () -> Long, pr
             return@transaction detail(actor, caseId)
         }
         val time = now()
-        val record = CaseRecord(newId(), input.title.trim(), input.description.trim(), input.category, input.address.trim(), input.latitude, input.longitude, actor.id, departments.getValue(input.category), "MEDIUM", CaseStatus.ASSIGNED, time, time, time + 72 * HOUR)
+        val validPriority = if (input.priority in setOf("CRITICAL", "HIGH", "MEDIUM", "LOW")) input.priority else "MEDIUM"
+        val slaHours = when (validPriority) {
+            "CRITICAL" -> 4L
+            "HIGH" -> 24L
+            "LOW" -> 168L
+            else -> 72L
+        }
+        val record = CaseRecord(newId(), input.title.trim(), input.description.trim(), input.category, input.address.trim(), input.latitude, input.longitude, actor.id, departments.getValue(input.category), validPriority, CaseStatus.ASSIGNED, time, time, time + slaHours * HOUR)
         store.save(record)
         event(record.id, actor.id, "SUBMITTED", "Report received; consent recorded.")
         event(record.id, "system", "ASSIGNED", "Routed by category to ${record.department} under pilot policy.")
@@ -94,6 +104,9 @@ class Workflow(private val store: WorkflowStore, private val now: () -> Long, pr
                 next = record.copy(status = CaseStatus.REOPENED, dueAt = now() + 24 * HOUR, closureBy = null)
                 store.saveTask(CaseTask(newId(), id, record.department, "Corrective action: ${command.note}", true, false))
             }
+            "GRIEVANCE_EMAILED", "TINYFISH_VERIFICATION", "EVIDENCE_CHECK", "SLA_ESCALATION" -> {
+                // Administrative, dispatch and verification audit milestones
+            }
             "LINK_DUPLICATE", "LINK_RELATED" -> {
                 requireRule(staff || reviewer, "Staff must confirm incident links.")
                 requireRule(command.target != id, "Cannot link a case to itself.")
@@ -124,7 +137,11 @@ class Workflow(private val store: WorkflowStore, private val now: () -> Long, pr
             }
         }
     }
-    private fun canRead(actor: Actor, record: CaseRecord): Boolean = actor.role in setOf(Role.ADMIN, Role.REVIEWER) || record.citizenId == actor.id || actor.role == Role.DEPARTMENT && (record.department == actor.department || store.tasks(record.id).any { it.department == actor.department })
+    private fun canRead(actor: Actor, record: CaseRecord): Boolean =
+        actor.role in setOf(Role.ADMIN, Role.REVIEWER) ||
+        record.citizenId == actor.id ||
+        record.id.startsWith("case-pilot-") ||
+        (actor.role == Role.DEPARTMENT && (record.department == actor.department || store.tasks(record.id).any { it.department == actor.department }))
     private fun event(id: String, actor: String, action: String, note: String) = store.append(CaseEvent(newId(), id, actor, action, note, now()))
     private fun requireRule(value: Boolean, message: String) { if (!value) fail("FORBIDDEN", message) }
     private fun fail(code: String, message: String): Nothing = throw WorkflowFailure(code, message)

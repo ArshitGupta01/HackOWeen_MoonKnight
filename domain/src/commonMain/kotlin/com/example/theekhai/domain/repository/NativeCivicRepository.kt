@@ -21,4 +21,13 @@ interface NativeCivicRepository {
     suspend fun askGuidance(query: String, jurisdiction: String): CivicGuidanceAnswer
     suspend fun reverseGeocode(latitude: Double, longitude: Double, language: String): CivicLocation
     suspend fun triageReport(title: String, description: String, address: String, language: String): CivicTriageSuggestion
+    suspend fun verifyCaseWithTinyFish(complaintId: String, portalUrl: String? = null): com.example.theekhai.contract.VerificationResultDto
+    suspend fun getMonitors(): List<com.example.theekhai.contract.LegalMonitorDto>
+    suspend fun createMonitor(name: String, monitorType: String, target: String, jurisdiction: String): com.example.theekhai.contract.LegalMonitorDto
+    suspend fun runMonitor(id: String): com.example.theekhai.contract.MonitorRunResultDto
+    suspend fun discoverSources(query: String, url: String, jurisdiction: String): List<CivicGuidanceSource>
+    suspend fun getPendingSources(): List<CivicGuidanceSource>
+    suspend fun reviewSource(id: String, approve: Boolean)
+    suspend fun draftComplaintEmail(caseId: String): com.example.theekhai.contract.EmailDraftDto
+    suspend fun sendComplaintEmail(caseId: String, recipientEmail: String, subject: String, body: String): com.example.theekhai.contract.SendEmailResponseDto
 }

@@ -15,6 +15,7 @@ import com.example.theekhai.domain.model.ComplaintStatus
 import com.example.theekhai.domain.repository.ComplaintRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
 class ComplaintRepositoryImpl(
     private val local: ComplaintLocalDataSource,
@@ -22,7 +23,14 @@ class ComplaintRepositoryImpl(
 ) : ComplaintRepository {
 
     override fun observeComplaints(): Flow<List<Complaint>> =
-        local.observeComplaints().map { list -> list.map { it.toDomain() } }
+        local.observeComplaints().map { list -> list.map { it.toDomain() } }.onStart {
+            runCatching {
+                val remoteList = remote.getComplaints()
+                for (dto in remoteList) {
+                    local.insertOrReplace(toEntity(dto.toDomain(), isSynced = 1L))
+                }
+            }
+        }
 
     override suspend fun getComplaintById(id: String): Complaint? {
         val cached = local.getComplaintById(id)
@@ -73,7 +81,7 @@ class ComplaintRepositoryImpl(
     }
 
     override suspend fun updateStatus(id: String, status: ComplaintStatus): Boolean {
-        val now = 1793100000000L
+        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
         local.updateStatus(id, status.name, now, isSynced = 0L)
         return true
     }
@@ -84,7 +92,7 @@ class ComplaintRepositoryImpl(
         priority: ComplaintPriority,
         category: String
     ): Boolean {
-        val now = 1793100000000L
+        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
         local.updateTriage(
             id = id,
             clusterId = clusterId,
@@ -102,7 +110,7 @@ class ComplaintRepositoryImpl(
         resolutionNotes: String,
         photoUrl: String
     ): Boolean {
-        val now = 1793100000000L
+        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
         local.updateResolution(
             id = id,
             workerId = workerId,

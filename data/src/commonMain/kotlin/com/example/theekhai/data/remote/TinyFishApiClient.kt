@@ -1,35 +1,59 @@
 package com.example.theekhai.data.remote
 
+import com.example.theekhai.contract.TriggerVerificationRequestDto
 import com.example.theekhai.contract.VerificationResultDto
 import com.example.theekhai.contract.VerificationStateDto
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
+import kotlinx.coroutines.CancellationException
 
-/**
- * TinyFish Autonomous Web Verification Agent client.
- * Scrapes municipal portals and civic dashboards to independently verify work completion.
- */
-class TinyFishApiClient {
+class TinyFishApiClient(
+    private val client: HttpClient? = null,
+    private val backendBaseUrl: String = ""
+) {
     suspend fun verifyResolutionOnPortal(
         complaintId: String,
         targetPortalUrl: String?,
         resolutionProofUrl: String?
     ): VerificationResultDto {
-        val portal = targetPortalUrl ?: "https://smartcity.municipal.gov.in/portal/grievance/$complaintId"
-        
-        // Simulates web inspection: checking whether civic work order shows inspection signoff
-        val isVerified = true
-        val contradiction = false
-        val snippet = "Municipal Work Order #$complaintId: Status [COMPLETED]. Asphalt recarpeting inspection signed by Junior Engineer on municipal portal."
+        if (client != null && backendBaseUrl.isNotBlank()) {
+            try {
+                val response = client.post("${backendBaseUrl.trimEnd('/')}/api/v1/complaints/$complaintId/verify") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        TriggerVerificationRequestDto(
+                            complaintId = complaintId,
+                            officialPortalUrl = targetPortalUrl,
+                            resolutionProofUrl = resolutionProofUrl
+                        )
+                    )
+                }
+                if (response.status.isSuccess()) {
+                    return response.body<VerificationResultDto>()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Fall through to offline fallback
+            }
+        }
 
+        val portal = targetPortalUrl ?: "https://haryana-rtsc.gov.in/guidelines"
         return VerificationResultDto(
             id = "tinyfish-verif-$complaintId",
             complaintId = complaintId,
-            state = VerificationStateDto.CONFIRMED_RESOLVED,
-            verified = isVerified,
+            state = VerificationStateDto.MANUAL_INSPECTION_REQUIRED,
+            verified = false,
             scrapedPortalUrl = portal,
-            scrapedEvidenceSnippet = snippet,
-            contradictionDetected = contradiction,
-            explanation = "TinyFish autonomous scraper accessed $portal, parsed DOM for audit signoff, and validated geotagged contractor completion logs.",
-            verifiedAtEpochMillis = 1793100000000L
+            scrapedEvidenceSnippet = "Offline fallback: live TinyFish verification could not reach backend for case #$complaintId.",
+            contradictionDetected = false,
+            explanation = "Backend verification endpoint was unreachable; manual reviewer verification is required.",
+            verifiedAtEpochMillis = kotlin.time.Clock.System.now().toEpochMilliseconds()
         )
     }
 }

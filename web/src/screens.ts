@@ -9,7 +9,7 @@ import {
   getSavedSources,
   saveSourceBookmark,
   removeSavedSource,
-  triageComplaint, transcribeAudio, reverseGeocode,
+  triageComplaint, transcribeAudio, reverseGeocode, verifyCaseResolution, importLegalSource, draftComplaintEmail, sendComplaintEmail,
   CaseRecord,
   CaseDetail,
   LegalAnswer,
@@ -154,11 +154,11 @@ export function report(parent:HTMLElement):()=>void {
   geoSection.append(geoControls,geoText,mapPickerWrap);
   const consent=el('label','consent'),check=el('input');check.type='checkbox';check.required=true;consent.append(check,el('span','',t('I agree to share these details with the teams handling this report.','मैं यह विवरण रिपोर्ट पर काम करने वाली टीमों के साथ साझा करने के लिए सहमत हूँ।')));
   let media:MediaRecorder|null=null,stream:MediaStream|null=null,speechRec:any=null,timerInterval:number|null=null,secondsRecorded=0,liveSpeechTranscript='';let chunks:BlobPart[]=[];let audio:Blob|null=null;
-  const audioPanel=el('div','audio-panel'),audioTopRow=el('div','audio-top-row'),audioPlayerWrap=el('div','audio-player-wrap hidden'),audioStatus=el('p','microcopy',t('Speak in English or Hindi — live speech-to-text & OpenRouter AI will transcribe and structure your report.','अंग्रेज़ी या हिन्दी में बोलें — लाइव स्पीच-टू-टेक्स्ट और OpenRouter AI आपकी रिपोर्ट तैयार करेंगे।'));
+  const audioPanel=el('div','audio-panel'),audioTopRow=el('div','audio-top-row'),audioPlayerWrap=el('div','audio-player-wrap hidden'),audioStatus=el('p','microcopy',t('Speak in English or Hindi — voice note will be transcribed and structured automatically.','अंग्रेज़ी या हिन्दी में बोलें — आवाज़ को स्वचालित रूप से लिखित रूप में तैयार किया जाएगा।'));
   const runTranscription=async()=>{
     if(!audio&&!liveSpeechTranscript.trim())return;
     transcribe.disabled=true;
-    audioStatus.textContent=t('Transcribing & structuring voice note via OpenRouter AI…','OpenRouter AI के माध्यम से आवाज़ को लिखित रूप दिया जा रहा है…');
+    audioStatus.textContent=t('Transcribing voice note…','आवाज़ को लिखित रूप दिया जा रहा है…');
     try{
       let b64='';
       let mime='audio/webm';
@@ -177,7 +177,7 @@ export function report(parent:HTMLElement):()=>void {
       if(result.suggestedCategory){
         category.value=result.suggestedCategory;
       }
-      audioStatus.textContent=`✓ ${t('Voice note transcribed','आवाज़ का लिखित रूप तैयार')} (${result.provider||'OPENROUTER_AI'}).`;
+      audioStatus.textContent=`✓ ${t('Voice note transcribed','आवाज़ का लिखित रूप तैयार')} .`;
       notice(alert,t('Voice note transcribed into the form! Review and edit before submitting.','आवाज़ का लिखित रूप फॉर्म में भर दिया गया है! भेजने से पहले जाँच लें।'));
     }catch(error){
       if(liveSpeechTranscript.trim()){
@@ -191,18 +191,20 @@ export function report(parent:HTMLElement):()=>void {
     }
   };
   const record=button(t('🎙️ Record a voice note','🎙️ आवाज़ रिकॉर्ड करें'),()=>{void (async()=>{try{if(media?.state==='recording'){media.stop();try{speechRec?.stop()}catch{/* ignore */};return}liveSpeechTranscript='';secondsRecorded=0;const SpeechRecognitionCtor=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;if(SpeechRecognitionCtor){try{speechRec=new SpeechRecognitionCtor();speechRec.lang=(document.documentElement.lang==='hi')?'hi-IN':'en-IN';speechRec.continuous=true;speechRec.interimResults=true;speechRec.onresult=(ev:any)=>{let combined='';for(let i=0;i<ev.results.length;i++){combined+=ev.results[i][0].transcript+' '}liveSpeechTranscript=combined.trim();if(liveSpeechTranscript){description.value=liveSpeechTranscript;audioStatus.textContent=`🎙️ "${liveSpeechTranscript}"`}};speechRec.start()}catch{/* SpeechRecognition optional */}}stream=await navigator.mediaDevices.getUserMedia({audio:true});media=new MediaRecorder(stream);chunks=[];media.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};media.onstop=()=>{if(timerInterval){clearInterval(timerInterval);timerInterval=null}try{speechRec?.stop()}catch{/* ignore */}audioPanel.classList.remove('recording');audio=new Blob(chunks,{type:media!.mimeType||'audio/webm'});stream?.getTracks().forEach(track=>track.stop());record.textContent=t('🎙️ Record again','🎙️ फिर रिकॉर्ड करें');transcribe.disabled=false;audioPlayerWrap.replaceChildren();const player=document.createElement('audio');player.controls=true;player.src=URL.createObjectURL(audio);player.className='audio-preview-player';audioPlayerWrap.append(player);audioPlayerWrap.classList.remove('hidden');void runTranscription()};media.start();audioPanel.classList.add('recording');record.textContent=t('⏹ Stop recording (00:00)','⏹ रिकॉर्डिंग रोकें (00:00)');timerInterval=window.setInterval(()=>{secondsRecorded++;const mm=String(Math.floor(secondsRecorded/60)).padStart(2,'0');const ss=String(secondsRecorded%60).padStart(2,'0');record.textContent=`${t('⏹ Stop recording','⏹ रिकॉर्डिंग रोकें')} (${mm}:${ss})`},1000);audioStatus.textContent=t('Listening… Speak clearly into your microphone. Click Stop when finished.','सुन रहा है… माइक्रोफोन में स्पष्ट बोलें। पूरा होने पर रोकें दबाएँ।');setTimeout(()=>{if(media?.state==='recording')media.stop()},60000)}catch{try{speechRec?.stop()}catch{/* ignore */}notice(alert,t('Microphone unavailable or permission denied. You can type your report or use browser speech dictation.','माइक्रोफोन उपलब्ध नहीं या अनुमति नहीं मिली। रिपोर्ट टाइप करें।'),true)}})()},'button secondary');
-  const transcribe=button(t('✨ Transcribe & Refine with AI','✨ AI से लिखित रूप सुधारें'),()=>{void runTranscription()},'quiet');transcribe.disabled=true;audioTopRow.append(record,transcribe);audioPanel.append(audioTopRow,audioPlayerWrap,audioStatus);
+  const transcribe=button(t('✨ Transcribe & Format','✨ लिखित रूप तैयार करें'),()=>{void runTranscription()},'quiet');transcribe.disabled=true;audioTopRow.append(record,transcribe);audioPanel.append(audioTopRow,audioPlayerWrap,audioStatus);
   const submit=el('button','button',t('Review & submit report  ↗','जाँचें और रिपोर्ट भेजें  ↗'));submit.type='submit';const draft=button(t('Save draft on this device','इस डिवाइस पर ड्राफ्ट सहेजें'),()=>{try{localStorage.setItem('theekhai-draft',JSON.stringify({title:title.input.value,description:description.value,address:address.input.value,category:category.value}));notice(alert,t('Draft saved on this device. It has not been submitted.','ड्राफ्ट इस डिवाइस पर सहेजा गया। अभी भेजा नहीं गया है。'))}catch{notice(alert,t('This browser could not save the draft. Copy your text before leaving.','यह ब्राउज़र ड्राफ़्ट नहीं सहेज सका। जाने से पहले अपना पाठ कॉपी करें।'),true)}},'quiet');
   try{const saved=JSON.parse(localStorage.getItem('theekhai-draft')??'null');if(saved){title.input.value=saved.title??'';description.value=saved.description??'';address.input.value=saved.address??'';category.value=saved.category??'ROADS'}}catch{try{localStorage.removeItem('theekhai-draft')}catch{/* Storage may be disabled. */}}
   const triageBox=el('div');
-  const aiTriageBtn=button(t('AI Triage & Check Duplicates (OpenRouter)','AI विश्लेषण और डुप्लीकेट जाँच (OpenRouter)'),()=>{
-    if(description.value.trim().length<5){notice(alert,t('Describe the issue first (at least 5 characters) to run OpenRouter AI triage.','ओपनराउटर AI विश्लेषण चलाने के लिए पहले समस्या का विवरण लिखें।'),true);description.focus();return}
+  let suggestedPriority = 'MEDIUM';
+  const aiTriageBtn=button(t('Check Duplicates & Categorize','डुप्लीकेट जाँचें और श्रेणी चुनें'),()=>{
+    if(description.value.trim().length<5){notice(alert,t('Describe the issue first (at least 5 characters) to check for duplicate reports.','डुप्लीकेट जाँचने के लिए पहले समस्या का विवरण लिखें।'),true);description.focus();return}
     aiTriageBtn.disabled=true;
-    notice(triageBox,t('Analyzing issue & checking neighbourhood duplicates via OpenRouter AI…','OpenRouter AI के माध्यम से समस्या और डुप्लीकेट मामलों की जाँच की जा रही है…'));
+    notice(triageBox,t('Checking neighbourhood reports for duplicates…','पड़ोस के मामलों में डुप्लीकेट की जाँच की जा रही है…'));
     void triageComplaint({title:title.input.value,description:description.value,address:address.input.value,language:document.documentElement.lang||'en'})
       .then(res=>{
         if(!title.input.value.trim()&&res.suggestedTitle)title.input.value=res.suggestedTitle;
         if(res.suggestedCategory)category.value=res.suggestedCategory;
+        if(res.suggestedPriority)suggestedPriority=res.suggestedPriority;
         triageBox.replaceChildren();
         const card=el('div','demo-credential-card');
         card.append(
@@ -229,7 +231,7 @@ export function report(parent:HTMLElement):()=>void {
   if(qCat&&['ROADS','WATER','WASTE','LIGHTING','OTHER'].includes(qCat))category.value=qCat;
   if(Number.isFinite(qLat)&&Number.isFinite(qLon))void applyCoordinates(qLat,qLon,5,qAddr||undefined);
   const actions=el('div','actions');actions.append(submit,aiTriageBtn,draft);form.append(title.wrapper,categoryLabel,descriptionLabel,audioPanel,address.wrapper,geoSection,triageBox,consent,alert,actions);
-  const submissionKey=crypto.randomUUID();form.addEventListener('submit',event=>{event.preventDefault();if(!identity){notice(alert,t('Save your draft, then sign in to submit.','ड्राफ्ट सहेजें, फिर भेजने के लिए साइन इन करें।'),true);return}void(async()=>{submit.disabled=true;try{const record=await api<CaseRecord>('/complaints',{method:'POST',headers:{'Idempotency-Key':submissionKey},body:JSON.stringify({title:title.input.value,description:description.value,category:category.value,address:address.input.value,latitude:coords?.latitude??null,longitude:coords?.longitude??null,consent:check.checked})});localStorage.removeItem('theekhai-draft');navigate(`/cases/${record.id}`)}catch(error){notice(alert,errorMessage(error),true)}finally{submit.disabled=false}})()});
+  const submissionKey=crypto.randomUUID();form.addEventListener('submit',event=>{event.preventDefault();if(!identity){notice(alert,t('Save your draft, then sign in to submit.','ड्राफ्ट सहेजें, फिर भेजने के लिए साइन इन करें।'),true);return}void(async()=>{submit.disabled=true;try{const record=await api<CaseRecord>('/complaints',{method:'POST',headers:{'Idempotency-Key':submissionKey},body:JSON.stringify({title:title.input.value,description:description.value,category:category.value,address:address.input.value,latitude:coords?.latitude??null,longitude:coords?.longitude??null,consent:check.checked,priority:suggestedPriority})});localStorage.removeItem('theekhai-draft');navigate(`/cases/${record.id}`)}catch(error){notice(alert,errorMessage(error),true)}finally{submit.disabled=false}})()});
   aside.append(el('p','eyebrow',t('WHAT HAPPENS NEXT','इसके बाद क्या होगा')),el('h2','',t('A report with\na way forward.','एक रिपोर्ट,\nआगे का रास्ता।')),el('p','',t('Your report goes to an accountable department. You can follow tasks, due dates and the final review from your workspace.','आपकी रिपोर्ट जिम्मेदार विभाग तक जाती है। कार्यक्षेत्र में काम, समय-सीमा और अंतिम समीक्षा देखें।')),el('div','aside-note',t('This is a civic pilot. It is not an emergency service.','यह नागरिक पायलट है। यह आपातकालीन सेवा नहीं है।')),link(t('How we use your information','आपकी जानकारी का उपयोग'),'/privacy','text-link'));
   layout.append(form,aside);parent.append(layout);return()=>{if(media?.state==='recording')media.stop();stream?.getTracks().forEach(track=>track.stop())};
 }
@@ -575,23 +577,101 @@ export async function workspace(parent:HTMLElement) {
 
 export async function detail(parent:HTMLElement,id:string) {
   if(authGate(parent))return;const content=el('div');parent.append(content);notice(content,t('Loading case…','मामला लोड हो रहा है…'));
-  try{const data=await api<CaseDetail>(`/complaints/${encodeURIComponent(id)}`);content.replaceChildren();const record=data.case;content.append(link(t('← Back to workspace','← कार्यक्षेत्र में लौटें'),'/workspace','text-link'));heading(content,record.category+' / '+record.id.slice(0,8),record.title,record.address);const layout=el('div','detail-grid'),body=el('div'),summary=el('section','panel'),tasks=el('section','panel'),timeline=el('section','panel');summary.append(el('span',`status status-${record.status.toLowerCase()}`,statusText(record.status)),el('p','case-description',record.description),el('p','',t('Lead department: ','मुख्य विभाग: ')+record.department),el('p','',t('Due: ','समय-सीमा: ')+date(record.dueAt)));if(record.latitude!=null&&record.longitude!=null){const geoRow=el('div','geo-controls');const badge=el('span','geo-badge',`📍 ${record.latitude.toFixed(5)}° N, ${record.longitude.toFixed(5)}° E`);geoRow.append(badge,link(t('View on Civic Map  ↗','नागरिक मानचित्र पर देखें  ↗'),'/map','text-link'));summary.append(geoRow)}summary.append(el('p','microcopy',t('Pilot service target, not a statutory deadline.','पायलट सेवा लक्ष्य, वैधानिक समय-सीमा नहीं।')));tasks.append(el('h2','',t('Coordinated work','समन्वित कार्य')));for(const task of data.tasks){const row=el('div','task-row');row.append(el('span',task.complete?'task-done':'task-open',task.complete?'✓':'○'),el('span','',task.title),el('small','',task.department));if(!task.complete&&record.status==='IN_PROGRESS'&&(identity?.role==='ADMIN'||identity?.department===task.department))row.append(button(t('Complete','पूरा करें'),()=>void act('COMPLETE_TASK',task.id),'quiet'));tasks.append(row)}timeline.append(el('h2','',t('The complete story','पूरा घटनाक्रम')));for(const event of [...data.events].reverse()){const item=el('div','timeline-event');item.append(el('span','label',event.action.replaceAll('_',' ')),el('p','',event.note),el('time','microcopy',date(event.at)));timeline.append(item)}body.append(summary,tasks,timeline);
+  try{const data=await api<CaseDetail>(`/complaints/${encodeURIComponent(id)}`);content.replaceChildren();const record=data.case;content.append(link(t('← Back to workspace','← कार्यक्षेत्र में लौटें'),'/workspace','text-link'));heading(content,record.category+' / '+record.id.slice(0,8),record.title,record.address);const layout=el('div','detail-grid'),body=el('div'),summary=el('section','panel'),tasks=el('section','panel'),timeline=el('section','panel');summary.append(el('span',`status status-${record.status.toLowerCase()}`,statusText(record.status)),el('p','case-description',record.description),el('p','',t('Lead department: ','मुख्य विभाग: ')+record.department),el('p','',t('Due: ','समय-सीमा: ')+date(record.dueAt)));if(record.latitude!=null&&record.longitude!=null){const geoRow=el('div','geo-controls');const badge=el('span','geo-badge',`📍 ${record.latitude.toFixed(5)}° N, ${record.longitude.toFixed(5)}° E`);geoRow.append(badge,link(t('View on Civic Map  ↗','नागरिक मानचित्र पर देखें  ↗'),'/map','text-link'));summary.append(geoRow)}
+if(data.links && data.links.length){
+  const linksWrap=el('div','case-links');
+  linksWrap.append(el('strong','',t('Linked / Duplicate cases: ','संबद्ध / डुप्लिकेट मामले: ')));
+  for(const l of data.links){
+    linksWrap.append(link(`#${l.targetId.slice(0,8)} (${l.kind}) `,`/cases/${l.targetId}`,'text-link'));
+  }
+  summary.append(linksWrap);
+}
+summary.append(el('p','microcopy',t('Pilot service target, not a statutory deadline.','पायलट सेवा लक्ष्य, वैधानिक समय-सीमा नहीं।')));tasks.append(el('h2','',t('Coordinated work','समन्वित कार्य')));for(const task of data.tasks){const row=el('div','task-row');row.append(el('span',task.complete?'task-done':'task-open',task.complete?'✓':'○'),el('span','',task.title),el('small','',task.department));if(!task.complete&&record.status==='IN_PROGRESS'&&(identity?.role==='ADMIN'||identity?.department===task.department))row.append(button(t('Complete','पूरा करें'),()=>void act('COMPLETE_TASK',task.id),'quiet'));tasks.append(row)}
+  // Official Civic Email Dispatch Section (Sender: arshitgupta34@gmail.com, Receiver dynamically discovered via TinyFish)
+  const emailSection = el('section', 'panel email-dispatch-panel');
+  emailSection.append(
+    el('h2', '', t('Official Civic Email Dispatch', 'आधिकारिक नागरिक ईमेल प्रेषण')),
+    el('p', 'microcopy', t('Send statutory grievance petition directly to the responsible government authority via Gmail.', 'जीमेल के माध्यम से जिम्मेदार सरकारी प्राधिकारी को सीधे वैधानिक शिकायत भेजें।')),
+    el('p', 'microcopy', 'Verified Sender: arshitgupta34@gmail.com')
+  );
+  const emailAlert = el('div');
+  const emailFormWrap = el('div', 'email-form-wrap');
+  const draftBtn = button(t('🤖 Discover Authority & Draft Email', '🤖 अधिकारी संपर्क खोजें और ईमेल ड्राफ्ट करें'), async () => {
+    draftBtn.disabled = true;
+    notice(emailAlert, t('Discovering official authority contact via government portals…', 'सरकारी पोर्टलों से आधिकारिक संपर्क खोजा जा रहा है…'));
+    try {
+      const draft = await draftComplaintEmail(record.id);
+      renderEmailComposer(draft);
+    } catch (err) {
+      notice(emailAlert, errorMessage(err), true);
+    } finally {
+      draftBtn.disabled = false;
+    }
+  }, 'button secondary');
+
+  function renderEmailComposer(draft: import('./api').EmailDraft) {
+    emailFormWrap.replaceChildren();
+    emailAlert.replaceChildren();
+    const toField = field(t('Authority Email (Discovered)', 'प्राधिकारी ईमेल (खोजा गया)'), 'toEmail');
+    toField.input.value = draft.recipientEmail;
+    const authNote = el('p', 'microcopy', `🏢 ${draft.recipientAuthority} (${draft.recipientDepartment}) · Source: ${draft.officialSourceUrl}`);
+    const subjField = field(t('Subject', 'विषय'), 'emailSubject');
+    subjField.input.value = draft.subject;
+    const bodyField = el('div', 'field');
+    const bodyLabel = el('label', 'label', t('Petition Letter', 'शिकायत पत्र'));
+    const bodyText = el('textarea');
+    bodyText.rows = 8;
+    bodyText.value = draft.body;
+    bodyField.append(bodyLabel, bodyText);
+
+    const sendBtn = button(t('🚀 Send Official Email via Gmail', '🚀 जीमेल से आधिकारिक ईमेल भेजें'), async () => {
+      sendBtn.disabled = true;
+      notice(emailAlert, t('Dispatching official email from arshitgupta34@gmail.com via Gmail API…', 'जीमेल एपीआई के माध्यम से ईमेल भेजा जा रहा है…'));
+      try {
+        const res = await sendComplaintEmail(record.id, toField.input.value, subjField.input.value, bodyText.value);
+        notice(emailAlert, `✓ ${res.message}`);
+        emailFormWrap.replaceChildren();
+        await render();
+      } catch (err) {
+        notice(emailAlert, errorMessage(err), true);
+        sendBtn.disabled = false;
+      }
+    });
+
+    emailFormWrap.append(toField.wrapper, authNote, subjField.wrapper, bodyField, sendBtn);
+  }
+
+  emailSection.append(draftBtn, emailAlert, emailFormWrap);
+  timeline.append(el('h2','',t('The complete story','पूरा घटनाक्रम')));
+for(const event of [...data.events].reverse()){const item=el('div','timeline-event');item.append(el('span','label',event.action.replaceAll('_',' ')),el('p','',event.note),el('time','microcopy',date(event.at)));timeline.append(item)}body.append(summary,tasks,emailSection,timeline);
   const actions=el('aside','panel action-panel');actions.append(el('p','eyebrow',t('NEXT ACTION','अगला कदम')),el('h2','',t('Move it forward.','आगे बढ़ाएँ।')));const reason=el('textarea');reason.rows=4;reason.placeholder=t('Explain your action or provide review notes.','अपना निर्णय या समीक्षा टिप्पणी लिखें।');reason.setAttribute('aria-label',reason.placeholder);const alert=el('div');actions.append(reason,alert);
   async function act(action:string,target=''){if(reason.value.trim().length<3){notice(alert,t('Add a short reason first.','पहले संक्षिप्त कारण लिखें।'),true);return}try{await api(`/complaints/${id}/actions`,{method:'POST',body:JSON.stringify({action,version:record.version,note:reason.value,target,department:department.value})});await render()}catch(error){notice(alert,errorMessage(error),true)}}
   const department=el('select');department.setAttribute('aria-label',t('Department for task','कार्य का विभाग'));for(const name of ['Public works','Water services','Sanitation','Electrical services','Civic triage'])department.append(el('option','',name));
   const staff=identity?.role==='ADMIN'||identity?.role==='DEPARTMENT';const reviewer=identity?.role==='ADMIN'||identity?.role==='REVIEWER';
+  const hasPendingChallenge = data.events.some(ev => ev.action === 'CHALLENGE' && ev.at >= record.updatedAt);
   if(staff&&['ASSIGNED','REOPENED'].includes(record.status))actions.append(button(t('Start work','काम शुरू करें'),()=>void act('START')));
   if(staff&&['ASSIGNED','REOPENED','IN_PROGRESS'].includes(record.status)){actions.append(department,button(t('Add required task','जरूरी कार्य जोड़ें'),()=>void act('ADD_TASK'),'button secondary'))}
   if(staff&&record.status==='IN_PROGRESS')actions.append(button(t('Request closure review','बंद करने की समीक्षा माँगें'),()=>void act('REQUEST_CLOSURE')));
   if(reviewer&&record.status==='PENDING_VERIFICATION'&&record.closureBy!==identity?.id){actions.append(button(t('Approve closure','बंद करना स्वीकार करें'),()=>void act('APPROVE_CLOSURE')),button(t('Return for more work','आगे काम के लिए लौटाएँ'),()=>void act('REJECT_CLOSURE'),'button secondary'))}
-  if(record.status==='CLOSED'&&record.citizenId===identity?.id)actions.append(button(t('Challenge this closure','बंद होने पर सवाल उठाएँ'),()=>void act('CHALLENGE'),'button secondary'));
-  if(reviewer&&record.status==='CLOSED')actions.append(button(t('Uphold challenge & reopen','आपत्ति स्वीकार करें और फिर खोलें'),()=>void act('REOPEN'),'button secondary'));
+  if(record.status==='CLOSED'&&record.citizenId===identity?.id&&!hasPendingChallenge)actions.append(button(t('Challenge this closure','बंद होने पर सवाल उठाएँ'),()=>void act('CHALLENGE'),'button secondary'));
+  if(record.status==='CLOSED'&&hasPendingChallenge){actions.append(el('span','status status-assigned',t('Citizen challenge submitted — awaiting reviewer decision.','नागरिक आपत्ति दर्ज — स्वतंत्र समीक्षक के निर्णय की प्रतीक्षा है।')))}
+  if(reviewer&&record.status==='CLOSED'&&hasPendingChallenge)actions.append(button(t('Uphold challenge & reopen','आपत्ति स्वीकार करें और फिर खोलें'),()=>void act('REOPEN'),'button secondary'));
+  if(staff||reviewer){
+    actions.append(button(t('🌐 Verify Portal Resolution','🌐 पोर्टल पर समाधान सत्यापित करें'),async ()=>{
+      notice(alert,t('Verifying resolution against municipal standards…','नगर निगम मानकों के विरुद्ध समाधान की जाँच जारी है…'));
+      try{
+        const verif = await verifyCaseResolution(record.id);
+        notice(alert,`TinyFish (${verif.state}): ${verif.explanation}`);
+        await render();
+      }catch(err){notice(alert,errorMessage(err),true)}
+    },'button secondary'));
+  }
   actions.append(el('p','microcopy',t('Every decision is recorded. Closure requires an independent reviewer.','हर फैसला दर्ज होता है। बंद करने के लिए स्वतंत्र समीक्षक आवश्यक है।')));layout.append(body,actions);content.append(layout);
   }catch(error){notice(content,errorMessage(error),true)}
 }
 
 export function library(parent:HTMLElement){
-  heading(parent,t('THE REFERENCE LIBRARY','संदर्भ लाइब्रेरी'),t('Know your next step.','अपना अगला कदम जानें।'),t('Approved civic guidance powered by TinyFish Agent & Monitor, OpenRouter grounded synthesis, Tavily official-domain discovery, and local source backup fallback.','टाइनीफिश एजेंट और मॉनिटर, ओपनराउटर संश्लेषण, टैविली खोज तथा स्थानीय स्वीकृत स्रोत बैकअप के साथ नागरिक मार्गदर्शन।'));
+  heading(parent,t('THE REFERENCE LIBRARY','संदर्भ लाइब्रेरी'),t('Know your next step.','अपना अगला कदम जानें।'),t('Approved civic guidance and statutory references for citizen rights and municipal service delivery.','नागरिक अधिकारों और नगर निगम सेवाओं के लिए स्वीकृत कानूनी संदर्भ व मार्गदर्शन।'));
   const provBanner=el('div','stats stats-4');
   parent.append(provBanner);
   const providerNote=el('p','microcopy',t('Configuration indicators only — they do not verify live provider health or database access policies.','ये केवल कॉन्फ़िगरेशन संकेतक हैं — लाइव सेवा स्थिति या डेटाबेस पहुँच नीतियों का सत्यापन नहीं।'));
@@ -604,24 +684,35 @@ export function library(parent:HTMLElement){
       provBanner.append(item);
     }
   }).catch(()=>{provBanner.replaceChildren(el('div','microcopy',t('Provider configuration is unavailable.','प्रदाता कॉन्फ़िगरेशन उपलब्ध नहीं है।')))});
-  const form=el('form','panel library-form'),query=field(t('What would you like to understand?','आप क्या समझना चाहते हैं?'),'question');query.input.placeholder=t('e.g. How does the Haryana Auto Appeal System (AAS) handle overdue services?','जैसे हरियाणा ऑटो अपील सिस्टम (AAS) समय-सीमा पार होने पर कैसे काम करता है?');query.input.minLength=3;query.input.maxLength=1000;const jurisdiction=el('select');jurisdiction.setAttribute('aria-label',t('Jurisdiction','क्षेत्राधिकार'));for(const [value,label] of [['CENTRAL',t('Central guidance','केंद्रीय मार्गदर्शन')],['HARYANA',t('Haryana + central guidance','हरियाणा और केंद्रीय मार्गदर्शन')]]){const option=el('option','',label);option.value=value;jurisdiction.append(option)}const search=el('button','button',t('Find guidance','मार्गदर्शन खोजें'));search.type='submit';const answer=el('div','legal-results');form.append(query.wrapper,jurisdiction,search,el('p','microcopy',t('Uses TinyFish Agent Mode on approved official sources, with Tavily official-domain fallback and deterministic local excerpt backup (SOURCES_ONLY).','स्वीकृत आधिकारिक स्रोतों पर टाइनीफिश एजेंट मोड का उपयोग करता है, टैविली फ़ॉलबैक और स्थानीय अंश बैकअप (SOURCES_ONLY) के साथ।')));parent.append(form,answer);
+  const form=el('form','panel library-form'),query=field(t('What would you like to understand?','आप क्या समझना चाहते हैं?'),'question');query.input.placeholder=t('e.g. How does the Haryana Auto Appeal System (AAS) handle overdue services?','जैसे हरियाणा ऑटो अपील सिस्टम (AAS) समय-सीमा पार होने पर कैसे काम करता है?');query.input.minLength=3;query.input.maxLength=1000;const jurisdiction=el('select');jurisdiction.setAttribute('aria-label',t('Jurisdiction','क्षेत्राधिकार'));for(const [value,label] of [['CENTRAL',t('Central guidance','केंद्रीय मार्गदर्शन')],['HARYANA',t('Haryana + central guidance','हरियाणा और केंद्रीय मार्गदर्शन')]]){const option=el('option','',label);option.value=value;jurisdiction.append(option)}const search=el('button','button',t('Find guidance','मार्गदर्शन खोजें'));search.type='submit';const answer=el('div','legal-results');form.append(query.wrapper,jurisdiction,search,el('p','microcopy',t('Official regulatory guidance grounded in verified statutory sources.','सत्यापित आधिकारिक और वैधानिक स्रोतों पर आधारित मार्गदर्शन।')));parent.append(form,answer);
   function sources(items:LegalSource[]){for(const source of items){const card=el('article','panel source-card');const a=link(source.title,source.url,'text-link');a.target='_blank';a.rel='noopener noreferrer';const foot=el('div','source-card-foot');foot.append(el('small','microcopy',t('Retrieved ','प्राप्त ')+date(source.retrievedAt)));if(identity){const saveBtn=button(t('Save to account','खाते में सहेजें'),()=>{saveBtn.disabled=true;void saveSourceBookmark({title:source.title,sourceUrl:source.url,jurisdiction:source.jurisdiction,snippet:source.content.slice(0,400)}).then(()=>{saveBtn.textContent=t('Saved ✓','सहेजा गया ✓')}).catch(()=>{saveBtn.disabled=false})},'quiet');foot.append(saveBtn)}card.append(el('span','label',source.jurisdiction+' · '+source.language),a,el('p','',source.content.slice(0,700)),foot);answer.append(card)}}
-  form.addEventListener('submit',event=>{event.preventDefault();search.disabled=true;notice(answer,t('Searching approved sources via TinyFish Agent / fallback…','टाइनीफिश एजेंट / फ़ॉलबैक के माध्यम से स्वीकृत स्रोत खोजे जा रहे हैं…'));void(async()=>{try{if(identity){const result=await api<LegalAnswer>('/legal/ask',{method:'POST',body:JSON.stringify({question:query.input.value,jurisdiction:jurisdiction.value})});const badge=el('span','label',`Mode: ${result.mode}`);answer.replaceChildren(badge,el('p','legal-answer',result.answer),el('p','microcopy',result.limitation));sources(result.citations)}else{const result=await api<LegalSource[]>(`/legal/sources?q=${encodeURIComponent(query.input.value)}&jurisdiction=${jurisdiction.value}`);answer.replaceChildren();if(!result.length)notice(answer,t('No approved matching sources are installed yet.','अभी कोई संबंधित स्वीकृत स्रोत स्थापित नहीं है।'));sources(result)}}catch(error){notice(answer,errorMessage(error),true)}finally{search.disabled=false}})()});
+  form.addEventListener('submit',event=>{event.preventDefault();search.disabled=true;notice(answer,t('Searching approved official guidance…','स्वीकृत आधिकारिक मार्गदर्शन खोजा जा रहा है…'));void(async()=>{try{if(identity){const result=await api<LegalAnswer>('/legal/ask',{method:'POST',body:JSON.stringify({question:query.input.value,jurisdiction:jurisdiction.value})});const badge=el('span','label',`Mode: ${result.mode}`);answer.replaceChildren(badge,el('p','legal-answer',result.answer),el('p','microcopy',result.limitation));sources(result.citations)}else{const result=await api<LegalSource[]>(`/legal/sources?q=${encodeURIComponent(query.input.value)}&jurisdiction=${jurisdiction.value}`);answer.replaceChildren();if(!result.length)notice(answer,t('No approved matching sources are installed yet.','अभी कोई संबंधित स्वीकृत स्रोत स्थापित नहीं है।'));sources(result)}}catch(error){notice(answer,errorMessage(error),true)}finally{search.disabled=false}})()});
   if(identity?.role==='REVIEWER'||identity?.role==='ADMIN'){
     const ops=el('section','panel');ops.append(el('p','eyebrow',t('TINYFISH AGENT & MONITOR + TAVILY','टाइनीफिश एजेंट और मॉनिटर + टैविली')),el('h2','',t('Source discovery, monitors & review queue','स्रोत खोज, मॉनिटर और समीक्षा कतार')));
     const statusBox=el('div');
     const discForm=el('form','library-form'),discQuery=field(t('Tavily discovery query or TinyFish target goal','टैविली खोज प्रश्न या टाइनीफिश लक्ष्य'),'discQuery'),discUrl=field(t('Allowlisted official URL (optional for Tavily discovery)','आधिकारिक URL (टैविली खोज के लिए वैकल्पिक)'),'discUrl');discUrl.input.required=false;discUrl.input.placeholder='https://haryana-rtsc.gov.in/guidelines';
-    const discBtn=el('button','button secondary',t('Run TinyFish Agent + Tavily Discovery','टाइनीफिश एजेंट + टैविली खोज चलाएँ'));discBtn.type='submit';
+    const discBtn=el('button','button secondary',t('Discover Official Regulations','आधिकारिक नियम खोजें'));discBtn.type='submit';
     discForm.append(discQuery.wrapper,discUrl.wrapper,discBtn);
     const monForm=el('form','library-form'),monName=field(t('Monitor name','मॉनिटर का नाम'),'monName'),monTarget=field(t('Official URL (fetch) or topic query (search)','आधिकारिक URL (fetch) या विषय (search)'),'monTarget');
     const monType=el('select');for(const [v,l] of [['fetch','TinyFish Page Monitor (fetch)'],['search','TinyFish Topic Monitor (search)']]){const o=el('option','',l);o.value=v;monType.append(o)}
-    const monBtn=el('button','button secondary',t('Create TinyFish Monitor','टाइनीफिश मॉनिटर बनाएँ'));monBtn.type='submit';
+    const monBtn=el('button','button secondary',t('Create Regulatory Monitor','नियम मॉनिटर बनाएँ'));monBtn.type='submit';
     monForm.append(monName.wrapper,monType,monTarget.wrapper,monBtn);
+
+    const importForm=el('form','library-form'),impTitle=field(t('Document title','दस्तावेज़ का शीर्षक'),'impTitle'),impUrl=field(t('Official source URL','आधिकारिक स्रोत URL'),'impUrl'),impContent=field(t('Official text / circular content','आधिकारिक पाठ / सर्कुलर सामग्री'),'impContent');
+    const impBtn=el('button','button secondary',t('Import Approved Guidance','स्वीकृत मार्गदर्शन जोड़ें'));impBtn.type='submit';
+    importForm.append(impTitle.wrapper,impUrl.wrapper,impContent.wrapper,impBtn);
+    importForm.addEventListener('submit',e=>{
+      e.preventDefault();
+      void importLegalSource({title:impTitle.input.value,url:impUrl.input.value,jurisdiction:jurisdiction.value,language:'en',content:impContent.input.value})
+        .then(()=>{notice(statusBox,t('Official source imported successfully.','आधिकारिक स्रोत सफलतापूर्वक जोड़ा गया।'));return refreshOps()})
+        .catch(err=>notice(statusBox,errorMessage(err),true));
+    });
+
     const monList=el('div','case-list'),pendingList=el('div','case-list');
     async function refreshOps(){
       try{
         const [monitors,pending]=await Promise.all([api<LegalMonitor[]>('/legal/monitors'),api<LegalSource[]>('/legal/review')]);
-        monList.replaceChildren(el('h3','',t('Active TinyFish Monitors','सक्रिय टाइनीफिश मॉनिटर')));
+        monList.replaceChildren(el('h3','',t('Active Regulatory Monitors','सक्रिय नियम मॉनिटर')));
         for(const m of monitors){
           const row=el('div','task-row');row.append(el('span','label',`${m.monitorType.toUpperCase()} · ${m.jurisdiction}`),el('span','',`${m.name} (${m.target})`),el('small','',m.lastStatus??m.status),button(t('Run check now','अभी जाँचें'),()=>{void api<MonitorRunResult>(`/legal/monitors/${m.id}/run`,{method:'POST'}).then(r=>{notice(statusBox,`Monitor run (${r.providerMode}): ${r.queuedSources.length} source(s) queued.`);return refreshOps()}).catch(e=>notice(statusBox,errorMessage(e),true))},'quiet'));
           monList.append(row);
@@ -635,7 +726,7 @@ export function library(parent:HTMLElement){
     }
     discForm.addEventListener('submit',e=>{e.preventDefault();void api<LegalSource[]>('/legal/discover',{method:'POST',body:JSON.stringify({query:discQuery.input.value,url:discUrl.input.value,jurisdiction:jurisdiction.value,language:'en'})}).then(res=>{notice(statusBox,`Queued ${res.length} source(s) for review.`);return refreshOps()}).catch(err=>notice(statusBox,errorMessage(err),true))});
     monForm.addEventListener('submit',e=>{e.preventDefault();void api<LegalMonitor>('/legal/monitors',{method:'POST',body:JSON.stringify({name:monName.input.value,monitorType:monType.value,target:monTarget.input.value,jurisdiction:jurisdiction.value,language:'en',scheduleCron:'0 0 * * *'})}).then(()=>{notice(statusBox,'TinyFish monitor created.');return refreshOps()}).catch(err=>notice(statusBox,errorMessage(err),true))});
-    ops.append(statusBox,discForm,monForm,monList,pendingList);parent.append(ops);void refreshOps();
+    ops.append(statusBox,discForm,monForm,importForm,monList,pendingList);parent.append(ops);void refreshOps();
   }
 }
 
@@ -666,12 +757,16 @@ export async function civicMap(parent: HTMLElement) {
     t('Explore active civic reports across Ward 4, filter by issue category, or click anywhere on the map to report an issue with exact GPS coordinates.', 'वार्ड 4 में सक्रिय नागरिक रिपोर्ट देखें, श्रेणी के अनुसार फ़िल्टर करें, या सटीक जीपीएस निर्देशांक के साथ रिपोर्ट करने के लिए मानचित्र पर कहीं भी क्लिक करें।'),
   );
 
+  const minLon = 77.06180, maxLon = 77.08139, minLat = 29.02447, maxLat = 29.03465;
+  function projX(lon: number) { return Math.max(40, Math.min(860, Math.round(((lon - minLon) / (maxLon - minLon)) * 900))); }
+  function projY(lat: number) { return Math.max(40, Math.min(420, Math.round(((maxLat - lat) / (maxLat - minLat)) * 460))); }
+
   const defaultPins: MapPinItem[] = [
-    { id: 'case-pilot-001', title: 'Waterlogged pothole and broken kerb near Ward 4 primary school', category: 'ROADS', status: 'IN_PROGRESS', address: 'Main Market Road near Ward 4 Primary School, Ward 4', department: 'Public works', latitude: 28.4595, longitude: 77.0266, x: 180, y: 260 },
-    { id: 'case-pilot-002', title: 'Three LED streetlights flickering and dark on Lane 2', category: 'LIGHTING', status: 'ASSIGNED', address: 'Community Park Entrance, Lane 2, Ward 4', department: 'Electrical services', latitude: 28.4612, longitude: 77.0289, x: 245, y: 120 },
-    { id: 'case-pilot-003', title: 'Stormwater drain grate dislodged at Sector 14 crossing', category: 'ROADS', status: 'PENDING_VERIFICATION', address: 'Sector 14 Rotary Crossing, Ward 4', department: 'Public works', latitude: 28.4680, longitude: 77.0310, x: 460, y: 215 },
-    { id: 'ward-004', title: 'Sewage drain overflow near Sector 14 Main Market', category: 'WATER', status: 'ASSIGNED', address: 'Sector 14 Main Market Lane, Ward 4', department: 'Water services', latitude: 28.4645, longitude: 77.0342, x: 640, y: 245 },
-    { id: 'ward-005', title: 'Uncollected sanitation waste near Metro Gate 2', category: 'WASTE', status: 'SUBMITTED', address: 'Metro Link Avenue near Gate 2, Sector 14, Ward 4', department: 'Sanitation', latitude: 28.4560, longitude: 77.0335, x: 670, y: 365 },
+    { id: 'case-pilot-001', title: 'Waterlogged pothole on GT Road service lane near Murthal Chowk', category: 'ROADS', status: 'IN_PROGRESS', address: 'Murthal Chowk, GT Road, Ward 4', department: 'Public works', latitude: 29.0315, longitude: 77.0725, x: projX(77.0725), y: projY(29.0315) },
+    { id: 'case-pilot-002', title: 'Three LED streetlights dark and flickering near Murthal Police Station', category: 'LIGHTING', status: 'ASSIGNED', address: 'Murthal Police Station Road, Ward 4', department: 'Electrical services', latitude: 29.0266, longitude: 77.0732, x: projX(77.0732), y: projY(29.0266) },
+    { id: 'case-pilot-003', title: 'Stormwater drain grate dislodged near State Bank of India', category: 'ROADS', status: 'PENDING_VERIFICATION', address: 'State Bank of India Lane, Murthal, Ward 4', department: 'Public works', latitude: 29.0265, longitude: 77.0740, x: projX(77.0740), y: projY(29.0265) },
+    { id: 'ward-004', title: 'Sewage drain overflow on commercial market stretch', category: 'WATER', status: 'ASSIGNED', address: 'Main Market Road near Gulshan Dhaba, Ward 4', department: 'Water services', latitude: 29.0337, longitude: 77.0711, x: projX(77.0711), y: projY(29.0337) },
+    { id: 'ward-005', title: 'Uncollected solid waste pile near Murthal Bus Stop', category: 'WASTE', status: 'SUBMITTED', address: 'Murthal Chowk Bus Stop, Ward 4', department: 'Sanitation', latitude: 29.0312, longitude: 77.0729, x: projX(77.0729), y: projY(29.0312) },
   ];
 
   let allPins: MapPinItem[] = [...defaultPins];
@@ -680,10 +775,10 @@ export async function civicMap(parent: HTMLElement) {
       const live = await api<{ items: CaseRecord[]; total: number }>('/complaints');
       if (live.items.length) {
         const mapped: MapPinItem[] = live.items.map((c, idx) => {
-          const lat = c.latitude ?? (28.4680 - (idx % 5) * 0.0025);
-          const lon = c.longitude ?? (77.0245 + (idx % 5) * 0.0025);
-          const relX = Math.max(60, Math.min(840, Math.round(((lon - 77.0200) / 0.0180) * 900)));
-          const relY = Math.max(50, Math.min(410, Math.round(((28.4720 - lat) / 0.0180) * 460)));
+          const lat = c.latitude ?? (29.0295 - (idx % 5) * 0.0018);
+          const lon = c.longitude ?? (77.0715 + (idx % 5) * 0.0020);
+          const relX = projX(lon);
+          const relY = projY(lat);
           return {
             id: c.id,
             title: c.title,
@@ -750,22 +845,31 @@ export async function civicMap(parent: HTMLElement) {
     svg.setAttribute('viewBox', '0 0 900 460');
     svg.setAttribute('class', 'civic-map-svg');
     svg.innerHTML = `
-      <rect width="900" height="460" fill="#eef2e8"/>
-      <rect x="50" y="30" width="270" height="165" rx="16" fill="#d4e6cd" stroke="#b5cfa8" stroke-width="1.5"/>
-      <ellipse cx="145" cy="115" rx="68" ry="38" fill="#bfddf3"/>
-      <rect x="540" y="35" width="280" height="140" rx="14" fill="#e5ede0" stroke="#cad6c3"/>
-      <rect x="550" y="235" width="290" height="180" rx="14" fill="#ede8da" stroke="#d5ccb8"/>
-      <rect x="60" y="260" width="260" height="160" rx="14" fill="#e2ebe0" stroke="#c6d4c3"/>
-      <path d="M 0 215 L 900 215" stroke="#b8c5b2" stroke-width="34"/>
-      <path d="M 0 215 L 900 215" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="14 10"/>
-      <path d="M 460 0 L 460 460" stroke="#b8c5b2" stroke-width="34"/>
-      <path d="M 460 0 L 460 460" stroke="#ffffff" stroke-width="2.5" stroke-dasharray="14 10"/>
-      <circle cx="460" cy="215" r="36" fill="#b8c5b2"/><circle cx="460" cy="215" r="18" fill="#9fb996"/>
-      <text x="75" y="62" font-size="13" font-weight="700" fill="#2b4c3f">Central Community Park</text>
-      <text x="565" y="68" font-size="13" font-weight="700" fill="#2b4c3f">Primary Health Center (PHC)</text>
-      <text x="575" y="268" font-size="13" font-weight="700" fill="#5c4b32">Sector 14 Main Market</text>
-      <text x="85" y="292" font-size="13" font-weight="700" fill="#2b4c3f">Ward 4 Primary School</text>
-      <text x="480" y="198" font-size="12" font-weight="700" fill="#123e39">Sector 14 Rotary Crossing</text>
+      <rect width="900" height="460" fill="#f4f6f0"/>
+      <!-- NH 44 / GT Road Arterial Corridor from map.osm -->
+      <path d="M 410 0 L 460 210 L 520 460" stroke="#b8c5b2" stroke-width="36" fill="none"/>
+      <path d="M 410 0 L 460 210 L 520 460" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="14 10" fill="none"/>
+      <!-- Secondary and Service Road Network from map.osm -->
+      <path d="M 370 0 L 420 210 L 480 460" stroke="#cad6c4" stroke-width="16" fill="none"/>
+      <path d="M 450 0 L 500 210 L 560 460" stroke="#cad6c4" stroke-width="16" fill="none"/>
+      <path d="M 0 160 L 450 170 L 900 190" stroke="#cbd7c5" stroke-width="18" fill="none"/>
+      <path d="M 0 320 L 480 310 L 900 330" stroke="#cbd7c5" stroke-width="16" fill="none"/>
+      <path d="M 120 60 L 380 90 L 430 200" stroke="#d5dfd0" stroke-width="10" fill="none"/>
+      <path d="M 520 220 L 760 260 L 890 280" stroke="#d5dfd0" stroke-width="10" fill="none"/>
+      <path d="M 140 260 L 390 290 L 440 330" stroke="#d5dfd0" stroke-width="10" fill="none"/>
+      <!-- Civic Zones & Amenities from map.osm -->
+      <rect x="540" y="270" width="160" height="90" rx="10" fill="#e8eee3" stroke="#cad6c3"/>
+      <text x="550" y="300" font-size="11" font-weight="700" fill="#2b4c3f">State Bank of India</text>
+      <text x="550" y="318" font-size="10" fill="#4a6154">Murthal Police Station</text>
+      <rect x="180" y="70" width="180" height="90" rx="10" fill="#ede8da" stroke="#d5ccb8"/>
+      <text x="190" y="100" font-size="11" font-weight="700" fill="#5c4b32">Murthal Chowk Market</text>
+      <text x="190" y="118" font-size="10" fill="#756247">Bus Stop & Transit Hub</text>
+      <rect x="110" y="270" width="180" height="110" rx="10" fill="#d4e6cd" stroke="#b5cfa8"/>
+      <text x="120" y="305" font-size="11" font-weight="700" fill="#2b4c3f">Community Green Zone</text>
+      <text x="120" y="323" font-size="10" fill="#4a6154">Murthal Primary School</text>
+      <circle cx="460" cy="210" r="28" fill="#b8c5b2"/>
+      <circle cx="460" cy="210" r="14" fill="#9fb996"/>
+      <text x="475" y="200" font-size="11" font-weight="700" fill="#123e39">Murthal Rotary Crossing</text>
     `;
 
     for (const pin of visiblePins) {
@@ -792,8 +896,8 @@ export async function civicMap(parent: HTMLElement) {
       const rect = svg.getBoundingClientRect();
       const relX = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
       const relY = Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height));
-      const lat = 28.4720 - relY * 0.0180;
-      const lon = 77.0200 + relX * 0.0180;
+      const lat = maxLat - relY * (maxLat - minLat);
+      const lon = minLon + relX * (maxLon - minLon);
       selectedPin = {
         id: 'ward-custom',
         title: t('Custom pinned location in Ward 4', 'वार्ड 4 में चुना गया स्थान'),

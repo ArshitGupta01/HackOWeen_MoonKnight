@@ -28,7 +28,12 @@ data class NativeConnectState(
     val guidanceSources: List<CivicGuidanceSource> = emptyList(),
     val guidanceAnswer: CivicGuidanceAnswer? = null,
     val location: CivicLocation? = null,
-    val triage: CivicTriageSuggestion? = null
+    val triage: CivicTriageSuggestion? = null,
+    val monitors: List<com.example.theekhai.contract.LegalMonitorDto> = emptyList(),
+    val pendingSources: List<CivicGuidanceSource> = emptyList(),
+    val verificationResult: com.example.theekhai.contract.VerificationResultDto? = null,
+    val emailDraft: com.example.theekhai.contract.EmailDraftDto? = null,
+    val emailSendResult: com.example.theekhai.contract.SendEmailResponseDto? = null
 )
 
 class NativeConnectViewModel(
@@ -70,6 +75,44 @@ class NativeConnectViewModel(
     fun saveGuidance(source: CivicGuidanceSource) = runRequest { val saved = backend.saveSource(source); _state.update { it.copy(savedSources = it.savedSources.filterNot { old -> old.sourceUrl == saved.sourceUrl } + saved, message = "Reference saved.") } }
     fun reverseGeocode(latitude: Double, longitude: Double, language: String = "en") = runRequest { _state.update { it.copy(location = backend.reverseGeocode(latitude, longitude, language)) } }
     fun triage(title: String, description: String, address: String, language: String = "en") = runRequest { _state.update { it.copy(triage = backend.triage(title, description, address, language)) } }
+    fun verifyCaseWithTinyFish(complaintId: String, portalUrl: String? = null) = runRequest {
+        val result = backend.verifyCaseWithTinyFish(complaintId, portalUrl)
+        _state.update { it.copy(verificationResult = result, message = "TinyFish verified [${result.state}]: ${result.explanation}") }
+    }
+    fun loadOpsData() = runRequest {
+        val monitors = backend.getMonitors()
+        val pending = backend.getPendingSources()
+        _state.update { it.copy(monitors = monitors, pendingSources = pending) }
+    }
+    fun createMonitor(name: String, monitorType: String, target: String, jurisdiction: String) = runRequest {
+        backend.createMonitor(name, monitorType, target, jurisdiction)
+        val monitors = backend.getMonitors()
+        _state.update { it.copy(monitors = monitors, message = "Monitor created.") }
+    }
+    fun runMonitor(id: String) = runRequest {
+        val res = backend.runMonitor(id)
+        val monitors = backend.getMonitors()
+        _state.update { it.copy(monitors = monitors, message = "Monitor run (${res.providerMode}): ${res.queuedSources.size} source(s) queued.") }
+    }
+    fun discoverSources(query: String, url: String, jurisdiction: String) = runRequest {
+        val queued = backend.discoverSources(query, url, jurisdiction)
+        val pending = backend.getPendingSources()
+        _state.update { it.copy(pendingSources = pending, message = "Queued ${queued.size} source(s) for review.") }
+    }
+    fun reviewSource(id: String, approve: Boolean) = runRequest {
+        backend.reviewSource(id, approve)
+        val pending = backend.getPendingSources()
+        _state.update { it.copy(pendingSources = pending, message = if (approve) "Source approved." else "Source rejected.") }
+    }
+    fun draftEmail(caseId: String) = runRequest {
+        val draft = backend.draftComplaintEmail(caseId)
+        _state.update { it.copy(emailDraft = draft, message = "Official authority email drafted for ${draft.recipientAuthority} (${draft.recipientEmail})") }
+    }
+    fun sendEmail(caseId: String, recipient: String, subject: String, body: String) = runRequest {
+        val result = backend.sendComplaintEmail(caseId, recipient, subject, body)
+        _state.update { it.copy(emailSendResult = result, message = "✓ ${result.message}") }
+        loadCase(caseId)
+    }
     fun signOut() = runRequest { backend.signOut(); _state.update { NativeConnectState(message = "Signed out.") } }
 
     private fun runRequest(block: suspend () -> Unit) {

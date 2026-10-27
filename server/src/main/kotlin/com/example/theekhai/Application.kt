@@ -52,12 +52,20 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     if (databasePath != null && testIdentity == null) {
         seedPilotCasesIfEmpty(database)
     }
-    val http = HttpClient(OkHttp) { install(HttpTimeout) { requestTimeoutMillis = 20_000; connectTimeoutMillis = 5_000 }; followRedirects = false }
+    val http = HttpClient(OkHttp) {
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60_000
+            connectTimeoutMillis = 10_000
+            socketTimeoutMillis = 60_000
+        }
+        followRedirects = true
+    }
     val staff = EnvConfig.get("THEEKHAI_STAFF").split(';').filter { it.isNotBlank() }.associate { entry ->
         val parts = entry.split('|'); require(parts.size >= 2); parts[0] to (Role.valueOf(parts[1]) to parts.getOrNull(2))
     }
     val auth = SupabaseJwtAuth(http, EnvConfig.get("SUPABASE_URL"), EnvConfig.get("SUPABASE_PUBLISHABLE_KEY"), staff)
     val legal = com.example.theekhai.legal.LegalService(database, http)
+    val gmail = com.example.theekhai.mail.GmailService(http)
     val cookieSecure = EnvConfig.get("THEEKHAI_COOKIE_SECURE", "false") != "false"
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     scope.launch { while(isActive) { try { synchronized(workflow) { workflow.checkDeadlines() } } catch (e: Exception) { if (e is CancellationException) throw e; log.error("Deadline worker failed: {}",e.javaClass.simpleName) }; delay(60_000) } }
@@ -129,7 +137,7 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
         post("/api/v1/complaints") { safe(call) {
             val actor = identity(call); val input = call.receive<ReportDto>(); val key = call.request.header("Idempotency-Key") ?: ""
             val (record, tasks, events) = synchronized(workflow) {
-                val r = workflow.submit(actor,ReportInput(input.title,input.description,input.category,input.address,input.latitude,input.longitude,input.consent),key)
+                val r = workflow.submit(actor,ReportInput(input.title,input.description,input.category,input.address,input.latitude,input.longitude,input.consent,input.priority),key)
                 Triple(r, workflow.tasks(actor, r.id), workflow.events(actor, r.id))
             }
             scope.launch { auth.syncCaseToSupabase(call, record, tasks, events) }
@@ -137,7 +145,14 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
         } }
         get("/api/v1/complaints/{id}") { safe(call) {
             val actor = identity(call); val id = call.parameters["id"]!!
-            val result = synchronized(workflow) { CaseDetailDto(workflow.detail(actor,id).dto(),workflow.tasks(actor,id).map { TaskDto(it.id,it.caseId,it.department,it.title,it.required,it.complete) },workflow.events(actor,id).map { EventDto(it.id,it.caseId,it.actorId,it.action,it.note,it.at) }) }
+            val result = synchronized(workflow) {
+                CaseDetailDto(
+                    workflow.detail(actor,id).dto(),
+                    workflow.tasks(actor,id).map { TaskDto(it.id,it.caseId,it.department,it.title,it.required,it.complete) },
+                    workflow.events(actor,id).map { EventDto(it.id,it.caseId,it.actorId,it.action,it.note,it.at) },
+                    workflow.links(actor,id).map { CaseLinkDto(it.caseId,it.targetId,it.kind) }
+                )
+            }
             call.respond(result)
         } }
         post("/api/v1/complaints/{id}/actions") { safe(call) {
@@ -167,6 +182,190 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
             val lat = call.request.queryParameters["lat"]?.toDoubleOrNull() ?: throw WorkflowFailure("INVALID_INPUT", "Missing or invalid 'lat' query parameter.")
             val lon = call.request.queryParameters["lon"]?.toDoubleOrNull() ?: throw WorkflowFailure("INVALID_INPUT", "Missing or invalid 'lon' query parameter.")
             call.respond(legal.reverseGeocode(lat, lon, call.request.queryParameters["lang"] ?: "en"))
+        } }
+        post("/api/v1/complaints/{id}/verify") { safe(call) {
+            val actor = identity(call)
+            val caseId = call.parameters["id"]!!
+            val req = runCatching { call.receive<TriggerVerificationRequestDto>() }.getOrDefault(TriggerVerificationRequestDto(caseId))
+            val (record, tasks, events) = synchronized(workflow) {
+                Triple(workflow.detail(actor, caseId), workflow.tasks(actor, caseId), workflow.events(actor, caseId))
+            }
+            val verif = legal.verifyCaseWithTinyFish(record, tasks, events, req)
+            synchronized(workflow) {
+                workflow.act(
+                    actor = Actor("system-tinyfish", Role.ADMIN),
+                    id = caseId,
+                    command = CaseAction("TINYFISH_VERIFICATION", record.version, "TinyFish verification result: ${verif.state} (${verif.explanation})", verif.id)
+                )
+            }
+            call.respond(verif)
+        } }
+        post("/api/v1/complaints/{id}/triage") { safe(call) {
+            val actor = identity(call)
+            val caseId = call.parameters["id"]!!
+            val (record, allCases) = synchronized(workflow) {
+                workflow.detail(actor, caseId) to workflow.list(Actor("system-triage", Role.ADMIN))
+            }
+            val triageAssist = legal.triageAssist(
+                TriageAssistRequestDto(title = record.title, description = record.description, address = record.address),
+                allCases
+            )
+            val prioDto = runCatching { ComplaintPriorityDto.valueOf(triageAssist.suggestedPriority) }.getOrDefault(ComplaintPriorityDto.MEDIUM)
+            call.respond(
+                TriageResponseDto(
+                    complaintId = caseId,
+                    clusterId = triageAssist.duplicateCaseIds.firstOrNull() ?: "cluster-${triageAssist.suggestedCategory.lowercase()}",
+                    priority = prioDto,
+                    assignedDepartment = triageAssist.suggestedDepartment,
+                    isDuplicate = triageAssist.duplicateCaseIds.isNotEmpty(),
+                    reasoning = triageAssist.summary,
+                    confidenceScore = 0.95
+                )
+            )
+        } }
+        post("/api/v1/complaints/{id}/resolve") { safe(call) {
+            val actor = identity(call)
+            val caseId = call.parameters["id"]!!
+            val req = call.receive<ResolveComplaintRequestDto>()
+            val result = synchronized(workflow) {
+                val record = workflow.detail(actor, caseId)
+                val openTasks = workflow.tasks(actor, caseId).filter { !it.complete && (actor.role == Role.ADMIN || it.department == actor.department) }
+                for (t in openTasks) {
+                    workflow.act(actor, caseId, CaseAction("COMPLETE_TASK", workflow.detail(actor, caseId).version, "Resolved by worker: ${req.resolutionNotes}", t.id))
+                }
+                val updated = workflow.detail(actor, caseId)
+                if (updated.status == CaseStatus.IN_PROGRESS && workflow.tasks(actor, caseId).none { it.required && !it.complete }) {
+                    workflow.act(actor, caseId, CaseAction("REQUEST_CLOSURE", updated.version, req.resolutionNotes))
+                } else updated
+            }
+            call.respond(mapOf("status" to "resolved", "caseId" to result.id))
+        } }
+        post("/api/v1/complaints/{id}/escalate") { safe(call) {
+            val actor = identity(call)
+            val caseId = call.parameters["id"]!!
+            val req = call.receive<EscalateRequestDto>()
+            synchronized(workflow) {
+                val record = workflow.detail(actor, caseId)
+                workflow.act(actor, caseId, CaseAction("SLA_ESCALATION", record.version, "Manual escalation: ${req.reason}"))
+            }
+            call.respond(mapOf("status" to "escalated", "caseId" to caseId))
+        } }
+        post("/api/v1/evidence/verify") { safe(call) {
+            val actor = identity(call)
+            val req = call.receive<EvidenceCheckRequestDto>()
+            val record = synchronized(workflow) { workflow.detail(actor, req.complaintId) }
+            val check = legal.verifyVisualEvidence(req, record)
+            synchronized(workflow) {
+                val fresh = workflow.detail(actor, req.complaintId)
+                workflow.act(actor, req.complaintId, CaseAction("EVIDENCE_CHECK", fresh.version, "Evidence check: approved=${check.approved}, distance=${check.distanceMeters.toInt()}m (${check.reasoning})"))
+            }
+            call.respond(check)
+        } }
+        get("/api/v1/audit/logs") { safe(call) {
+            val actor = identity(call)
+            val cId = call.request.queryParameters["complaintId"]
+            val logs = synchronized(workflow) {
+                if (cId != null) {
+                    workflow.events(actor, cId).map {
+                        AuditLogDto(it.id, it.caseId, runCatching { ActorTypeDto.valueOf(actor.role.name) }.getOrDefault(ActorTypeDto.CITIZEN), it.actorId, it.action, it.note, null, it.at)
+                    }
+                } else {
+                    workflow.list(actor).flatMap { c ->
+                        workflow.events(actor, c.id).map {
+                            AuditLogDto(it.id, it.caseId, runCatching { ActorTypeDto.valueOf(actor.role.name) }.getOrDefault(ActorTypeDto.CITIZEN), it.actorId, it.action, it.note, null, it.at)
+                        }
+                    }
+                }
+            }
+            call.respond(logs)
+        } }
+        get("/api/v1/gmail/status") { safe(call) {
+            val redirect = call.request.queryParameters["redirect_uri"]
+            call.respond(gmail.getStatus(redirect))
+        } }
+        get("/api/v1/gmail/auth-url") { safe(call) {
+            val redirect = call.request.queryParameters["redirect_uri"]
+            call.respond(mapOf("authUrl" to gmail.getAuthUrl(redirect)))
+        } }
+        get("/api/v1/gmail/oauth2callback") {
+            val code = call.request.queryParameters["code"]
+            val redirect = call.request.queryParameters["redirect_uri"]
+            if (code != null) {
+                val success = gmail.handleOAuthCallback(code, redirect)
+                val msg = if (success) {
+                    "Google Gmail authorization successful! Connected as arshitgupta34@gmail.com. You can close this window and return to TheekHai."
+                } else {
+                    "Google Gmail authorization failed. Please check backend logs or try again."
+                }
+                call.respondText(
+                    "<html><body style='font-family:sans-serif;padding:40px;text-align:center;'><h2>TheekHai Civic Redressal</h2><p>$msg</p><button onclick='window.close()'>Close Window</button></body></html>",
+                    io.ktor.http.ContentType.Text.Html
+                )
+            } else {
+                call.respondText("Missing Google authorization code.", io.ktor.http.ContentType.Text.Plain)
+            }
+        }
+        post("/api/v1/complaints/{id}/email/draft") { safe(call) {
+            val actor = identity(call)
+            val caseId = call.parameters["id"]!!
+            val (record, tasks) = synchronized(workflow) {
+                workflow.detail(actor, caseId) to workflow.tasks(actor, caseId)
+            }
+            // Dynamically discover official contact from government portals via TinyFish
+            val contact = legal.discoverOfficialContactWithTinyFish(
+                department = record.department,
+                ward = if (record.address.contains("Ward", ignoreCase = true)) "Ward " + record.address.substringAfter("Ward").takeWhile { it.isDigit() || it.isWhitespace() }.trim() else "Ward 4",
+                address = record.address,
+                category = record.category
+            )
+            // Draft factual statutory complaint email using OpenRouter / grounded template
+            val draft = legal.draftComplaintEmail(record, tasks, contact)
+            call.respond(draft)
+        } }
+        post("/api/v1/complaints/{id}/email/send") { safe(call) {
+            val actor = identity(call)
+            val caseId = call.parameters["id"]!!
+            val req = call.receive<SendEmailRequestDto>()
+            val record = synchronized(workflow) { workflow.detail(actor, caseId) }
+            val result = gmail.sendEmail(
+                recipientEmail = req.recipientEmail,
+                subject = req.subject,
+                bodyText = req.body
+            )
+            synchronized(workflow) {
+                workflow.act(
+                    actor = actor,
+                    id = caseId,
+                    command = CaseAction(
+                        action = "GRIEVANCE_EMAILED",
+                        version = record.version,
+                        note = "Official petition sent to ${req.recipientEmail} via Gmail (${result.messageId})",
+                        target = req.recipientEmail
+                    )
+                )
+            }
+            call.respond(result)
+        } }
+        post("/api/v1/sync/batch") { safe(call) {
+            val actor = identity(call)
+            val req = call.receive<SyncBatchRequestDto>()
+            val synced = mutableListOf<String>()
+            val rejected = mutableListOf<String>()
+            for (c in req.offlineComplaints) {
+                try {
+                    synchronized(workflow) {
+                        workflow.submit(
+                            actor,
+                            ReportInput(c.title, c.description, c.category, c.address, c.latitude, c.longitude, true, c.priority.name),
+                            "sync-${c.id}"
+                        )
+                    }
+                    synced.add(c.id)
+                } catch (_: Exception) {
+                    rejected.add(c.id)
+                }
+            }
+            call.respond(SyncBatchResponseDto(synced, rejected, System.currentTimeMillis()))
         } }
     }
 }

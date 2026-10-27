@@ -9,10 +9,10 @@ import org.koin.dsl.module
 
 actual val platformDataModule: Module = module {
     single<SqlDriver> { AndroidSqliteDriver(AppDatabase.Schema, get<Context>(), "theekhai.db") }
-    // Uses the live unified HTTPS ngrok tunnel so physical Android phones and emulators work anywhere.
+    // 10.0.2.2 is host loopback from Android emulator; or override with THEEKHAI_BACKEND_URL for ngrok/production.
     single(DataQualifiers.BackendBaseUrl) {
         System.getProperty("THEEKHAI_BACKEND_URL")
             ?: System.getenv("THEEKHAI_BACKEND_URL")
-            ?: "https://bless-stinger-plow.ngrok-free.dev"
+            ?: "http://10.0.2.2:8080"
     }
 }
