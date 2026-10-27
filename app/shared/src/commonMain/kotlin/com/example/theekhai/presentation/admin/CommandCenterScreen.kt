@@ -66,13 +66,13 @@ fun CommandCenterScreen(
         ) {
             Column {
                 Text(
-                    text = "THEEKHAI • SMART CITIES COMMAND CENTER",
-                    fontSize = 22.sp,
+                    text = "THEEKHAI • MUNICIPAL COMMAND CENTER",
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
                 Text(
-                    text = "Problem 8: From Citizen Reports to Autonomous Verified Resolution • DPDP Act 2026 Ready",
+                    text = "Central Dispatch, SLA Monitoring & Verified Redressal Operations",
                     fontSize = 12.sp,
                     color = Color(0xFF94A3B8)
                 )
@@ -89,7 +89,7 @@ fun CommandCenterScreen(
                 ) {
                     Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFF10B981)))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Supabase Realtime Live", color = Color(0xFF6EE7B7), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(text = "Live Network Synced", color = Color(0xFF6EE7B7), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -99,10 +99,10 @@ fun CommandCenterScreen(
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            MetricCard("Total Reports", state.metrics.total.toString(), Color(0xFF38BDF8), Modifier.weight(1f))
-            MetricCard("Pending AI Triage", state.metrics.pendingTriage.toString(), Color(0xFFFBBF24), Modifier.weight(1f))
+            MetricCard("Total Incidents", state.metrics.total.toString(), Color(0xFF38BDF8), Modifier.weight(1f))
+            MetricCard("Awaiting Triage", state.metrics.pendingTriage.toString(), Color(0xFFFBBF24), Modifier.weight(1f))
             MetricCard("In Progress", state.metrics.inProgress.toString(), Color(0xFF818CF8), Modifier.weight(1f))
-            MetricCard("TinyFish Verified", state.metrics.verified.toString(), Color(0xFF34D399), Modifier.weight(1f))
+            MetricCard("Field Verified", state.metrics.verified.toString(), Color(0xFF34D399), Modifier.weight(1f))
             MetricCard("SLA Escalated", state.metrics.escalated.toString(), Color(0xFFF87171), Modifier.weight(1f))
         }
 

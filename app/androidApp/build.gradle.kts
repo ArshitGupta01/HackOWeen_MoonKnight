@@ -12,10 +12,13 @@ kotlin {
 }
 dependencies {
     implementation(project(":app:shared"))
+    implementation(project(":core"))
+    implementation(project(":domain"))
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.koin.android)
 
+    implementation(libs.compose.material3)
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
 }
@@ -30,6 +33,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        manifestPlaceholders["allowCleartext"] = "false"
     }
     packaging {
         resources {
@@ -37,7 +41,12 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // The emulator uses the local Ktor server at http://10.0.2.2:8080.
+            manifestPlaceholders["allowCleartext"] = "true"
+        }
         release {
+            manifestPlaceholders["allowCleartext"] = "false"
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

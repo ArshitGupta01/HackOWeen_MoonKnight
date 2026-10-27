@@ -107,7 +107,7 @@ class CommandCenterViewModel(
 
     fun triggerAiTriage(complaintId: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isActionInProgress = true, actionMessage = "Running Gemini 3.8 Flash triage & clustering...") }
+            _uiState.update { it.copy(isActionInProgress = true, actionMessage = "Running OpenRouter triage and duplicate checks...") }
             val result = triageComplaintUseCase(complaintId)
             result.onSuccess { triage ->
                 _uiState.update {

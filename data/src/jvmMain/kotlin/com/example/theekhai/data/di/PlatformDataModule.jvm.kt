@@ -8,7 +8,11 @@ import java.io.File
 
 actual val platformDataModule: Module = module {
     single<SqlDriver> { createJvmSqliteDriver(desktopDatabasePath()) }
-    single(DataQualifiers.BackendBaseUrl) { "http://localhost:8080" }
+    single(DataQualifiers.BackendBaseUrl) {
+        System.getProperty("THEEKHAI_BACKEND_URL")
+            ?: System.getenv("THEEKHAI_BACKEND_URL")
+            ?: "https://bless-stinger-plow.ngrok-free.dev"
+    }
 }
 
 /** `~/.theekhai/theekhai.db` - created on first launch. */

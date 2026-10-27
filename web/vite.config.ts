@@ -1,2 +1,37 @@
 import { defineConfig } from 'vite';
-export default defineConfig({server:{proxy:{'/api':'http://127.0.0.1:8080','/health':'http://127.0.0.1:8080'}},build:{sourcemap:false}});
+
+export default defineConfig({
+  server: {
+    host: true,
+    port: 5173,
+    allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: false,
+      },
+      '/health': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: false,
+      },
+    },
+  },
+  preview: {
+    host: true,
+    port: 5173,
+    allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: false,
+      },
+      '/health': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: false,
+      },
+    },
+  },
+  build: {
+    sourcemap: false,
+  },
+});

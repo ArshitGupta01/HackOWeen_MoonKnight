@@ -109,6 +109,24 @@ class WorkflowTest {
                     }
                 }
             }
+            hosts("https://mock.openrouter.local") {
+                routing {
+                    post("/api/v1/chat/completions") {
+                        val body = call.receiveText()
+                        if (body.contains("suggestedCategory")) {
+                            call.respondText(
+                                """{"choices":[{"message":{"content":"{\"suggestedTitle\":\"Waterlogged pothole near Ward 4 school\",\"suggestedCategory\":\"ROADS\",\"suggestedPriority\":\"HIGH\",\"suggestedDepartment\":\"Public works\",\"duplicateCaseIds\":[],\"summary\":\"High-priority road hazard routed to Public works.\"}"}}]}""",
+                                ContentType.Application.Json,
+                            )
+                        } else {
+                            call.respondText(
+                                """{"choices":[{"message":{"content":"Under the Haryana Right to Service Commission guidelines and the Auto Appeal System (AAS) connected to Antyodaya SARAL, notified public services carry stipulated delivery timelines."}}]}""",
+                                ContentType.Application.Json,
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         val driver = createJvmSqliteDriver(null)
@@ -119,8 +137,10 @@ class WorkflowTest {
                 client = createClient { },
                 tinyFishApiKey = "tf-test-key",
                 tavilyApiKey = "tvly-test-key",
+                openRouterApiKey = "",
                 tinyFishBaseUrl = "https://mock.tinyfish.local",
                 tavilyBaseUrl = "https://mock.tavily.local",
+                openRouterBaseUrl = "https://mock.openrouter.local/api/v1",
             )
 
             // 1. Primary TinyFish Agent Mode
@@ -133,7 +153,29 @@ class WorkflowTest {
             val tavilyAnswer = legal.ask(LegalQuestionDto("How does Haryana AAS handle service timelines?", "HARYANA"))
             assertEquals("TAVILY_FALLBACK", tavilyAnswer.mode)
 
-            // 3. Deterministic Local Backup Fallback (SOURCES_ONLY) when both fail
+            // 2b. Tavily + OpenRouter Grounded Synthesis when OpenRouter is also configured
+            val legalWithOpenRouter = LegalService(
+                db = db,
+                client = createClient { },
+                tinyFishApiKey = "tf-test-key",
+                tavilyApiKey = "tvly-test-key",
+                openRouterApiKey = "sk-or-test-key",
+                tinyFishBaseUrl = "https://mock.tinyfish.local",
+                tavilyBaseUrl = "https://mock.tavily.local",
+                openRouterBaseUrl = "https://mock.openrouter.local/api/v1",
+            )
+            val orAnswer = legalWithOpenRouter.ask(LegalQuestionDto("How does Haryana AAS handle service timelines?", "HARYANA"))
+            assertEquals("TAVILY_AND_OPENROUTER", orAnswer.mode)
+
+            val triage = legalWithOpenRouter.triageAssist(
+                TriageAssistRequestDto(title = "", description = "Deep waterlogged pothole near Ward 4 school", address = "Ward 4"),
+                emptyList(),
+            )
+            assertEquals("ROADS", triage.suggestedCategory)
+            assertEquals("HIGH", triage.suggestedPriority)
+            assertTrue(triage.provider.startsWith("OPENROUTER"))
+
+            // 3. Deterministic Local Backup Fallback (SOURCES_ONLY) when all external providers fail
             tavilyHealthy = false
             val backupAnswer = legal.ask(LegalQuestionDto("How does Haryana AAS handle service timelines?", "HARYANA"))
             assertEquals("SOURCES_ONLY", backupAnswer.mode)

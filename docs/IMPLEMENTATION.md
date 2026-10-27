@@ -30,3 +30,29 @@ Update this file at each verified checkpoint, including outstanding gaps.
 - **TinyFish Monitor Mode (`POST /v1/monitors`, `POST /v1/monitors/{id}/runs`)** persisted in `LegalMonitor` (`GET/POST /api/v1/legal/monitors`, `POST /api/v1/legal/monitors/{id}/run`) for tracking official page (`fetch`) and topic (`search`) updates and queuing changed revisions as `PENDING` for human reviewer approval.
 - **Tavily Search (`POST /search`)** restricted to allowlisted official domains for discovery and secondary question-answering fallback (`TAVILY_FALLBACK`).
 - **Deterministic Backup Fallback (`SOURCES_ONLY`)** serving seeded/approved Central and Haryana reference packs directly from SQLite when external providers are unconfigured, unreachable, or return ungrounded text.
+- Unmounted legacy server route files and greeting scaffolding (`GreetingUtil.kt`) removed; `POST /api/v1/voice/transcribe` mounted directly on the authoritative server. All history consolidated onto the single `main` branch.
+
+
+## Checkpoint 3
+
+Connected live Supabase project `TheekHai` (`ffmcurazxvygsifbglwy`, `https://ffmcurazxvygsifbglwy.supabase.co`) inspired by TenderLens (`D:\TenderLens`):
+- Applied live Supabase migration `theekhai_profiles_and_saved_sources_rls` creating `public.profiles` and `public.saved_sources` with strict Row-Level Security (`(select auth.uid()) = user_id`), `protect_profile_role()` privilege-escalation guard, `handle_new_user()` profile sync trigger, and private `evidence` bucket.
+- Provisioned 4 pre-confirmed shared demo accounts (`citizen@theekhai.in`, `pwd@theekhai.in`, `reviewer@theekhai.in`, `admin@theekhai.in` — password `TheekHai@2026`) and `auto_confirm_pilot_user_trigger` for instant citizen registration.
+- Wired `/api/v1/auth/config`, `/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/auth/recover`, `/api/v1/auth/me`, `/api/v1/profile`, and `/api/v1/saved-sources` in Ktor (`SupabaseJwtAuth.kt` + `Application.kt`) and updated the bilingual web frontend (`/login` with 1-click demo role cards & password visibility toggle, `/signup` with 3-bar password strength meter, `/account` with RLS profile sync & saved sources, and `/library` source bookmarking).
+
+## Checkpoint 4 — Native preview honesty and theme controls (2026-10-28)
+
+- Android and Desktop Compose scaffolds now expose a dark-mode control while following the device theme by default; the browser theme toggle persists its override.
+- Removed false native success states for sign-in, signup, report submission, draft saving, voice capture, profile sync, and field evidence. Native preview data is empty or explicitly labeled as illustrative so it cannot be mistaken for a live resident case.
+- Verified: web production build and four Playwright checks; `:app:shared:jvmTest`, `:server:test`, Android debug assembly, and Desktop Kotlin compilation pass.
+- At that checkpoint, native sign-in and report submission were still unavailable. Checkpoint 5 records their connection; the remaining native gaps are listed there.
+
+## Checkpoint 5 — Native authentication and report API (2026-10-28)
+
+- Native sign-in and citizen registration now call the Ktor Supabase auth bridge. Native clients attach the returned Supabase access token as a Bearer token, so protected requests are verified by the server and the web cookie/CSRF path remains unchanged.
+- Native report submission calls `POST /api/v1/complaints`, preserves the explicit consent gate, sends an idempotency key and optional GPS/map coordinates, and displays the authoritative case tracking ID/status returned by Ktor.
+- Android GPS/map pins and desktop map pins now feed the report submission. Desktop microphone audio is sent to `/api/v1/voice/transcribe` for OpenRouter-backed transcription; Android uses the platform speech recognizer to populate the form from actual recognized speech. Fake audio/text/location payloads were removed.
+- Android debug builds permit local emulator HTTP only; release manifest disables cleartext. Desktop/Android default to the local backend addresses described in the platform data modules.
+- Verified Android debug assembly, shared JVM/Android compilation, desktop compilation, server compilation, and web production build.
+- Remaining native gaps: process-death session restoration/refresh, server-backed workspace and case details, profile/source sync, Android audio upload through OpenRouter, photo selection/private evidence upload, and desktop location provider integration. Android reverse lookup currently uses the platform geocoder; Ktor also exposes `/api/v1/geo/reverse` for consistent server-side lookup.
+- OpenRouter now defaults to its free-model router (`openrouter/free`); `OPENROUTER_MODEL` can override it. The free router currently documents text/image input, not audio input, so raw audio transcription requires an audio-capable override; web speech hints and Android's platform recognizer remain available without one.
