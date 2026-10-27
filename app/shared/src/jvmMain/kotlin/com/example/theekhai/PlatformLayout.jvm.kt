@@ -3,10 +3,10 @@ package com.example.theekhai
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,16 +19,20 @@ import androidx.compose.ui.unit.sp
 import com.example.theekhai.navigation.AppNavigator
 import com.example.theekhai.navigation.Route
 import com.example.theekhai.ui.components.*
+import com.example.theekhai.ui.localization.AppLanguage
+import com.example.theekhai.ui.localization.LocalAppLanguage
+import com.example.theekhai.ui.localization.t
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
 
 /**
  * Desktop (JVM) platform target layout.
- * Totally identical to the web app (`web/src/main.ts`):
- * - Left persistent sidebar (Brand, 01-05 nav, Operations, Pilot dot, Account)
- * - Topbar (Location label, language toggle, user chip, Report CTA)
- * - Main content
- * - Civic footer (Privacy, Terms, Accountability note)
+ * Exactly mirrors the web app (`web/src/main.ts` & `web/src/style.css`):
+ * - Left persistent sidebar (230px, #eceee5, brand, 01-05 nav, operations, side-foot)
+ * - Topbar (72px, #f5f3ec, location-label, language button, account-chip, report CTA)
+ * - Reactive Hindi/English toggle matching web app's `switchLanguage()`
+ * - Main content (#f5f3ec)
+ * - Civic footer (#f5f3ec, privacy, terms, built around accountability)
  */
 @Composable
 actual fun PlatformAppScaffold(
@@ -37,51 +41,61 @@ actual fun PlatformAppScaffold(
     content: @Composable () -> Unit
 ) {
     val ext = LocalTheekHaiColors.current
-    var language by remember { mutableStateOf("en") }
+    var currentLanguage by remember { mutableStateOf(AppLanguage.EN) }
 
-    Row(modifier = Modifier.fillMaxSize()) {
-        // ── 1. Web-Mirroring Desktop Sidebar ──
-        DesktopSidebar(
-            currentRoute = currentRoute,
-            onNavigate = { navigator.navigateTo(it) },
-            modifier = Modifier.width(260.dp).fillMaxHeight()
-        )
-
-        TheekHaiDivider(modifier = Modifier.fillMaxHeight().width(1.dp))
-
-        // ── 2. Right Pane: Topbar + Main Body + Footer ──
-        Column(
+    CompositionLocalProvider(LocalAppLanguage provides currentLanguage) {
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .background(ext.paper)
+                .fillMaxSize()
+                .background(TheekHaiColors.Background)
         ) {
-            // Web-mirroring Topbar
-            DesktopTopBar(
-                language = language,
-                onToggleLanguage = { language = if (language == "en") "hi" else "en" },
-                onReportClick = { navigator.navigateTo(Route.Report) },
-                onAccountClick = { navigator.navigateTo(Route.Account) },
-                onSignOutClick = { navigator.navigateTo(Route.Login) }
+            // ── 1. Web-Mirroring Persistent Sidebar (230px) ──
+            DesktopSidebar(
+                currentRoute = currentRoute,
+                onNavigate = { navigator.navigateTo(it) },
+                modifier = Modifier
+                    .width(230.dp)
+                    .fillMaxHeight()
             )
 
-            TheekHaiDivider()
+            TheekHaiDivider(modifier = Modifier.fillMaxHeight().width(1.dp))
 
-            // Main Content Area
-            Box(
+            // ── 2. Right Pane: Topbar (72dp) + Main Body + Footer ──
+            Column(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .background(TheekHaiColors.Background)
             ) {
-                content()
+                // Web-mirroring Topbar with functional Hindi-English toggle
+                DesktopTopBar(
+                    language = currentLanguage,
+                    onToggleLanguage = {
+                        currentLanguage = if (currentLanguage == AppLanguage.EN) AppLanguage.HI else AppLanguage.EN
+                    },
+                    onReportClick = { navigator.navigateTo(Route.Report) },
+                    onAccountClick = { navigator.navigateTo(Route.Account) },
+                    onSignOutClick = { navigator.navigateTo(Route.Login) }
+                )
+
+                TheekHaiDivider()
+
+                // Main Content Area
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    content()
+                }
+
+                TheekHaiDivider()
+
+                // Web-mirroring Footer
+                DesktopFooter(
+                    onNavigate = { navigator.navigateTo(it) }
+                )
             }
-
-            TheekHaiDivider()
-
-            // Web-mirroring Footer
-            DesktopFooter(
-                onNavigate = { navigator.navigateTo(it) }
-            )
         }
     }
 }
@@ -93,172 +107,202 @@ private fun DesktopSidebar(
     modifier: Modifier = Modifier
 ) {
     val ext = LocalTheekHaiColors.current
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = modifier
-            .background(ext.sidebarBg)
-            .padding(20.dp),
+            .background(TheekHaiColors.SidebarBg)
+            .verticalScroll(scrollState)
+            .padding(top = 36.dp, start = 24.dp, end = 24.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Column {
-            // Brand & Pilot status
-            Row(
+            // Brand: TheekHai + A BETTER EVERYDAY (matching web/src/style.css .brand & .brand-caption)
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onNavigate(Route.Home) }
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.size(32.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        color = TheekHaiColors.Green
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "TH",
+                                color = Color(0xFFFCFBF6),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+
                     Text(
-                        text = "THEEKHAI",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = ext.green,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
-                        text = "A BETTER EVERYDAY",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ext.muted,
-                        fontSize = 9.sp,
-                        letterSpacing = 1.2.sp
+                        text = "TheekHai",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = ext.ink
                     )
                 }
 
-                Surface(
-                    color = TheekHaiColors.GreenSurface,
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        DotIndicator()
-                        Text("Live", style = MaterialTheme.typography.labelSmall, color = TheekHaiColors.Green)
-                    }
-                }
+                Text(
+                    text = t("A BETTER EVERYDAY", "बेहतर हर दिन"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ext.muted,
+                    fontSize = 9.sp,
+                    letterSpacing = 1.8.sp,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 36.dp, start = 2.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            // Citizen Services Navigation
+            Eyebrow(t("CITIZEN SERVICES", "नागरिक सेवाएँ"), modifier = Modifier.padding(start = 10.dp, bottom = 6.dp))
 
-            // Citizen Services Navigation (01 to 05)
-            Eyebrow("CITIZEN SERVICES", modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))
-
-            SidebarNavItem(
+            WebSidebarNavItem(
                 number = "01",
-                label = "Overview",
+                label = t("Overview", "परिचय"),
                 isActive = currentRoute == Route.Home,
                 onClick = { onNavigate(Route.Home) }
             )
-            SidebarNavItem(
+            WebSidebarNavItem(
                 number = "02",
-                label = "Report an issue",
+                label = t("Report an issue", "समस्या दर्ज करें"),
                 isActive = currentRoute == Route.Report,
                 onClick = { onNavigate(Route.Report) }
             )
-            SidebarNavItem(
+            WebSidebarNavItem(
                 number = "03",
-                label = "My workspace",
+                label = t("My workspace", "मेरा कार्यक्षेत्र"),
                 isActive = currentRoute == Route.Workspace || currentRoute is Route.CaseDetail,
                 onClick = { onNavigate(Route.Workspace) }
             )
-            SidebarNavItem(
+            WebSidebarNavItem(
                 number = "04",
-                label = "Know your options",
+                label = t("Civic Map", "नागरिक मानचित्र"),
+                isActive = currentRoute == Route.Map,
+                onClick = { onNavigate(Route.Map) }
+            )
+            WebSidebarNavItem(
+                number = "05",
+                label = t("Know your options", "अपने विकल्प जानें"),
                 isActive = currentRoute == Route.Library,
                 onClick = { onNavigate(Route.Library) }
             )
-            SidebarNavItem(
-                number = "05",
-                label = "Resident profile",
+            WebSidebarNavItem(
+                number = "06",
+                label = t("My account", "मेरा खाता"),
                 isActive = currentRoute == Route.Account,
                 onClick = { onNavigate(Route.Account) }
             )
 
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(20.dp))
             TheekHaiDivider()
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Operations Navigation
-            Eyebrow("OPERATIONS", modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))
+            Eyebrow(t("OPERATIONS", "संचालन"), modifier = Modifier.padding(start = 10.dp, bottom = 6.dp))
 
-            SidebarNavItem(
+            WebSidebarNavItem(
                 number = "🏢",
-                label = "Command Center",
+                label = t("Command Center", "कमांड सेंटर"),
                 isActive = currentRoute == Route.CommandCenter,
                 onClick = { onNavigate(Route.CommandCenter) }
             )
-            SidebarNavItem(
+            WebSidebarNavItem(
                 number = "👷",
-                label = "Field Inspection",
+                label = t("Field Inspection", "फील्ड निरीक्षण"),
                 isActive = currentRoute == Route.FieldWorker,
                 onClick = { onNavigate(Route.FieldWorker) }
             )
         }
 
-        // Side-Foot & User row
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // Civic pilot note
-            Column(modifier = Modifier.padding(start = 6.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    DotIndicator()
-                    Text(
-                        text = "Civic pilot · Supabase RLS",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = ext.ink
-                    )
-                }
-                Spacer(modifier = Modifier.height(2.dp))
+        // Side-Foot (matching web/src/style.css .side-foot)
+        Column(modifier = Modifier.padding(top = 32.dp)) {
+            TheekHaiDivider()
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                DotIndicator()
                 Text(
-                    text = "City-neutral. Community-focused.",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.sp,
-                    color = ext.muted
+                    text = t("Civic pilot · Supabase RLS", "नागरिक पायलट · सुपाबेस RLS"),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = ext.ink,
+                    fontSize = 11.sp
                 )
             }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = t("City-neutral. Community-focused.", "हर शहर के लिए। समुदाय के साथ।"),
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.sp,
+                color = ext.muted
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = t("Help & permissions", "सहायता और अनुमतियाँ"),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = ext.green,
+                modifier = Modifier.clickable { onNavigate(Route.Library) }
+            )
+        }
+    }
+}
 
-            // User card
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable { onNavigate(Route.Account) },
-                color = ext.paper,
-                shape = RoundedCornerShape(6.dp),
-                border = ButtonDefaults.outlinedButtonBorder(enabled = true)
-            ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    AvatarCircle(initials = "PS", size = 30.dp, bgColor = ext.green)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Priya Sharma", style = MaterialTheme.typography.labelMedium, color = ext.ink, fontWeight = FontWeight.Bold)
-                        Text("Ward 4 Resident", style = MaterialTheme.typography.bodySmall, color = ext.muted, fontSize = 11.sp)
-                    }
-                    Icon(
-                        imageVector = Icons.Default.ExitToApp,
-                        contentDescription = "Switch account",
-                        tint = ext.muted,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
+@Composable
+private fun WebSidebarNavItem(
+    number: String,
+    label: String,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val ext = LocalTheekHaiColors.current
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .clickable(onClick = onClick),
+        color = if (isActive) TheekHaiColors.Green else Color.Transparent,
+        shape = RoundedCornerShape(5.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = number,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (isActive) Color(0xFFE8EDE2).copy(alpha = 0.7f) else ext.muted
+            )
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (isActive) Color(0xFFFCFBF6) else Color(0xFF5B6B61)
+            )
         }
     }
 }
 
 @Composable
 private fun DesktopTopBar(
-    language: String,
+    language: AppLanguage,
     onToggleLanguage: () -> Unit,
     onReportClick: () -> Unit,
     onAccountClick: () -> Unit,
@@ -269,73 +313,102 @@ private fun DesktopTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .background(ext.sidebarBg)
-            .padding(horizontal = 24.dp),
+            .height(72.dp)
+            .background(TheekHaiColors.Background)
+            .padding(horizontal = 48.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
+        // Location Label (matching .location-label in web/src/style.css)
         Text(
-            text = "YOUR NEIGHBOURHOOD, BETTER TOGETHER",
-            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
-            color = ext.muted,
-            fontWeight = FontWeight.Bold
+            text = t("YOUR NEIGHBOURHOOD, BETTER TOGETHER", "आपका पड़ोस, मिलकर बेहतर"),
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 10.sp,
+                letterSpacing = 1.6.sp,
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = Color(0xFF6C796D)
         )
 
+        // Header Tools (matching .header-tools in web/src/style.css: gap 24px)
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Language Button
-            OutlinedButton(
+            // Language Button (borderless quiet button matching web .language)
+            TextButton(
                 onClick = onToggleLanguage,
-                shape = RoundedCornerShape(4.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
             ) {
                 Text(
-                    text = if (language == "en") "हिन्दी" else "English",
-                    fontSize = 12.sp,
-                    color = ext.ink
+                    text = if (language == AppLanguage.EN) "हिन्दी" else "English",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TheekHaiColors.Green
                 )
             }
 
-            // Account chip
+            // Account chip (matching .account-chip in web/src/style.css)
             Surface(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(999.dp))
                     .clickable(onClick = onAccountClick),
-                color = ext.paper,
-                shape = RoundedCornerShape(16.dp),
-                border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+                color = Color(0xFFE8ECE1),
+                shape = RoundedCornerShape(999.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCFD7C7))
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AvatarCircle(initials = "PS", size = 20.dp, bgColor = ext.green)
-                    Text("Priya Sharma", fontSize = 12.sp, color = ext.ink, fontWeight = FontWeight.Medium)
+                    AvatarCircle(initials = "PS", size = 24.dp, bgColor = TheekHaiColors.Green)
+                    Text(t("Priya Sharma", "प्रिया शर्मा"), fontSize = 12.sp, color = ext.ink, fontWeight = FontWeight.Medium)
                     Surface(
-                        color = Color(0xFFE2EADF),
-                        shape = RoundedCornerShape(8.dp)
+                        color = Color(0xFFD6DFD0),
+                        shape = RoundedCornerShape(3.dp)
                     ) {
                         Text(
-                            text = "resident",
+                            text = t("resident", "नागरिक"),
                             fontSize = 9.sp,
-                            color = ext.green,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.7.sp,
+                            color = ext.ink,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 }
             }
 
-            // Quick Report CTA
-            TheekHaiButton(
-                text = "Report an issue  ↗",
+            // Sign Out quiet button
+            TextButton(
+                onClick = onSignOutClick,
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = t("Sign out", "साइन आउट"),
+                    fontSize = 12.sp,
+                    color = ext.muted
+                )
+            }
+
+            // Quick Report CTA Button (matching .button.small in web/src/style.css)
+            Button(
                 onClick = onReportClick,
-                modifier = Modifier.height(34.dp)
-            )
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TheekHaiColors.Green,
+                    contentColor = Color(0xFFFFFDF5)
+                ),
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+                modifier = Modifier.height(39.dp)
+            ) {
+                Text(
+                    text = t("Report an issue  ↗", "समस्या दर्ज करें  ↗"),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
@@ -349,38 +422,38 @@ private fun DesktopFooter(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(44.dp)
-            .background(ext.sidebarBg)
-            .padding(horizontal = 24.dp),
+            .height(52.dp)
+            .background(TheekHaiColors.Background)
+            .padding(horizontal = 48.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(25.dp)
         ) {
             Text(
-                text = "TheekHai • Civic pilot",
-                fontSize = 12.sp,
+                text = t("TheekHai · Civic pilot", "ठीकहै · नागरिक पायलट"),
+                fontSize = 11.sp,
                 color = ext.muted
             )
             Text(
-                text = "Privacy",
-                fontSize = 12.sp,
+                text = t("Privacy", "गोपनीयता"),
+                fontSize = 11.sp,
                 color = ext.green,
                 modifier = Modifier.clickable { onNavigate(Route.Library) }
             )
             Text(
-                text = "Terms",
-                fontSize = 12.sp,
+                text = t("Terms", "शर्तें"),
+                fontSize = 11.sp,
                 color = ext.green,
                 modifier = Modifier.clickable { onNavigate(Route.Library) }
             )
         }
 
         Text(
-            text = "Built around accountability.",
-            fontSize = 12.sp,
+            text = t("Built around accountability.", "जवाबदेही के लिए बनाया गया।"),
+            fontSize = 11.sp,
             color = ext.muted
         )
     }

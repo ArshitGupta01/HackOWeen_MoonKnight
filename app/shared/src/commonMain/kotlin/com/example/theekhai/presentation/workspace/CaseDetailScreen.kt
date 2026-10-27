@@ -25,7 +25,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
+import org.jetbrains.compose.resources.painterResource
+import theekhai.app.shared.generated.resources.Res
+import theekhai.app.shared.generated.resources.broken_streetlight
 import com.example.theekhai.domain.model.Complaint
 import com.example.theekhai.domain.model.ComplaintPriority
 import com.example.theekhai.domain.model.ComplaintStatus
@@ -68,7 +73,7 @@ fun CaseDetailScreen(caseId: String) {
                 longitude = 77.0266,
                 address = "Sector 14, Main Market, Ward 4",
                 zone = "Zone 4 - Gurugram Central",
-                photoUrl = "https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=600&auto=format&fit=crop&q=80",
+                photoUrl = null,
                 assignedWorkerId = "PWD Electrical Crew #12",
                 slaDueEpochMillis = 1718086400000L,
                 createdAtEpochMillis = 1718000000000L,
@@ -281,11 +286,26 @@ private fun CaseSummaryPanel(complaint: Complaint, ext: com.example.theekhai.ui.
             lineHeight = 24.sp
         )
 
-        complaint.photoUrl?.let { imgUrl ->
-            Spacer(modifier = Modifier.height(16.dp))
+        val isStreetlight = complaint.category.contains("LIGHT", ignoreCase = true) ||
+                complaint.title.contains("streetlight", ignoreCase = true) ||
+                complaint.id.contains("003")
+
+        Spacer(modifier = Modifier.height(16.dp))
+        if (isStreetlight) {
+            Image(
+                painter = painterResource(Res.drawable.broken_streetlight),
+                contentDescription = "Broken Municipal Streetlight Evidence Photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+        } else if (complaint.photoUrl != null) {
             AsyncImage(
-                model = imgUrl,
+                model = complaint.photoUrl,
                 contentDescription = "Case Evidence Photo",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
