@@ -6,6 +6,8 @@ Last reviewed: 2026-10-27
 
 Read this guide before changing the project. Maintain a clean repository and Clean Architecture throughout development. Update this file in the same change when architecture, module ownership, setup, dependencies, validation, or established decisions change. Record decisions and current facts, not a transcript or per-edit log. Preserve user changes and keep work scoped.
 
+Current user instruction: do not write application code. Organize supplied sources and maintain project documentation only until the user requests implementation.
+
 ## Current implementation
 
 Repository: https://github.com/ArshitGupta01/HackOWeen_MoonKnight
@@ -19,6 +21,8 @@ The working example is greeting creation/history, not the complaint workflow. It
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the existing architecture reference and [README.md](README.md) for run instructions. Keep those documents aligned when implementation changes.
 
 The project-specific [security](docs/SECURITY.md), [code style](docs/CODE_STYLE.md), [database](docs/DATABASE.md), [API](docs/API.md), and [design system](docs/DESIGN_SYSTEM.md) guides turn the supplied reference documents into applicable final checks. Update them with real implementation changes; do not mark planned controls as deployed.
+
+[Legal channels and integration references](docs/LEGAL_AND_INTEGRATIONS.md) records Haryana AAS as the first government integration to investigate and eCourts as an authorized judicial filing channel requiring appropriate legal review. No API access, integration permission, outreach, or filing is established by those references. Internal SLA escalation is separate from an official appeal or court filing.
 
 ## Required module boundaries
 
