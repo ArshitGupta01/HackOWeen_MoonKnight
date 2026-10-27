@@ -38,7 +38,7 @@ class OpenRouterApiClient(
     private val apiKey: String = "",
     private val backendBaseUrl: String = "",
     private val baseUrl: String = "https://openrouter.ai/api/v1",
-    private val model: String = "openrouter/auto",
+    private val model: String = "openrouter/free",
 ) : TriageAiClient {
     private val json = Json { ignoreUnknownKeys = true }
 

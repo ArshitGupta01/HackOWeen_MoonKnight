@@ -34,7 +34,7 @@ class LegalService(
     private val tinyFishBaseUrl: String = EnvConfig.get("TINYFISH_BASE_URL", "https://agent.tinyfish.ai").trimEnd('/'),
     private val tavilyBaseUrl: String = EnvConfig.get("TAVILY_BASE_URL", "https://api.tavily.com").trimEnd('/'),
     private val openRouterBaseUrl: String = EnvConfig.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").trimEnd('/'),
-    private val openRouterModel: String = EnvConfig.get("OPENROUTER_MODEL", "openrouter/auto"),
+    private val openRouterModel: String = EnvConfig.get("OPENROUTER_MODEL", "openrouter/free"),
 ) {
     private val agentSemaphore = Semaphore(1)
     private val json = Json { ignoreUnknownKeys = true }
@@ -972,16 +972,17 @@ class LegalService(
                                 val text = parsed["text"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: hint
                                 val title = parsed["suggestedTitle"]?.jsonPrimitive?.contentOrNull ?: ""
                                 val cat = parsed["suggestedCategory"]?.jsonPrimitive?.contentOrNull?.uppercase() ?: ""
-                                return TranscribeResponseDto(text, title, if (cat in setOf("ROADS", "WATER", "WASTE", "LIGHTING", "OTHER")) cat else "", "OPENROUTER_AI")
+                                TranscribeResponseDto(text, title, if (cat in setOf("ROADS", "WATER", "WASTE", "LIGHTING", "OTHER")) cat else "", "OPENROUTER_AI")
+                            } else {
+                                null
                             }
-                        }
-                    }
-                    null
+                        } else null
+                    } else null
                 }.getOrNull()
                 if (refined != null) return refined
             }
 
-            // 2. Try multimodal input_audio with OpenRouter (Gemini Flash supports audio input)
+            // 2. Try multimodal input_audio. The configured OpenRouter model must support audio input.
             if (req.audioBase64.length >= 32) {
                 val multimodal = runCatching {
                     val response = client.post("$openRouterBaseUrl/chat/completions") {
@@ -1041,14 +1042,17 @@ class LegalService(
                                 val title = parsed["suggestedTitle"]?.jsonPrimitive?.contentOrNull ?: ""
                                 val cat = parsed["suggestedCategory"]?.jsonPrimitive?.contentOrNull?.uppercase() ?: ""
                                 if (text != null) {
-                                    return TranscribeResponseDto(text, title, if (cat in setOf("ROADS", "WATER", "WASTE", "LIGHTING", "OTHER")) cat else "", "OPENROUTER_AUDIO")
+                                    TranscribeResponseDto(text, title, if (cat in setOf("ROADS", "WATER", "WASTE", "LIGHTING", "OTHER")) cat else "", "OPENROUTER_AUDIO")
+                                } else {
+                                    null
                                 }
                             } else if (content.length in 10..2000) {
-                                return TranscribeResponseDto(content.trim(), "", "", "OPENROUTER_AUDIO")
+                                TranscribeResponseDto(content.trim(), "", "", "OPENROUTER_AUDIO")
+                            } else {
+                                null
                             }
-                        }
-                    }
-                    null
+                        } else null
+                    } else null
                 }.getOrNull()
                 if (multimodal != null) return multimodal
             }
@@ -1063,12 +1067,7 @@ class LegalService(
                 provider = "BROWSER_SPEECH_API",
             )
         }
-        val fallbackText = if (req.language == "hi") {
-            "वार्ड 4 में नागरिक समस्या के संबंध में वॉयस नोट दर्ज किया गया (${req.mimeType})। कृपया भेजने से पहले स्थान और विवरण की पुष्टि करें।"
-        } else {
-            "Voice note recorded (${req.mimeType}). Civic issue reported for municipal inspection in Ward 4; please review or add specific landmark details before submitting."
-        }
-        return TranscribeResponseDto(fallbackText, "", "", "VOICE_NOTE_FALLBACK")
+        throw WorkflowFailure("UNAVAILABLE", "Voice transcription is unavailable right now. Please retry or enter the report manually.")
     }
 
     /**
