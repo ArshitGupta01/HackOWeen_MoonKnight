@@ -12,10 +12,10 @@
 - `LegalSource`: approved and pending legal/civic reference passages (`CENTRAL` and `HARYANA` packs) with SHA-256 content hashes and superseded-version links.
 - `LegalMonitor`: scheduled TinyFish Page (`fetch`) and Topic (`search`) monitors.
 
-Android uses `AndroidSqliteDriver`, iOS uses `NativeSqliteDriver`, and Desktop/Server use `JdbcSqliteDriver`. `THEEKHAI_DB_PATH` selects the server database file; in-memory SQLite is used for tests.
+Android uses `AndroidSqliteDriver`, iOS uses `NativeSqliteDriver`, and Desktop/Server use `JdbcSqliteDriver`. `THEEKHAI_DB_PATH` selects the server database file (seeded on initial startup with 3 Ward 4 demonstration cases); in-memory SQLite is used for tests.
 
 ### 2. Connected Supabase PostgreSQL Database (`TheekHai` — `ffmcurazxvygsifbglwy`)
-Inspired by TenderLens (`supabase/schema.sql`), the live Supabase project `TheekHai` (`https://ffmcurazxvygsifbglwy.supabase.co`) manages identity, user profiles, bookmarked legal sources, and private evidence storage:
+Inspired by TenderLens (`supabase/schema.sql`), the live Supabase project `TheekHai` (`https://ffmcurazxvygsifbglwy.supabase.co`) manages identity, user profiles, bookmarked legal sources, workflow tables, and private evidence storage across 7 RLS-enabled tables:
 - `public.profiles` (`user_id`, `email`, `full_name`, `organization`, `role`, `department`, `ward`, `preferred_language`, `created_at`, `updated_at`):
   - Synced automatically on `auth.users` signup via `public.handle_new_user()` trigger.
   - Protected by PostgreSQL Row-Level Security (`profiles_select_own`, `profiles_insert_own`, `profiles_update_own` using `(select auth.uid()) = user_id`).
@@ -23,6 +23,8 @@ Inspired by TenderLens (`supabase/schema.sql`), the live Supabase project `Theek
 - `public.saved_sources` (`id`, `user_id`, `title`, `source_url`, `jurisdiction`, `snippet`, `created_at`):
   - Bookmarked legal/civic reference sources per user (`unique(user_id, source_url)`).
   - Protected by PostgreSQL RLS (`saved_sources_select_own`, `saved_sources_insert_own`, `saved_sources_delete_own` using `(select auth.uid()) = user_id`).
+- `public.complaints`, `public.case_tasks`, `public.audit_logs`, `public.legal_sources`, and `public.legal_monitors`:
+  - RLS-protected tables in Supabase PostgreSQL seeded with the initial Ward 4 cases, departmental tasks, audit trail events, approved Central/Haryana legal sources, and active TinyFish monitors, and synchronized when complaints or workflow actions occur through Ktor.
 - `storage.buckets` (`evidence`):
   - Private storage bucket (`public = false`) for complaint evidence attachments.
 

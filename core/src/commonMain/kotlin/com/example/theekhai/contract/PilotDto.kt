@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class IdentityDto(val id: String, val role: String, val department: String?, val csrf: String? = null, val email: String = "", val fullName: String = "", val organization: String = "", val ward: String = "Ward 1", val preferredLanguage: String = "en")
 @Serializable data class AuthConfigDto(val configured: Boolean, val supabaseUrl: String, val publishableKey: String)
 @Serializable data class LoginDto(val email: String, val password: String)
-@Serializable data class RegisterDto(val email: String, val password: String, val fullName: String, val ward: String = "Ward 1", val preferredLanguage: String = "en")
+@Serializable data class RegisterDto(val email: String, val password: String, val fullName: String, val organization: String = "Citizen Resident", val ward: String = "Ward 1", val preferredLanguage: String = "en")
 @Serializable data class RecoverPasswordDto(val email: String)
 @Serializable data class ProfileDto(val userId: String = "", val email: String = "", val fullName: String, val organization: String = "", val role: String = "CITIZEN", val department: String? = null, val ward: String = "Ward 1", val preferredLanguage: String = "en")
 @Serializable data class SavedSourceDto(val id: String, val userId: String, val title: String, val sourceUrl: String, val jurisdiction: String, val snippet: String, val createdAt: String = "")

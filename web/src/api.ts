@@ -12,7 +12,7 @@ export interface Identity {
 
 export interface AuthConfig {
   supabaseUrl: string;
-  supabasePublishableKey: string;
+  publishableKey: string;
   configured: boolean;
 }
 
@@ -58,10 +58,33 @@ export interface MonitorRunResult { monitor:LegalMonitor; queuedSources:LegalSou
 
 export let identity: Identity | null = null;
 
+const TOKEN_STORAGE_KEY = 'theekhai_supabase_token';
+
+function getStoredToken(): string | null {
+  try {
+    return sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredToken(token: string | null) {
+  try {
+    if (token) sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    else sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export async function api<T>(path:string, options:RequestInit = {}):Promise<T> {
   const headers = new Headers(options.headers);
   if(options.body) headers.set('Content-Type','application/json');
   if(identity?.csrf) headers.set('X-CSRF-Token',identity.csrf);
+  const bearer = getStoredToken();
+  if(bearer && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${bearer}`);
+  }
   const response = await fetch(`/api/v1${path}`,{...options,headers,credentials:'same-origin',signal:options.signal ?? AbortSignal.timeout(25000)});
   const data = await response.json().catch(() => null);
   if(!response.ok) throw new Error(data?.message ?? `Request failed (${response.status}). Please retry.`);
@@ -82,12 +105,20 @@ export async function getAuthConfig() {
 }
 
 export async function signIn(email:string, password:string) {
-  await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  const res = await api<{ status: string; accessToken?: string }>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+  if (res?.accessToken) setStoredToken(res.accessToken);
   return loadIdentity();
 }
 
 export async function registerAccount(input: RegisterInput) {
-  await api('/auth/register', { method: 'POST', body: JSON.stringify(input) });
+  const res = await api<{ status: string; accessToken?: string }>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  if (res?.accessToken) setStoredToken(res.accessToken);
   return loadIdentity();
 }
 
@@ -96,8 +127,12 @@ export async function requestPasswordReset(email: string) {
 }
 
 export async function signOut() {
-  await api('/auth/logout', { method: 'POST' });
-  identity = null;
+  try {
+    await api('/auth/logout', { method: 'POST' });
+  } finally {
+    setStoredToken(null);
+    identity = null;
+  }
 }
 
 export async function getProfile() {

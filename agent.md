@@ -1,12 +1,12 @@
 # TheekHai project guide
 
-Last reviewed: 2026-10-27
+Last reviewed: 2026-10-28
 
 ## Maintenance
 
 Read this guide before changing the project. Maintain a clean repository and Clean Architecture throughout development. Update this file in the same change when architecture, module ownership, setup, dependencies, validation, or established decisions change. Record decisions and current facts, not a transcript or per-edit log. Preserve user changes and keep work scoped.
 
-Current user instruction: implement the accepted English/Hindi civic pilot, common Ktor backend, Supabase `TheekHai` authentication and RLS-protected profile/bookmark database (`public.profiles` and `public.saved_sources`) inspired by TenderLens, and legal reference & source monitoring powered by TinyFish (Agent Mode and Monitor Mode), Tavily discovery/fallback, and deterministic local approved-source backup fallback (`SOURCES_ONLY`), with no local LLM container. Commit verified increments on the unified `main` branch. See `docs/IMPLEMENTATION.md` for current verification and remaining release gates.
+Current user instruction: implement the accepted English/Hindi civic pilot, common Ktor backend, Supabase `TheekHai` authentication and RLS-protected PostgreSQL database (`public.profiles`, `public.saved_sources`, `public.complaints`, `public.case_tasks`, `public.audit_logs`, `public.legal_sources`, `public.legal_monitors`) inspired by TenderLens, and legal reference & source monitoring powered by TinyFish (Agent Mode and Monitor Mode), Tavily discovery/fallback, and deterministic local approved-source backup fallback (`SOURCES_ONLY`), with no local LLM container. Commit verified increments on the unified `main` branch. See `docs/IMPLEMENTATION.md` for current verification and remaining release gates.
 
 ## Current implementation
 
@@ -18,6 +18,7 @@ The connected Supabase project is named `TheekHai` (project ref `ffmcurazxvygsif
 - Authentication (`/auth/v1/token`, `/auth/v1/signup`, `/auth/v1/recover`, `/auth/v1/user`) with 4 pre-confirmed shared pilot demo accounts (`citizen@theekhai.in`, `pwd@theekhai.in`, `reviewer@theekhai.in`, `admin@theekhai.in` — password `TheekHai@2026`) and an automatic confirmation trigger (`auto_confirm_pilot_user_trigger`) for newly registered pilot accounts.
 - `public.profiles` (`user_id`, `email`, `full_name`, `organization`, `role`, `department`, `ward`, `preferred_language`) protected by PostgreSQL Row-Level Security (`(select auth.uid()) = user_id`) and a `protect_profile_role()` trigger preventing client-side role escalation.
 - `public.saved_sources` (`id`, `user_id`, `title`, `source_url`, `jurisdiction`, `snippet`) protected by RLS (`(select auth.uid()) = user_id`) for bookmarking approved civic/legal reference passages.
+- `public.complaints`, `public.case_tasks`, `public.audit_logs`, `public.legal_sources`, and `public.legal_monitors` protected by RLS and synchronized from Ktor workflow actions.
 - Private `evidence` Storage bucket (`storage.buckets`).
 
 The Ktor/SQLDelight backend remains the authoritative owner of case workflow (`PilotCase`, `PilotTask`, `PilotEvent`, `PilotReceipt`, `PilotLink`, `LegalSource`, `LegalMonitor`). Base package is `com.example.theekhai`.
@@ -59,7 +60,7 @@ Android, Desktop, and browser-native web all call the same Ktor backend. iOS rem
 
 Share the SQLDelight schema/code, not a live database file. Each native client has its own local SQLite instance; the server has its own authoritative persistent database (`Pilot.sq` with migrations `1.sqm` and `2.sqm`). Local SQLite is the source for native UI observation/cache and queued drafts. It cannot authorize or finalize shared workflow transitions.
 
-The server owns permissions, case IDs, assignments, valid status changes, duplicate links, required departmental task checks, deadlines, escalation, closure review, reopening, and append-only audit events. Browser sessions use `HttpOnly` cookies (`theekhai_session`) with `SameSite=Strict` and `X-CSRF-Token` validation, while Ktor forwards the user's Supabase JWT Bearer token when querying Supabase PostgREST (`/rest/v1/profiles`, `/rest/v1/saved_sources`) so PostgreSQL RLS policies are enforced per user.
+The server owns permissions, case IDs, assignments, valid status changes, duplicate links, required departmental task checks, deadlines, escalation, closure review, reopening, and append-only audit events. Browser sessions use `HttpOnly` cookies (`theekhai_session`) with `X-CSRF-Token` validation plus `Authorization: Bearer` token fallback, while Ktor forwards the user's Supabase JWT Bearer token when querying Supabase PostgREST (`/rest/v1/profiles`, `/rest/v1/saved_sources`, `/rest/v1/complaints`) so PostgreSQL RLS policies are enforced per user.
 
 ## Validation
 
@@ -81,4 +82,4 @@ Use `.\gradlew.bat` on Windows or `./gradlew` on Unix, followed by the appropria
 - 2026-10-27: Adopt Clean Architecture + MVVM, Koin, SQLDelight, and common Ktor backend specification.
 - 2026-10-27: Native web (`web/`) uses Vite + TypeScript HTML/DOM, separate from Compose and consuming the common REST API.
 - 2026-10-27: Server is authoritative for shared complaint workflow (`Pilot.sq`).
-- 2026-10-27: Live Supabase project `TheekHai` (`ffmcurazxvygsifbglwy`) is connected for Auth (`/login`, `/signup`, `/recover`), RLS-protected `public.profiles` (with `protect_profile_role()` trigger), RLS-protected `public.saved_sources`, and private `evidence` Storage bucket, inspired by TenderLens.
+- 2026-10-28: Live Supabase project `TheekHai` (`ffmcurazxvygsifbglwy`) is connected for Auth (`/login`, `/signup`, `/recover`), RLS-protected `public.profiles`, `public.saved_sources`, `public.complaints`, `public.case_tasks`, `public.audit_logs`, `public.legal_sources`, `public.legal_monitors`, and private `evidence` Storage bucket, inspired by TenderLens.

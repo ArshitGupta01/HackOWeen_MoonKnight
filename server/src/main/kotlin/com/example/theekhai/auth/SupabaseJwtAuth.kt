@@ -41,7 +41,8 @@ object EnvConfig {
  * Online Supabase Auth + PostgreSQL PostgREST RLS service (inspired by TenderLens).
  * Connects to Supabase project `TheekHai` (`ffmcurazxvygsifbglwy`):
  * - Verifies credentials & sessions via `/auth/v1/...`
- * - Resolves and syncs user profiles (`public.profiles`) and bookmarked sources (`public.saved_sources`)
+ * - Resolves and syncs user profiles (`public.profiles`), bookmarked sources (`public.saved_sources`),
+ *   and workflow tables (`public.complaints`, `public.case_tasks`, `public.audit_logs`)
  *   via PostgREST (`/rest/v1/...`) scoped to the user's JWT Bearer token so PostgreSQL RLS policies apply.
  */
 class SupabaseJwtAuth(
@@ -103,7 +104,8 @@ class SupabaseJwtAuth(
         if (url.isBlank() || key.isBlank()) throw WorkflowFailure("UNAVAILABLE", "Registration is not configured on this server.")
         val cleanEmail = input.email.trim()
         val cleanName = input.fullName.trim()
-        val cleanWard = input.ward.trim().ifBlank { "Ward 1" }
+        val cleanOrg = input.organization.trim().ifBlank { "Citizen Resident" }.take(100)
+        val cleanWard = input.ward.trim().ifBlank { "Ward 1" }.take(80)
         val cleanLang = if (input.preferredLanguage in setOf("en", "hi")) input.preferredLanguage else "en"
         if (cleanEmail.length !in 3..254 || !cleanEmail.contains("@")) {
             throw WorkflowFailure("INVALID_INPUT", "Enter a valid email address.")
@@ -126,6 +128,7 @@ class SupabaseJwtAuth(
                         "data",
                         buildJsonObject {
                             put("full_name", cleanName)
+                            put("organization", cleanOrg)
                             put("ward", cleanWard)
                             put("preferred_language", cleanLang)
                         },
@@ -304,15 +307,105 @@ class SupabaseJwtAuth(
         }
     }
 
+    /**
+     * Best-effort synchronization of local SQLDelight workflow changes to Supabase PostgreSQL
+     * (`public.complaints`, `public.case_tasks`, `public.audit_logs`) using the authenticated user's JWT.
+     */
+    suspend fun syncCaseToSupabase(
+        call: ApplicationCall,
+        record: CaseRecord,
+        tasks: List<CaseTask>,
+        events: List<CaseEvent>,
+    ) {
+        val token = extractToken(call) ?: return
+        if (url.isBlank() || key.isBlank()) return
+        runCatching {
+            client.post("$url/rest/v1/complaints?on_conflict=id") {
+                header("apikey", key)
+                bearerAuth(token)
+                header("Prefer", "resolution=merge-duplicates")
+                contentType(ContentType.Application.Json)
+                setBody(
+                    buildJsonObject {
+                        put("id", record.id)
+                        put("citizen_id", record.citizenId)
+                        put("title", record.title)
+                        put("description", record.description)
+                        put("category", record.category)
+                        put("address", record.address)
+                        record.latitude?.let { put("latitude", it) } ?: put("latitude", JsonNull)
+                        record.longitude?.let { put("longitude", it) } ?: put("longitude", JsonNull)
+                        put("department", record.department)
+                        put("priority", record.priority)
+                        put("status", record.status.name)
+                        put("created_at", record.createdAt)
+                        put("updated_at", record.updatedAt)
+                        put("due_at", record.dueAt)
+                        put("version", record.version)
+                        put("escalation", record.escalation)
+                        record.closureBy?.let { put("closure_by", it) } ?: put("closure_by", JsonNull)
+                    }.toString()
+                )
+            }
+            for (t in tasks) {
+                client.post("$url/rest/v1/case_tasks?on_conflict=id") {
+                    header("apikey", key)
+                    bearerAuth(token)
+                    header("Prefer", "resolution=merge-duplicates")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        buildJsonObject {
+                            put("id", t.id)
+                            put("case_id", t.caseId)
+                            put("department", t.department)
+                            put("title", t.title)
+                            put("required", t.required)
+                            put("complete", t.complete)
+                        }.toString()
+                    )
+                }
+            }
+            for (ev in events) {
+                client.post("$url/rest/v1/audit_logs?on_conflict=id") {
+                    header("apikey", key)
+                    bearerAuth(token)
+                    header("Prefer", "resolution=merge-duplicates")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        buildJsonObject {
+                            put("id", ev.id)
+                            put("case_id", ev.caseId)
+                            put("actor_id", ev.actorId)
+                            put("action", ev.action)
+                            put("note", ev.note)
+                            put("at", ev.at)
+                        }.toString()
+                    )
+                }
+            }
+        }
+    }
+
+    private fun extractToken(call: ApplicationCall): String? {
+        val cookie = call.request.cookies["theekhai_session"]
+        val session = cookie?.let { sessions[it] }
+        if (session != null && session.expiresAt > System.currentTimeMillis()) {
+            return session.token
+        }
+        return call.request.header(HttpHeaders.Authorization)
+            ?.takeIf { it.startsWith("Bearer ") }
+            ?.removePrefix("Bearer ")
+            ?.trim()
+    }
+
     private suspend fun verifyCall(call: ApplicationCall): VerifiedUser {
         val cookie = call.request.cookies["theekhai_session"]
         val session = cookie?.let { sessions[it] }
-        val bearer = call.request.header(HttpHeaders.Authorization)?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")
-        val token = if (cookie != null) {
-            if (session == null || session.expiresAt <= System.currentTimeMillis()) {
-                sessions.remove(cookie)
-                throw WorkflowFailure("UNAUTHORIZED", "Session expired. Sign in again.")
-            }
+        val bearer = call.request.header(HttpHeaders.Authorization)
+            ?.takeIf { it.startsWith("Bearer ") }
+            ?.removePrefix("Bearer ")
+            ?.trim()
+        val token = if (cookie != null && session != null && session.expiresAt > System.currentTimeMillis()) {
             if (call.request.local.method !in setOf(HttpMethod.Get, HttpMethod.Head, HttpMethod.Options) &&
                 call.request.header("X-CSRF-Token") != session.csrf
             ) {
@@ -320,7 +413,8 @@ class SupabaseJwtAuth(
             }
             session.token
         } else {
-            bearer ?: throw WorkflowFailure("UNAUTHORIZED", "Sign in to continue.")
+            if (cookie != null) sessions.remove(cookie)
+            bearer ?: throw WorkflowFailure("UNAUTHORIZED", if (cookie != null) "Session expired. Sign in again." else "Sign in to continue.")
         }
         if (url.isBlank() || key.isBlank()) throw WorkflowFailure("UNAVAILABLE", "Authentication is not configured.")
         val response = client.get("$url/auth/v1/user") {
@@ -336,6 +430,7 @@ class SupabaseJwtAuth(
         val email = user["email"]?.jsonPrimitive?.contentOrNull ?: ""
         val meta = user["user_metadata"] as? JsonObject
         val fallbackName = meta?.get("full_name")?.jsonPrimitive?.contentOrNull ?: email.substringBefore('@')
+        val fallbackOrg = meta?.get("organization")?.jsonPrimitive?.contentOrNull ?: "Citizen Resident"
         val fallbackWard = meta?.get("ward")?.jsonPrimitive?.contentOrNull ?: "Ward 1"
         val fallbackLang = meta?.get("preferred_language")?.jsonPrimitive?.contentOrNull ?: "en"
 
@@ -345,7 +440,7 @@ class SupabaseJwtAuth(
             ?.let { runCatching { Role.valueOf(it) }.getOrNull() }
         val dbDept = profileObj?.get("department")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
         val fullName = profileObj?.get("full_name")?.jsonPrimitive?.contentOrNull?.ifBlank { fallbackName } ?: fallbackName
-        val organization = profileObj?.get("organization")?.jsonPrimitive?.contentOrNull ?: ""
+        val organization = profileObj?.get("organization")?.jsonPrimitive?.contentOrNull?.ifBlank { fallbackOrg } ?: fallbackOrg
         val ward = profileObj?.get("ward")?.jsonPrimitive?.contentOrNull?.ifBlank { fallbackWard } ?: fallbackWard
         val preferredLang = profileObj?.get("preferred_language")?.jsonPrimitive?.contentOrNull?.ifBlank { fallbackLang } ?: fallbackLang
 
