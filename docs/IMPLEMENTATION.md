@@ -39,3 +39,10 @@ Connected live Supabase project `TheekHai` (`ffmcurazxvygsifbglwy`, `https://ffm
 - Applied live Supabase migration `theekhai_profiles_and_saved_sources_rls` creating `public.profiles` and `public.saved_sources` with strict Row-Level Security (`(select auth.uid()) = user_id`), `protect_profile_role()` privilege-escalation guard, `handle_new_user()` profile sync trigger, and private `evidence` bucket.
 - Provisioned 4 pre-confirmed shared demo accounts (`citizen@theekhai.in`, `pwd@theekhai.in`, `reviewer@theekhai.in`, `admin@theekhai.in` — password `TheekHai@2026`) and `auto_confirm_pilot_user_trigger` for instant citizen registration.
 - Wired `/api/v1/auth/config`, `/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/auth/recover`, `/api/v1/auth/me`, `/api/v1/profile`, and `/api/v1/saved-sources` in Ktor (`SupabaseJwtAuth.kt` + `Application.kt`) and updated the bilingual web frontend (`/login` with 1-click demo role cards & password visibility toggle, `/signup` with 3-bar password strength meter, `/account` with RLS profile sync & saved sources, and `/library` source bookmarking).
+
+## Checkpoint 4 — Native preview honesty and theme controls (2026-10-28)
+
+- Android and Desktop Compose scaffolds now expose a dark-mode control while following the device theme by default; the browser theme toggle persists its override.
+- Removed false native success states for sign-in, signup, report submission, draft saving, voice capture, profile sync, and field evidence. Native preview data is empty or explicitly labeled as illustrative so it cannot be mistaken for a live resident case.
+- Verified: web production build and four Playwright checks; `:app:shared:jvmTest`, `:server:test`, Android debug assembly, and Desktop Kotlin compilation pass.
+- Remaining native gaps: Supabase session/auth wiring, actual report persistence, device media/location permissions and uploads, voice recording/transcription integration, profile/source sync, and live case detail loading. These screens now report that those actions are unavailable rather than inventing successful outcomes.

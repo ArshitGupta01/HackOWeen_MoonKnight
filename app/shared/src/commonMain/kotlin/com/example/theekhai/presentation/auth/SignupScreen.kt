@@ -106,8 +106,7 @@ fun SignupScreen() {
                                     errorMessage = "Please accept the privacy consent to proceed."
                                     return@SignupForm
                                 }
-                                isLoading = true
-                                navigator.navigateTo(Route.Workspace)
+                                errorMessage = "Account creation is not connected in this native preview. No account was created."
                             },
                             onNavigateLogin = { navigator.navigateTo(Route.Login) },
                             ext = ext
@@ -150,8 +149,7 @@ fun SignupScreen() {
                                 errorMessage = "Please accept the privacy consent to proceed."
                                 return@SignupForm
                             }
-                            isLoading = true
-                            navigator.navigateTo(Route.Workspace)
+                            errorMessage = "Account creation is not connected in this native preview. No account was created."
                         },
                         onNavigateLogin = { navigator.navigateTo(Route.Login) },
                         ext = ext

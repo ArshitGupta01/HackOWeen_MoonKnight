@@ -59,7 +59,7 @@ fun FieldWorkerScreen(
     val ext = LocalTheekHaiColors.current
     val bgDark = Color(0xFF0F172A)
     val cardBg = Color(0xFF1E293B)
-    var resolutionNotes by remember { mutableStateOf("Repaired surface asphalt and cleared debris.") }
+    var resolutionNotes by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
@@ -88,7 +88,7 @@ fun FieldWorkerScreen(
                         color = Color.White
                     )
                     Text(
-                        text = "Satish Kumar • PWD Ward 14 (#4092)",
+                        text = "Field worker preview · no authenticated worker",
                         fontSize = 12.sp,
                         color = Color(0xFF94A3B8)
                     )

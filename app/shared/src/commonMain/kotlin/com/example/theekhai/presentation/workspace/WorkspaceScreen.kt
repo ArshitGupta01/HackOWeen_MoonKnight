@@ -18,7 +18,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.theekhai.domain.model.Complaint
-import com.example.theekhai.domain.model.ComplaintPriority
 import com.example.theekhai.domain.model.ComplaintStatus
 import com.example.theekhai.navigation.LocalNavigator
 import com.example.theekhai.navigation.Route
@@ -28,7 +27,7 @@ import com.example.theekhai.ui.theme.TheekHaiColors
 
 @Composable
 fun WorkspaceScreen(
-    complaints: List<Complaint> = sampleComplaints()
+    complaints: List<Complaint> = emptyList()
 ) {
     val navigator = LocalNavigator.current
     val ext = LocalTheekHaiColors.current
@@ -238,7 +237,6 @@ fun WorkspaceScreen(
         }
     }
 }
-
 @Composable
 private fun CaseRow(complaint: Complaint, onClick: () -> Unit) {
     val ext = LocalTheekHaiColors.current
@@ -297,39 +295,3 @@ private fun CaseRow(complaint: Complaint, onClick: () -> Unit) {
         Text("›", fontSize = 20.sp, color = ext.muted)
     }
 }
-
-/** Sample complaints for dev/demo rendering */
-private fun sampleComplaints(): List<Complaint> = listOf(
-    Complaint(
-        id = "c-001-abc", title = "Broken streetlight near Central Park",
-        description = "The streetlight at the junction has been non-functional for 2 weeks.",
-        category = "LIGHTING", priority = ComplaintPriority.HIGH, status = ComplaintStatus.TRIAGED,
-        latitude = 28.6139, longitude = 77.2090, address = "MG Road Junction",
-        citizenId = "citizen-1", zone = "Ward 4", slaDueEpochMillis = 0L,
-        createdAtEpochMillis = 0L, updatedAtEpochMillis = 0L
-    ),
-    Complaint(
-        id = "c-002-def", title = "Overflowing drain on Nehru Lane",
-        description = "Sewage water overflowing onto the road since morning.",
-        category = "WATER", priority = ComplaintPriority.CRITICAL, status = ComplaintStatus.PENDING,
-        latitude = 28.6150, longitude = 77.2100, address = "Nehru Lane, Block B",
-        citizenId = "citizen-1", zone = "Ward 4", slaDueEpochMillis = 0L,
-        createdAtEpochMillis = 0L, updatedAtEpochMillis = 0L
-    ),
-    Complaint(
-        id = "c-003-ghi", title = "Pothole causing accidents on Ring Road",
-        description = "Large pothole near the flyover exit. Two-wheelers at risk.",
-        category = "ROADS", priority = ComplaintPriority.HIGH, status = ComplaintStatus.RESOLVED,
-        latitude = 28.6200, longitude = 77.2200, address = "Ring Road Exit 3",
-        citizenId = "citizen-1", zone = "Ward 2", slaDueEpochMillis = 0L,
-        createdAtEpochMillis = 0L, updatedAtEpochMillis = 0L
-    ),
-    Complaint(
-        id = "c-004-jkl", title = "Garbage dump near Sector 5 gate",
-        description = "The garbage truck has not visited for the past 3 days.",
-        category = "WASTE", priority = ComplaintPriority.MEDIUM, status = ComplaintStatus.VERIFIED,
-        latitude = 28.6300, longitude = 77.2300, address = "Sector 5 Main Gate",
-        citizenId = "citizen-1", zone = "Ward 3", slaDueEpochMillis = 0L,
-        createdAtEpochMillis = 0L, updatedAtEpochMillis = 0L
-    ),
-)

@@ -77,13 +77,12 @@ fun LoginScreen() {
                             isLoading = isLoading,
                             errorMessage = errorMessage,
                             onSubmit = {
-                                isLoading = true
-                                navigator.navigateTo(Route.Workspace)
+                                errorMessage = "Sign-in is not connected in this native preview. No account was authenticated."
                             },
                             onNavigateSignup = { navigator.navigateTo(Route.Signup) },
                             onSelectDemo = { _, selectedEmail ->
                                 email = selectedEmail
-                                password = "pilot-password"
+                                password = ""
                             },
                             ext = ext
                         )
@@ -108,13 +107,12 @@ fun LoginScreen() {
                         isLoading = isLoading,
                         errorMessage = errorMessage,
                         onSubmit = {
-                            isLoading = true
-                            navigator.navigateTo(Route.Workspace)
+                            errorMessage = "Sign-in is not connected in this native preview. No account was authenticated."
                         },
                         onNavigateSignup = { navigator.navigateTo(Route.Signup) },
                         onSelectDemo = { _, selectedEmail ->
                             email = selectedEmail
-                            password = "pilot-password"
+                            password = ""
                         },
                         ext = ext
                     )
@@ -234,9 +232,9 @@ private fun LoginForm(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
-                Text("Demo Access", style = MaterialTheme.typography.titleSmall, color = ext.ink)
+                Text("Demo account examples", style = MaterialTheme.typography.titleSmall, color = ext.ink)
                 Text(
-                    "Quick sign-in for previewing citizen, department officer, or inspector workflows.",
+                    "These examples only fill the email field. Native sign-in is not connected; no account will be authenticated.",
                     style = MaterialTheme.typography.bodySmall,
                     color = ext.muted,
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)

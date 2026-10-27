@@ -41,43 +41,17 @@ fun AccountScreen() {
     val navigator = LocalNavigator.current
     val ext = LocalTheekHaiColors.current
 
-    var fullName by remember { mutableStateOf("Priya Sharma") }
-    var email by remember { mutableStateOf("priya.sharma@gurugram.gov.in") }
-    var organization by remember { mutableStateOf("Sector 14 Residents Welfare Association") }
-    var ward by remember { mutableStateOf("Ward 4 (DLF Phase 1 & Old City)") }
+    var fullName by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var organization by remember { mutableStateOf("") }
+    var ward by remember { mutableStateOf("") }
     var selectedLanguage by remember { mutableStateOf("English") }
     var langExpanded by remember { mutableStateOf(false) }
 
     var saveFeedback by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    var savedSources by remember {
-        mutableStateOf(
-            listOf(
-                SavedLegalSource(
-                    id = "src-1",
-                    title = "Haryana Right to Service Act, 2014 – Section 7 Auto Appeal Rules",
-                    jurisdiction = "HARYANA",
-                    snippet = "In case of failure to deliver the notified service within the stipulated time limit, the grievance is automatically escalated to the First Appellate Authority.",
-                    url = "https://haryana-rtsc.gov.in"
-                ),
-                SavedLegalSource(
-                    id = "src-2",
-                    title = "Digital Personal Data Protection Act, 2023 – Section 6 Consent Framework",
-                    jurisdiction = "CENTRAL",
-                    snippet = "Consent of the Data Principal shall be free, specific, informed, unconditional and unambiguous with a clear affirmative action.",
-                    url = "https://meity.gov.in/dpdp"
-                ),
-                SavedLegalSource(
-                    id = "src-3",
-                    title = "National Municipal Accounting Manual – Public Works Service Level Benchmark",
-                    jurisdiction = "CENTRAL",
-                    snippet = "Pothole repair SLA: Notified urban roads must be rectified within 48 hours of ticket confirmation by municipal engineers.",
-                    url = "https://mohua.gov.in"
-                )
-            )
-        )
-    }
+    var savedSources by remember { mutableStateOf<List<SavedLegalSource>>(emptyList()) }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isWide = maxWidth >= 850.dp
@@ -99,7 +73,7 @@ fun AccountScreen() {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Manage your verified resident details, neighbourhood, and bookmarked municipal service standards.",
+                text = "Native preview only. Account syncing is not connected, so profile edits are temporary and are not sent.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = ext.muted
             )
@@ -130,7 +104,7 @@ fun AccountScreen() {
                             saveFeedback = saveFeedback,
                             onSave = {
                                 isSaving = true
-                                saveFeedback = "Profile successfully synced to Supabase public.profiles (RLS verified)."
+                                saveFeedback = "No profile was synced. Native profile integration is not connected yet."
                                 isSaving = false
                             },
                             ext = ext
@@ -168,7 +142,7 @@ fun AccountScreen() {
                         saveFeedback = saveFeedback,
                         onSave = {
                             isSaving = true
-                            saveFeedback = "Profile changes saved successfully."
+                            saveFeedback = "No profile was saved. Native profile integration is not connected yet."
                             isSaving = false
                         },
                         ext = ext
@@ -218,13 +192,13 @@ private fun ProfileFormPanel(
             AvatarCircle(initials = fullName, size = 52.dp, bgColor = TheekHaiColors.Green)
             Column {
                 StatusChip(
-                    label = "Verified Resident Account",
+                    label = "Native account preview",
                     containerColor = TheekHaiColors.StatusClosed,
                     contentColor = TheekHaiColors.StatusClosedText
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(fullName, style = MaterialTheme.typography.titleLarge, color = ext.ink)
-                Text("$email · Role: CITIZEN", style = MaterialTheme.typography.bodySmall, color = ext.muted)
+                Text(if (email.isBlank()) "Not signed in" else email, style = MaterialTheme.typography.bodySmall, color = ext.muted)
             }
         }
 

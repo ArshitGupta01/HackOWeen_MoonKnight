@@ -393,7 +393,7 @@ private fun CityIllustration(ext: com.example.theekhai.ui.theme.TheekHaiExtended
                 ) {
                     DotIndicator()
                     Text(
-                        text = "100% Verified Resolutions backed by Field Evidence",
+                        text = "Pilot goal: verify resolutions with field evidence before closure",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.W600,
                         color = ext.ink

@@ -11,7 +11,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
@@ -22,8 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.theekhai.navigation.LocalNavigator
-import com.example.theekhai.navigation.Route
 import com.example.theekhai.ui.components.*
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
@@ -31,7 +28,6 @@ import com.example.theekhai.ui.theme.TheekHaiColors
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportScreen() {
-    val navigator = LocalNavigator.current
     val ext = LocalTheekHaiColors.current
     val scrollState = rememberScrollState()
 
@@ -101,8 +97,8 @@ fun ReportScreen() {
                                 isRecording = isRecording,
                                 hasRecording = hasRecording,
                                 onToggleRecording = {
-                                    isRecording = !isRecording
-                                    if (!isRecording) hasRecording = true
+                                    statusMessage = "Voice capture is not connected in this native preview. No recording was made."
+                                    isError = true
                                 },
                                 address = address,
                                 onAddressChange = { address = it },
@@ -117,14 +113,13 @@ fun ReportScreen() {
                                         isError = true
                                         return@ReportForm
                                     }
-                                    isSubmitting = true
-                                    statusMessage = "Submitting report for AI triage..."
-                                    isError = false
-                                    navigator.navigateTo(Route.Workspace)
+                                    isSubmitting = false
+                                    statusMessage = "Report submission is not connected in this native preview. Your report was not sent."
+                                    isError = true
                                 },
                                 onSaveDraft = {
-                                    statusMessage = "Draft saved on this device."
-                                    isError = false
+                                    statusMessage = "Draft storage is not connected in this native preview. Copy your text before leaving."
+                                    isError = true
                                 }
                             )
                         }
@@ -146,8 +141,8 @@ fun ReportScreen() {
                         isRecording = isRecording,
                         hasRecording = hasRecording,
                         onToggleRecording = {
-                            isRecording = !isRecording
-                            if (!isRecording) hasRecording = true
+                            statusMessage = "Voice capture is not connected in this native preview. No recording was made."
+                            isError = true
                         },
                         address = address,
                         onAddressChange = { address = it },
@@ -162,14 +157,13 @@ fun ReportScreen() {
                                 isError = true
                                 return@ReportForm
                             }
-                            isSubmitting = true
-                            statusMessage = "Submitting report for AI triage..."
-                            isError = false
-                            navigator.navigateTo(Route.Workspace)
+                            isSubmitting = false
+                            statusMessage = "Report submission is not connected in this native preview. Your report was not sent."
+                            isError = true
                         },
                         onSaveDraft = {
-                            statusMessage = "Draft saved on this device."
-                            isError = false
+                            statusMessage = "Draft storage is not connected in this native preview. Copy your text before leaving."
+                            isError = true
                         }
                     )
 
@@ -188,10 +182,8 @@ fun ReportScreen() {
                             isError = true
                             return@ExtendedFloatingActionButton
                         }
-                        isSubmitting = true
-                        statusMessage = "Submitting report..."
-                        isError = false
-                        navigator.navigateTo(Route.Workspace)
+                        statusMessage = "Report submission is not connected in this native preview. Your report was not sent."
+                        isError = true
                     },
                     icon = { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Submit") },
                     text = { Text("Submit Report", fontWeight = FontWeight.Bold) },
@@ -333,13 +325,13 @@ private fun ReportForm(
                         }
                         Column {
                             Text(
-                                text = if (isRecording) "Recording voice note..." else if (hasRecording) "Voice note recorded" else "Record voice grievance",
+                                text = "Voice recording unavailable in preview",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = ext.ink
                             )
                             Text(
-                                text = "Supports 12+ Indian languages",
+                                text = "No recording is made by this control yet.",
                                 fontSize = 10.sp,
                                 color = ext.muted
                             )
@@ -375,11 +367,6 @@ private fun ReportForm(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(6.dp),
                 singleLine = true,
-                trailingIcon = {
-                    IconButton(onClick = { onAddressChange("Ward 4, MG Road Crossing") }) {
-                        Icon(Icons.Default.LocationOn, contentDescription = "Use location", tint = ext.green)
-                    }
-                },
                 colors = reportFieldColors(ext)
             )
 

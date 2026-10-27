@@ -95,8 +95,8 @@ fun CaseDetailScreen(caseId: String) {
     var timeline by remember {
         mutableStateOf(
             listOf(
-                CaseTimelineEvent("COMPLAINT_FILED", "Citizen reported via TheekHai voice intake.", "Yesterday 14:20"),
-                CaseTimelineEvent("AI_TRIAGED", "Gemini 3.8 Flash classified as Electrical Services with HIGH priority.", "Yesterday 14:21"),
+                CaseTimelineEvent("COMPLAINT_FILED", "Sample timeline event — illustrative only.", "Yesterday 14:20"),
+                CaseTimelineEvent("AI_TRIAGED", "OpenRouter triage preview — illustrative only.", "Yesterday 14:21"),
                 CaseTimelineEvent("WORK_ORDER_ASSIGNED", "Dispatched to Sector 14 electrical maintenance crew.", "Yesterday 15:00"),
                 CaseTimelineEvent("TASK_COMPLETED", "Task 'Inspect line voltage' completed by technician.", "Today 09:30")
             )
@@ -154,6 +154,16 @@ fun CaseDetailScreen(caseId: String) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = ext.muted
             )
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Surface(color = ext.sidebarBg, shape = RoundedCornerShape(4.dp)) {
+                Text(
+                    text = "Sample case preview. Details, timeline, and actions are illustrative and are not saved to the backend.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ext.ink,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(28.dp))
 
