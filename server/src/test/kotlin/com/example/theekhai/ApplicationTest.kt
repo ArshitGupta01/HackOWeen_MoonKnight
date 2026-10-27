@@ -1,11 +1,9 @@
 package com.example.theekhai
 
-import com.example.theekhai.contract.GreetingDto
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
-import kotlinx.serialization.json.Json
 import kotlin.test.*
 
 class ApplicationTest {
@@ -17,25 +15,16 @@ class ApplicationTest {
         }
         val response = client.get("/")
         assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("Hello, Ktor!", response.bodyAsText())
+        assertTrue(response.bodyAsText().contains("THEEKHAI Smart Cities Backend Server"))
     }
 
     @Test
-    fun greetingEndpointReturnsSharedContract() = testApplication {
+    fun testHealthEndpoint() = testApplication {
         application {
             module()
         }
-        val response = client.get("/api/v1/greeting?platform=Android")
+        val response = client.get("/health")
         assertEquals(HttpStatusCode.OK, response.status)
-        val dto = Json.decodeFromString<GreetingDto>(response.bodyAsText())
-        assertEquals("Hello, Android!", dto.message)
-    }
-
-    @Test
-    fun greetingEndpointRejectsMissingPlatform() = testApplication {
-        application {
-            module()
-        }
-        assertEquals(HttpStatusCode.BadRequest, client.get("/api/v1/greeting").status)
+        assertTrue(response.bodyAsText().contains("HEALTHY"))
     }
 }

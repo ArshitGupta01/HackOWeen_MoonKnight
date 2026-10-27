@@ -21,3 +21,9 @@ node_modules/
 # Local SQLite databases
 *.db
 *.db-journal
+
+# Environment variables & secrets
+.env
+.env.*
+repomix-output.xml
+repomix-output.txt
