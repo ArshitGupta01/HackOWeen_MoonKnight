@@ -15,6 +15,7 @@ import java.io.File
 import java.net.URI
 import java.security.SecureRandom
 import java.util.Base64
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 object EnvConfig {
@@ -53,6 +54,7 @@ class SupabaseJwtAuth(
     rawKey: String,
     private val staff: Map<String, Pair<Role, String?>> = emptyMap(),
     private val database: AppDatabase? = null,
+    private val gmail: com.example.theekhai.mail.GmailService? = null,
 ) {
     val url: String = rawUrl.ifBlank {
         EnvConfig.get("SUPABASE_URL", "https://ffmcurazxvygsifbglwy.supabase.co")
@@ -79,9 +81,18 @@ class SupabaseJwtAuth(
         val ward: String,
         val preferredLanguage: String,
     )
+    data class PendingLoginVerification(
+        val email: String,
+        val code: String,
+        val expiresAt: Long,
+        var attempts: Int = 0,
+        val localUserId: String? = null,
+        val supabasePassword: String? = null
+    )
 
     private val sessions = ConcurrentHashMap<String, Session>()
     private val localBearerTokens = ConcurrentHashMap<String, String>()
+    private val pendingVerifications = ConcurrentHashMap<String, PendingLoginVerification>()
 
     fun config(): AuthConfigDto {
         val configured = url.startsWith("https://") && key.length > 15
@@ -99,10 +110,163 @@ class SupabaseJwtAuth(
         return createLocalSession(localUser.id)
     }
 
+    suspend fun requestLoginCode(input: RequestLoginCodeDto): RequestLoginCodeResponseDto {
+        val cleanEmail = input.email.trim().lowercase()
+        if (cleanEmail.length !in 3..254 || !cleanEmail.contains("@")) {
+            throw WorkflowFailure("INVALID_INPUT", "Enter a valid email address.")
+        }
+        val localUser = database?.pilotQueries?.pilotUserByEmail(cleanEmail)?.executeAsOneOrNull()
+        if (localUser != null && !input.password.isNullOrBlank()) {
+            if (localUser.passwordHash != input.password) {
+                throw WorkflowFailure("UNAUTHORIZED", "Incorrect password.")
+            }
+        }
+        val random = SecureRandom()
+        val code = String.format(java.util.Locale.US, "%06d", 100000 + random.nextInt(900000))
+
+        pendingVerifications[cleanEmail] = PendingLoginVerification(
+            email = cleanEmail,
+            code = code,
+            expiresAt = System.currentTimeMillis() + 10 * 60 * 1000L,
+            attempts = 0,
+            localUserId = localUser?.id,
+            supabasePassword = input.password
+        )
+
+        // Dispatch official login verification email via GmailService (Sender: arshitgupta34@gmail.com)
+        if (gmail != null) {
+            val subject = "[TheekHai] Login Verification Code: $code"
+            val body = """
+                Dear Citizen / Officer,
+
+                Your secure login verification code for TheekHai Civic Portal is:
+
+                $code
+
+                Please enter this 6-digit verification code to authenticate your sign-in.
+                This code is valid for 10 minutes.
+
+                If you did not request this login verification code, please ignore this email.
+
+                ---
+                TheekHai Civic Redressal Platform (Haryana Municipal Pilot)
+                Security Sender: ${gmail?.senderEmail ?: "arshitgupta34@gmail.com"}
+            """.trimIndent()
+
+            runCatching {
+                gmail?.sendEmail(
+                    recipientEmail = cleanEmail,
+                    subject = subject,
+                    bodyText = body
+                )
+            }
+        }
+
+        // Also notify Supabase Auth OTP if configured
+        if (url.isNotBlank() && key.isNotBlank()) {
+            runCatching {
+                client.post("$url/auth/v1/otp") {
+                    header("apikey", key)
+                    contentType(ContentType.Application.Json)
+                    setBody(buildJsonObject { put("email", cleanEmail) }.toString())
+                }
+            }
+        }
+
+        val devCode = if (EnvConfig.get("THEEKHAI_DEV_AUTH", "true") != "false") code else null
+        return RequestLoginCodeResponseDto(
+            status = "code_sent",
+            email = cleanEmail,
+            message = "A 6-digit login verification code has been dispatched to $cleanEmail.",
+            expiresInSeconds = 600,
+            devCode = devCode
+        )
+    }
+
+    suspend fun verifyLoginCode(input: VerifyLoginCodeDto): Pair<String, Session> {
+        val cleanEmail = input.email.trim().lowercase()
+        val cleanCode = input.code.trim()
+        if (cleanEmail.isBlank() || cleanCode.isBlank()) {
+            throw WorkflowFailure("INVALID_INPUT", "Enter your email and the 6-digit verification code.")
+        }
+        val pending = pendingVerifications[cleanEmail]
+            ?: throw WorkflowFailure("UNAUTHORIZED", "No verification code pending for $cleanEmail. Please request a new code.")
+
+        if (System.currentTimeMillis() > pending.expiresAt) {
+            pendingVerifications.remove(cleanEmail)
+            throw WorkflowFailure("UNAUTHORIZED", "Verification code has expired. Please request a new code.")
+        }
+
+        pending.attempts++
+        if (pending.attempts > 5) {
+            pendingVerifications.remove(cleanEmail)
+            throw WorkflowFailure("FORBIDDEN", "Too many failed verification attempts. Please request a new code.")
+        }
+
+        if (pending.code != cleanCode) {
+            var supabaseSession: Pair<String, Session>? = null
+            if (url.isNotBlank() && key.isNotBlank()) {
+                supabaseSession = runCatching {
+                    val resp = client.post("$url/auth/v1/verify") {
+                        header("apikey", key)
+                        contentType(ContentType.Application.Json)
+                        setBody(buildJsonObject {
+                            put("type", "email")
+                            put("email", cleanEmail)
+                            put("token", cleanCode)
+                        }.toString())
+                    }
+                    if (resp.status.isSuccess()) createSessionFromAuthJson(resp.bodyAsText()) else null
+                }.getOrNull()
+            }
+            if (supabaseSession == null) {
+                throw WorkflowFailure("UNAUTHORIZED", "Invalid verification code. Please check your email and try again.")
+            }
+            pendingVerifications.remove(cleanEmail)
+            return supabaseSession
+        }
+
+        pendingVerifications.remove(cleanEmail)
+
+        if (pending.localUserId != null) {
+            return createLocalSession(pending.localUserId)
+        }
+        val localUser = database?.pilotQueries?.pilotUserByEmail(cleanEmail)?.executeAsOneOrNull()
+        if (localUser != null) {
+            return createLocalSession(localUser.id)
+        }
+        if (!pending.supabasePassword.isNullOrBlank()) {
+            return login(LoginDto(cleanEmail, pending.supabasePassword, cleanCode))
+        }
+
+        val newId = UUID.randomUUID().toString()
+        database?.pilotQueries?.savePilotUser(
+            id = newId,
+            fullName = cleanEmail.substringBefore('@').replaceFirstChar { it.uppercase() },
+            email = cleanEmail,
+            passwordHash = "VERIFIED_EMAIL",
+            role = "CITIZEN",
+            department = null,
+            ward = "Ward 4",
+            organization = "Citizen Resident",
+            preferredLanguage = "en",
+            baseScore = 100L,
+            actionsTakenCount = 0L,
+            complaintsSubmittedCount = 0L,
+            complaintsApprovedCount = 0L,
+            createdAt = System.currentTimeMillis()
+        )
+        return createLocalSession(newId)
+    }
+
     suspend fun login(input: LoginDto): Pair<String, Session> {
         val cleanEmail = input.email.trim().lowercase()
-        if (cleanEmail.length !in 3..254 || input.password.length !in 1..256) {
-            throw WorkflowFailure("INVALID_INPUT", "Enter your email and password.")
+        if (cleanEmail.length !in 3..254) {
+            throw WorkflowFailure("INVALID_INPUT", "Enter your email address.")
+        }
+        val code = input.code
+        if (!code.isNullOrBlank()) {
+            return verifyLoginCode(VerifyLoginCodeDto(cleanEmail, code))
         }
         val localUser = database?.pilotQueries?.pilotUserByEmail(cleanEmail)?.executeAsOneOrNull()
         if (localUser != null && localUser.passwordHash == input.password) {

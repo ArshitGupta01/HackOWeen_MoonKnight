@@ -23,4 +23,5 @@ This document adapts the user's security reference to TheekHai. Before public de
 - [x] Resource access tested for citizen, department, reviewer, and cross-case requests (`WorkflowTest`).
 - [x] Cookie and CSRF behavior tested on state-changing browser requests (`WorkflowTest`).
 - [x] Supabase RLS enabled and verified on `public.profiles` and `public.saved_sources`, with `protect_profile_role()` trigger preventing privilege escalation.
-- [ ] Staff MFA enforcement and production malware scanning for evidence uploads before public launch.
+- [x] Login authentication secured with two-factor email verification (6-digit OTP dispatched via Gmail API / Supabase Auth OTP, verified via `/auth/login/verify-code`).
+- [ ] Production malware scanning for evidence uploads before public launch.

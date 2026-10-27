@@ -149,10 +149,41 @@ export async function getAuthConfig() {
   return api<AuthConfig>('/auth/config');
 }
 
-export async function signIn(email:string, password:string) {
-  const res = await api<{ status: string; accessToken?: string }>('/auth/login', {
+export interface RequestLoginCodeResponse {
+  status: string;
+  email: string;
+  message: string;
+  expiresInSeconds: number;
+  devCode?: string | null;
+}
+
+export interface VerifyLoginCodeResponse {
+  status: string;
+  accessToken: string;
+  email: string;
+  message?: string;
+}
+
+export async function requestLoginCode(email: string, password?: string): Promise<RequestLoginCodeResponse> {
+  return api<RequestLoginCodeResponse>('/auth/login/request-code', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function verifyLoginCode(email: string, code: string): Promise<Identity | null> {
+  const res = await api<VerifyLoginCodeResponse>('/auth/login/verify-code', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  });
+  if (res?.accessToken) setStoredToken(res.accessToken);
+  return loadIdentity();
+}
+
+export async function signIn(email: string, password: string = '', code?: string) {
+  const res = await api<{ status: string; accessToken?: string }>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password, code }),
   });
   if (res?.accessToken) setStoredToken(res.accessToken);
   return loadIdentity();

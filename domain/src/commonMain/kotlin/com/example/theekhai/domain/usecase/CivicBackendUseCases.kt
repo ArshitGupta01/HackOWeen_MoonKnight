@@ -5,6 +5,8 @@ import com.example.theekhai.domain.model.CivicProfile
 import com.example.theekhai.domain.repository.NativeCivicRepository
 
 class CivicBackendUseCases(private val repository: NativeCivicRepository) {
+    suspend fun requestLoginCode(email: String, password: String? = null) = repository.requestLoginCode(email.trim(), password)
+    suspend fun verifyLoginCode(email: String, code: String) = repository.verifyLoginCode(email.trim(), code.trim())
     suspend fun instantSignIn(email: String) = repository.instantSignIn(email.trim())
     suspend fun dummyUsers() = repository.getDummyUsers()
     suspend fun leaderboard(roleFilter: String = "ALL") = repository.getLeaderboard(roleFilter)

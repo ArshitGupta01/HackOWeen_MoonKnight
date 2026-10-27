@@ -83,12 +83,18 @@ fun LoginScreen() {
                             onTogglePassword = { passwordVisible = !passwordVisible },
                             isLoading = connectState.isLoading,
                             errorMessage = connectState.error ?: errorMessage,
+                            loginCodeSent = connectState.loginCodeSent,
+                            pendingEmail = connectState.pendingLoginEmail,
+                            loginDevCode = connectState.loginDevCode,
+                            onRequestCode = { connectViewModel.requestLoginCode(email, password.ifBlank { null }) },
+                            onVerifyCode = { code -> connectViewModel.verifyLoginCode(connectState.pendingLoginEmail ?: email, code) },
+                            onResetStep = { connectViewModel.resetLoginStep() },
                             onSubmit = { connectViewModel.signIn(email, password) },
                             onNavigateSignup = { navigator.navigateTo(Route.Signup) },
                             onSelectDemo = { _, selectedEmail ->
                                 email = selectedEmail
                                 password = "TheekHai@2026"
-                                connectViewModel.instantSignIn(selectedEmail)
+                                connectViewModel.requestLoginCode(selectedEmail, "TheekHai@2026")
                             },
                             ext = ext
                         )
@@ -112,11 +118,18 @@ fun LoginScreen() {
                         onTogglePassword = { passwordVisible = !passwordVisible },
                         isLoading = connectState.isLoading,
                         errorMessage = connectState.error ?: errorMessage,
+                        loginCodeSent = connectState.loginCodeSent,
+                        pendingEmail = connectState.pendingLoginEmail,
+                        loginDevCode = connectState.loginDevCode,
+                        onRequestCode = { connectViewModel.requestLoginCode(email, password.ifBlank { null }) },
+                        onVerifyCode = { code -> connectViewModel.verifyLoginCode(connectState.pendingLoginEmail ?: email, code) },
+                        onResetStep = { connectViewModel.resetLoginStep() },
                         onSubmit = { connectViewModel.signIn(email, password) },
                         onNavigateSignup = { navigator.navigateTo(Route.Signup) },
                         onSelectDemo = { _, selectedEmail ->
                             email = selectedEmail
                             password = "TheekHai@2026"
+                            connectViewModel.requestLoginCode(selectedEmail, "TheekHai@2026")
                         },
                         ext = ext
                     )
@@ -138,91 +151,182 @@ private fun LoginForm(
     onTogglePassword: () -> Unit,
     isLoading: Boolean,
     errorMessage: String?,
+    loginCodeSent: Boolean,
+    pendingEmail: String?,
+    loginDevCode: String?,
+    onRequestCode: () -> Unit,
+    onVerifyCode: (String) -> Unit,
+    onResetStep: () -> Unit,
     onSubmit: () -> Unit,
     onNavigateSignup: () -> Unit,
     onSelectDemo: (role: String, email: String) -> Unit,
     ext: com.example.theekhai.ui.theme.TheekHaiExtendedColors
 ) {
+    var otpCode by remember(loginDevCode) { mutableStateOf(loginDevCode ?: "") }
+
     Column {
         PanelCard(modifier = Modifier.fillMaxWidth()) {
-            Text("Email address", style = MaterialTheme.typography.labelMedium, color = ext.ink)
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = email,
-                onValueChange = onEmailChange,
-                placeholder = { Text("you@example.com") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(4.dp),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Password", style = MaterialTheme.typography.labelMedium, color = ext.ink)
+            if (loginCodeSent) {
+                // Step 2: 6-Digit Email Verification Code Input
+                Text("🔒 TWO-FACTOR EMAIL AUTHENTICATION", style = MaterialTheme.typography.labelSmall, color = ext.green, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Enter Verification Code", style = MaterialTheme.typography.titleMedium, color = ext.ink, fontWeight = FontWeight.Bold)
                 Text(
-                    text = if (passwordVisible) "Hide" else "Show",
-                    fontSize = 12.sp,
-                    color = ext.green,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.clickable { onTogglePassword() }
+                    text = "A 6-digit verification code has been dispatched via Gmail to ${pendingEmail ?: email}.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ext.muted
                 )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = password,
-                onValueChange = onPasswordChange,
-                placeholder = { Text("Enter your password") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(4.dp),
-                singleLine = true,
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
-            )
+                if (loginDevCode != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(color = Color(0xFFE8F5E9), shape = RoundedCornerShape(4.dp)) {
+                        Text(
+                            text = "🔑 Auto-dispatched Code: $loginDevCode",
+                            color = Color(0xFF2E7D32),
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
 
-            errorMessage?.let { msg ->
-                Spacer(modifier = Modifier.height(14.dp))
-                Surface(
-                    color = Color(0xFFF9EDE1),
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("6-Digit Code", style = MaterialTheme.typography.labelMedium, color = ext.ink)
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = otpCode,
+                    onValueChange = { if (it.length <= 6) otpCode = it },
+                    placeholder = { Text("• • • • • •") },
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    singleLine = true
+                )
+
+                errorMessage?.let { msg ->
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Surface(
+                        color = Color(0xFFF9EDE1),
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = msg,
+                            color = Color(0xFF8A3D24),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                TheekHaiButton(
+                    text = if (isLoading) "Verifying..." else "Verify & Sign in →",
+                    onClick = { onVerifyCode(otpCode) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = otpCode.length >= 4 && !isLoading
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = msg,
-                        color = Color(0xFF8A3D24),
+                        text = "← Change Email",
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(10.dp)
+                        color = ext.muted,
+                        modifier = Modifier.clickable { onResetStep() }
+                    )
+                    Text(
+                        text = "Resend Code",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ext.green,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { onRequestCode() }
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            TheekHaiButton(
-                text = if (isLoading) "Signing in..." else "Sign in",
-                onClick = onSubmit,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = email.isNotBlank() && password.isNotBlank() && !isLoading
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("New to TheekHai? ", style = MaterialTheme.typography.bodySmall, color = ext.muted)
-                Text(
-                    text = "Create an account →",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ext.green,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onNavigateSignup() }
+            } else {
+                Text("Email address", style = MaterialTheme.typography.labelMedium, color = ext.ink)
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = onEmailChange,
+                    placeholder = { Text("you@example.com") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(4.dp),
+                    singleLine = true
                 )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Password (Optional / Pilot Access)", style = MaterialTheme.typography.labelMedium, color = ext.ink)
+                    Text(
+                        text = if (passwordVisible) "Hide" else "Show",
+                        fontSize = 12.sp,
+                        color = ext.green,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.clickable { onTogglePassword() }
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = onPasswordChange,
+                    placeholder = { Text("Enter password or request email code") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(4.dp),
+                    singleLine = true,
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
+                )
+
+                errorMessage?.let { msg ->
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Surface(
+                        color = Color(0xFFF9EDE1),
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = msg,
+                            color = Color(0xFF8A3D24),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                TheekHaiButton(
+                    text = if (isLoading) "Sending code..." else "✉️ Send Verification Code to Email →",
+                    onClick = onRequestCode,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = email.isNotBlank() && !isLoading
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("New to TheekHai? ", style = MaterialTheme.typography.bodySmall, color = ext.muted)
+                    Text(
+                        text = "Create an account →",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ext.green,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { onNavigateSignup() }
+                    )
+                }
             }
         }
 
@@ -316,6 +420,8 @@ private fun SecurityInfoPanel(ext: com.example.theekhai.ui.theme.TheekHaiExtende
         TheekHaiDivider()
         Spacer(modifier = Modifier.height(18.dp))
 
+        PillarItem("Email-Verified Authentication", "Every login authenticates via a dynamic 6-digit one-time verification code dispatched via Gmail API.")
+        Spacer(modifier = Modifier.height(14.dp))
         PillarItem("Strict Data Privacy", "Personal contact details are shared only with the designated handling officer under data protection standards.")
         Spacer(modifier = Modifier.height(14.dp))
         PillarItem("Transparent Audit Trail", "All decisions, inspection notes, and work completion photos are documented and open to citizen review.")

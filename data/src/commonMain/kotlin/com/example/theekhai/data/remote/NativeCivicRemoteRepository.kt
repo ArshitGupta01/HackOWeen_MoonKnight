@@ -54,6 +54,26 @@ class NativeCivicRemoteRepository(
         return currentUser()
     }
 
+    override suspend fun requestLoginCode(email: String, password: String?): com.example.theekhai.contract.RequestLoginCodeResponseDto {
+        val httpResponse = client.post(url("/auth/login/request-code")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.RequestLoginCodeDto(email, password))
+        }
+        requireSuccess(httpResponse)
+        return httpResponse.body()
+    }
+
+    override suspend fun verifyLoginCode(email: String, code: String): SignedInUser {
+        val httpResponse = client.post(url("/auth/login/verify-code")) {
+            contentType(ContentType.Application.Json)
+            setBody(com.example.theekhai.contract.VerifyLoginCodeDto(email, code))
+        }
+        requireSuccess(httpResponse)
+        val response: Map<String, String> = httpResponse.body()
+        session.value = response["accessToken"] ?: error("The server did not return a sign-in token.")
+        return currentUser()
+    }
+
     override suspend fun register(email: String, password: String, fullName: String, ward: String): SignedInUser {
         val httpResponse = client.post(url("/auth/register")) {
             contentType(ContentType.Application.Json)

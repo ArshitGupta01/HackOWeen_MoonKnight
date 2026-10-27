@@ -6,6 +6,8 @@ import com.example.theekhai.domain.model.*
 
 interface NativeCivicRepository {
     suspend fun signIn(email: String, password: String): SignedInUser
+    suspend fun requestLoginCode(email: String, password: String? = null): com.example.theekhai.contract.RequestLoginCodeResponseDto
+    suspend fun verifyLoginCode(email: String, code: String): SignedInUser
     suspend fun instantSignIn(email: String): SignedInUser
     suspend fun getDummyUsers(): List<com.example.theekhai.contract.DummyUserCredentialDto>
     suspend fun getLeaderboard(roleFilter: String = "ALL"): com.example.theekhai.contract.LeaderboardResponseDto

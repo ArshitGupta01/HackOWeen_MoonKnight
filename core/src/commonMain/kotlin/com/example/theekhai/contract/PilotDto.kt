@@ -12,7 +12,22 @@ import kotlinx.serialization.Serializable
 @Serializable data class CasePageDto(val items: List<CaseDto>, val total: Int, val offset: Int)
 @Serializable data class IdentityDto(val id: String, val role: String, val department: String?, val csrf: String? = null, val email: String = "", val fullName: String = "", val organization: String = "", val ward: String = "Ward 1", val preferredLanguage: String = "en")
 @Serializable data class AuthConfigDto(val configured: Boolean, val supabaseUrl: String, val publishableKey: String)
-@Serializable data class LoginDto(val email: String, val password: String)
+@Serializable data class LoginDto(val email: String, val password: String = "", val code: String? = null)
+@Serializable data class RequestLoginCodeDto(val email: String, val password: String? = null)
+@Serializable data class RequestLoginCodeResponseDto(
+    val status: String,
+    val email: String,
+    val message: String,
+    val expiresInSeconds: Int = 600,
+    val devCode: String? = null
+)
+@Serializable data class VerifyLoginCodeDto(val email: String, val code: String)
+@Serializable data class VerifyLoginCodeResponseDto(
+    val status: String,
+    val accessToken: String,
+    val email: String,
+    val message: String
+)
 @Serializable data class RegisterDto(val email: String, val password: String, val fullName: String, val organization: String = "Citizen Resident", val ward: String = "Ward 1", val preferredLanguage: String = "en")
 @Serializable data class RecoverPasswordDto(val email: String)
 @Serializable data class ProfileDto(val userId: String = "", val email: String = "", val fullName: String, val organization: String = "", val role: String = "CITIZEN", val department: String? = null, val ward: String = "Ward 1", val preferredLanguage: String = "en")

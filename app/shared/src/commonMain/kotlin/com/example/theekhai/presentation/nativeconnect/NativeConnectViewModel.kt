@@ -35,7 +35,10 @@ data class NativeConnectState(
     val emailDraft: com.example.theekhai.contract.EmailDraftDto? = null,
     val emailSendResult: com.example.theekhai.contract.SendEmailResponseDto? = null,
     val leaderboard: com.example.theekhai.contract.LeaderboardResponseDto? = null,
-    val dummyUsers: List<com.example.theekhai.contract.DummyUserCredentialDto> = emptyList()
+    val dummyUsers: List<com.example.theekhai.contract.DummyUserCredentialDto> = emptyList(),
+    val loginCodeSent: Boolean = false,
+    val pendingLoginEmail: String? = null,
+    val loginDevCode: String? = null
 )
 
 class NativeConnectViewModel(
@@ -50,6 +53,35 @@ class NativeConnectViewModel(
     fun signIn(email: String, password: String) = runRequest {
         val user = signInUseCase(email, password)
         _state.update { it.copy(user = user, message = "Signed in successfully.") }
+    }
+
+    fun requestLoginCode(email: String, password: String? = null) = runRequest {
+        val res = backend.requestLoginCode(email, password)
+        _state.update {
+            it.copy(
+                loginCodeSent = true,
+                pendingLoginEmail = res.email,
+                loginDevCode = res.devCode,
+                message = res.message
+            )
+        }
+    }
+
+    fun verifyLoginCode(email: String, code: String) = runRequest {
+        val user = backend.verifyLoginCode(email, code)
+        _state.update {
+            it.copy(
+                user = user,
+                loginCodeSent = false,
+                pendingLoginEmail = null,
+                loginDevCode = null,
+                message = "Signed in successfully with verified email."
+            )
+        }
+    }
+
+    fun resetLoginStep() {
+        _state.update { it.copy(loginCodeSent = false, pendingLoginEmail = null, loginDevCode = null) }
     }
 
     fun register(email: String, password: String, fullName: String, ward: String) = runRequest {

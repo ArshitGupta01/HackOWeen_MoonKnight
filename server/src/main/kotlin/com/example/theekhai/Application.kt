@@ -63,9 +63,9 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     val staff = EnvConfig.get("THEEKHAI_STAFF").split(';').filter { it.isNotBlank() }.associate { entry ->
         val parts = entry.split('|'); require(parts.size >= 2); parts[0] to (Role.valueOf(parts[1]) to parts.getOrNull(2))
     }
-    val auth = SupabaseJwtAuth(http, EnvConfig.get("SUPABASE_URL"), EnvConfig.get("SUPABASE_PUBLISHABLE_KEY"), staff, database)
-    val legal = com.example.theekhai.legal.LegalService(database, http)
     val gmail = com.example.theekhai.mail.GmailService(http)
+    val auth = SupabaseJwtAuth(http, EnvConfig.get("SUPABASE_URL"), EnvConfig.get("SUPABASE_PUBLISHABLE_KEY"), staff, database, gmail)
+    val legal = com.example.theekhai.legal.LegalService(database, http)
     val cookieSecure = EnvConfig.get("THEEKHAI_COOKIE_SECURE", "false") != "false"
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     scope.launch { while(isActive) { try { synchronized(workflow) { workflow.checkDeadlines() } } catch (e: Exception) { if (e is CancellationException) throw e; log.error("Deadline worker failed: {}",e.javaClass.simpleName) }; delay(60_000) } }
@@ -188,6 +188,23 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
         }
         get("/api/v1/providers") { safe(call) { call.respond(legal.providerStatus(auth.config().configured)) } }
         get("/api/v1/auth/config") { safe(call) { call.respond(auth.config()) } }
+        post("/api/v1/auth/login/request-code") { safe(call) {
+            val origin = call.request.header(HttpHeaders.Origin)
+            if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN", "Origin is not allowed.")
+            val req = call.receive<RequestLoginCodeDto>()
+            val res = auth.requestLoginCode(req)
+            call.respond(res)
+        } }
+        post("/api/v1/auth/login/verify-code") { safe(call) {
+            val origin = call.request.header(HttpHeaders.Origin)
+            if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN", "Origin is not allowed.")
+            val req = call.receive<VerifyLoginCodeDto>()
+            val (id, session) = auth.verifyLoginCode(req)
+            call.response.cookies.append(
+                Cookie("theekhai_session", id, httpOnly = true, secure = cookieSecure, path = "/", extensions = mapOf("SameSite" to "Lax"))
+            )
+            call.respond(mapOf("status" to "signed_in", "accessToken" to session.token, "email" to req.email))
+        } }
         post("/api/v1/auth/login") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)
             if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")

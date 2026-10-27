@@ -6,7 +6,9 @@ The Ktor API is JSON at `/api/v1`, defined by `:core`'s `PilotDto.kt` and mounte
 
 - `GET /api/v1/providers` -> `ProviderStatusDto` (`supabaseConfigured`, `tinyFishConfigured`, `tavilyConfigured`, `openRouterConfigured`, `sarvamConfigured`, `groqConfigured`).
 - `GET /api/v1/auth/config` -> `AuthConfigDto` (`supabaseUrl`, `publishableKey`, `configured`).
-- `POST /api/v1/auth/login` -> Authenticates via Supabase `/auth/v1/token?grant_type=password`, resolves role/profile from `public.profiles`, sets an `HttpOnly` cookie (`theekhai_session`), and returns `accessToken` for Bearer fallback.
+- `POST /api/v1/auth/login` -> Authenticates via Supabase `/auth/v1/token?grant_type=password` or verified one-time email code, resolves role/profile from `public.profiles`, sets an `HttpOnly` cookie (`theekhai_session`), and returns `accessToken` for Bearer fallback.
+- `POST /api/v1/auth/login/request-code` -> Dispatches a secure 6-digit one-time login verification code to the specified email via Gmail API (`GmailService`, sender: `arshitgupta34@gmail.com`) and Supabase Auth OTP (`/auth/v1/otp`), valid for 10 minutes. Returns `RequestLoginCodeResponseDto`.
+- `POST /api/v1/auth/login/verify-code` -> Verifies the 6-digit code against pending verifications / Supabase OTP, creates an authenticated session with `theekhai_session` HttpOnly cookie and Bearer token, and returns `{ status: "signed_in", accessToken: "..." }`.
 - `POST /api/v1/auth/register` -> Registers a citizen account via Supabase `/auth/v1/signup`, auto-provisions `public.profiles` (including `organization`, `ward`, `preferredLanguage`), and sets `theekhai_session`.
 - `POST /api/v1/auth/recover` -> Triggers a Supabase password reset email via `/auth/v1/recover`.
 - `GET /api/v1/auth/me` -> Returns `IdentityDto` (`id`, `role`, `department`, `csrf`, `email`, `fullName`, `organization`, `ward`, `preferredLanguage`).
