@@ -116,14 +116,14 @@ fun FieldWorkerScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "MULTILINGUAL VOICE GRIEVANCE INTAKE",
+                            text = "VOICE GRIEVANCE INTAKE",
                             color = Color(0xFF38BDF8),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Record in Hindi, Telugu, Tamil, Marathi or English. Powered by Sarvam & Groq Whisper.",
+                            text = "Record in your preferred language (Hindi, Telugu, Tamil, Marathi, Bengali, or English).",
                             color = Color(0xFF94A3B8),
                             fontSize = 12.sp
                         )
