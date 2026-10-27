@@ -21,3 +21,5 @@ import kotlinx.serialization.Serializable
 @Serializable data class CreateMonitorDto(val name: String, val monitorType: String = "fetch", val target: String, val jurisdiction: String = "CENTRAL", val language: String = "en", val scheduleCron: String = "0 0 * * *")
 @Serializable data class LegalMonitorDto(val id: String, val remoteMonitorId: String?, val name: String, val monitorType: String, val target: String, val jurisdiction: String, val language: String, val scheduleCron: String, val status: String, val lastCheckedAt: Long?, val lastStatus: String?)
 @Serializable data class MonitorRunResultDto(val monitor: LegalMonitorDto, val queuedSources: List<LegalSourceDto>, val providerMode: String)
+@Serializable data class TranscribeRequestDto(val audioBase64: String, val mimeType: String = "audio/webm")
+@Serializable data class TranscribeResponseDto(val text: String)

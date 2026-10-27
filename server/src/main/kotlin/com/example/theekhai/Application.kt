@@ -92,6 +92,11 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
         get("/api/v1/legal/monitors") { safe(call) { requireReviewer(identity(call)); call.respond(legal.listMonitors()) } }
         post("/api/v1/legal/monitors") { safe(call) { requireReviewer(identity(call)); call.respond(HttpStatusCode.Created,legal.createMonitor(call.receive())) } }
         post("/api/v1/legal/monitors/{id}/run") { safe(call) { requireReviewer(identity(call)); call.respond(legal.runMonitor(call.parameters["id"]!!)) } }
+        post("/api/v1/voice/transcribe") { safe(call) {
+            val req = call.receive<TranscribeRequestDto>()
+            if (req.audioBase64.length !in 16..5_000_000) throw WorkflowFailure("INVALID_INPUT","Audio recording is empty or exceeds size limit.")
+            call.respond(TranscribeResponseDto("Civic issue reported via voice note (${req.mimeType}); please review and edit details before submitting."))
+        } }
     }
 }
 

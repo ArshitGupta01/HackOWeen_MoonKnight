@@ -6,7 +6,7 @@ Last reviewed: 2026-10-27
 
 Read this guide before changing the project. Maintain a clean repository and Clean Architecture throughout development. Update this file in the same change when architecture, module ownership, setup, dependencies, validation, or established decisions change. Record decisions and current facts, not a transcript or per-edit log. Preserve user changes and keep work scoped.
 
-Current user instruction: implement the accepted English/Hindi civic pilot, common Ktor backend, and legal reference & source monitoring powered by TinyFish (Agent Mode and Monitor Mode), Tavily discovery/fallback, and deterministic local approved-source backup fallback (`SOURCES_ONLY`), with no local LLM container. Commit verified increments on `codex/theekhai-project-guides`; retain Mohit's history. See `docs/IMPLEMENTATION.md` for current verification and remaining release gates.
+Current user instruction: implement the accepted English/Hindi civic pilot, common Ktor backend, and legal reference & source monitoring powered by TinyFish (Agent Mode and Monitor Mode), Tavily discovery/fallback, and deterministic local approved-source backup fallback (`SOURCES_ONLY`), with no local LLM container. Commit verified increments on the unified `main` branch; retain Mohit's history. See `docs/IMPLEMENTATION.md` for current verification and remaining release gates.
 
 ## Current implementation
 
