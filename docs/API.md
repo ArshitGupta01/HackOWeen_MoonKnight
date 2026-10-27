@@ -2,12 +2,12 @@
 
 The Ktor API is JSON at `/api/v1`, defined by `:core`'s `PilotDto.kt` and mounted in `server/src/main/kotlin/com/example/theekhai/Application.kt`.
 
+`GET /health` returns only basic service health (`status`, `version`). Provider configuration and connectivity are server-side details.
+
 ## Authentication, Profile & Saved Sources (Supabase `TheekHai` + RLS)
 
-- `GET /api/v1/providers` -> `ProviderStatusDto` (`supabaseConfigured`, `tinyFishConfigured`, `tavilyConfigured`, `openRouterConfigured`).
-- `GET /api/v1/auth/config` -> `AuthConfigDto` (`supabaseUrl`, `publishableKey`, `configured`).
-- `POST /api/v1/auth/login` -> Authenticates via Supabase `/auth/v1/token?grant_type=password`, resolves role/profile from `public.profiles`, sets an `HttpOnly` cookie (`theekhai_session`), and returns `accessToken` for Bearer fallback.
-- `POST /api/v1/auth/register` -> Registers a citizen account via Supabase `/auth/v1/signup`, auto-provisions `public.profiles` (including `organization`, `ward`, `preferredLanguage`), and sets `theekhai_session`.
+- `POST /api/v1/auth/login` -> Authenticates, resolves the role/profile, and sets an `HttpOnly` cookie (`theekhai_session`) for browser sessions. Native clients without an `Origin` receive an `accessToken` for their in-memory Bearer session.
+- `POST /api/v1/auth/register` -> Registers a citizen account, provisions the profile, and sets `theekhai_session`. Browser sessions receive only the cookie; native clients receive an `accessToken` for their in-memory Bearer session.
 - `POST /api/v1/auth/recover` -> Triggers a Supabase password reset email via `/auth/v1/recover`.
 - `GET /api/v1/auth/me` -> Returns `IdentityDto` (`id`, `role`, `department`, `csrf`, `email`, `fullName`, `organization`, `ward`, `preferredLanguage`).
 - `POST /api/v1/auth/logout` -> Invalidates the server session and clears `theekhai_session` (requires `X-CSRF-Token`).

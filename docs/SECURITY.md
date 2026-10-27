@@ -15,6 +15,7 @@ This document adapts the user's security reference to TheekHai. Before public de
 
 - Validate payload type, length, ranges, enum values and unexpected fields in Ktor. Use SQLDelight-bound parameters; never concatenate user data into SQL or shell commands. Guard outbound URLs against SSRF and allowlist official service origins (`LegalService.allowedHosts`).
 - Keep server-only credentials, TinyFish/Tavily API keys, and DB paths out of browser bundles and Git. `.env` is gitignored and `.env.example` provides variable names and safe placeholders.
+- Do not publish provider configuration or connectivity flags through public UI or health routes; `/health` exposes service health only.
 - Production uses HTTPS (`THEEKHAI_COOKIE_SECURE=true`), trusted-origin CORS (`THEEKHAI_ALLOWED_ORIGINS`), restrictive cookie settings, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`, and sanitized errors (`ApiErrorDto`).
 
 ## Final verification

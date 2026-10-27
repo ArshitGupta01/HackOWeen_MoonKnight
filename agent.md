@@ -29,7 +29,7 @@ The project-specific [security](docs/SECURITY.md), [code style](docs/CODE_STYLE.
 
 [Legal channels and integration references](docs/LEGAL_AND_INTEGRATIONS.md) records Haryana AAS as the first government integration to investigate and eCourts as an authorized judicial filing channel requiring appropriate legal review. Internal SLA escalation is separate from an official appeal or court filing.
 
-TinyFish (Agent Mode `/v1/automation/run` and Monitor Mode `/v1/monitors`), Tavily (`/search` restricted to allowlisted official domains), and OpenRouter (`/chat/completions`, default free router `openrouter/free`, configurable with `OPENROUTER_MODEL`) power official source discovery, scheduled change monitoring, AI complaint intake triage, voice-to-text refinement/transcription, and source-grounded legal/civic question answering behind the Ktor backend (`TINYFISH_API_KEY`, `TAVILY_API_KEY`, `OPENROUTER_API_KEY`). Geotagging across Web, Android, and Desktop uses `GET /api/v1/geo/reverse` (OpenStreetMap Nominatim + Ward 4 geospatial landmark index) alongside an interactive Ward 4 map pin picker and KMP `expect`/`actual` `PlatformCapabilities`. Local LLM inference (`llama.cpp` / `Qwen3`) has been removed; when external providers are unavailable or ungrounded, `LegalService` falls back deterministically to approved local SQLite source excerpts (`SOURCES_ONLY`) and `LOCAL_RULE_FALLBACK`. Changed or newly discovered sources always enter the `PENDING` review queue rather than overwriting `APPROVED` guidance.
+TinyFish (Agent Mode `/v1/automation/run` and Monitor Mode `/v1/monitors`), Tavily (`/search` restricted to allowlisted official domains), and OpenRouter (`/chat/completions`, default free router `openrouter/free`, configurable with `OPENROUTER_MODEL`) power official source discovery, scheduled change monitoring, AI complaint intake triage, voice-to-text refinement/transcription, and source-grounded legal/civic question answering behind the Ktor backend (`TINYFISH_API_KEY`, `TAVILY_API_KEY`, `OPENROUTER_API_KEY`). Provider credentials and connectivity details stay server-side; the public health endpoint reports service health only. Geotagging across Web, Android, and Desktop uses `GET /api/v1/geo/reverse` (OpenStreetMap Nominatim + Ward 4 geospatial landmark index) alongside an interactive Ward 4 map pin picker and KMP `expect`/`actual` `PlatformCapabilities`. Local LLM inference (`llama.cpp` / `Qwen3`) has been removed; when external providers are unavailable or ungrounded, `LegalService` falls back deterministically to approved local SQLite source excerpts (`SOURCES_ONLY`) and `LOCAL_RULE_FALLBACK`. Changed or newly discovered sources always enter the `PENDING` review queue rather than overwriting `APPROVED` guidance.
 
 ## Required module boundaries
 
@@ -76,6 +76,7 @@ Use `.\gradlew.bat` on Windows or `./gradlew` on Unix, followed by the appropria
 | Shared JVM tests | `:app:shared:jvmTest` |
 | Server tests | `:server:test` |
 | Web build | `cd web && npm run build` |
+| Ngrok unified tunnel (Web + API) | `.\start-ngrok.ps1` |
 
 ## Decisions and remaining gaps
 

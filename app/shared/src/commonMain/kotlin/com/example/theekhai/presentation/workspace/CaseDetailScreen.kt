@@ -96,7 +96,7 @@ fun CaseDetailScreen(caseId: String) {
         mutableStateOf(
             listOf(
                 CaseTimelineEvent("COMPLAINT_FILED", "Sample timeline event — illustrative only.", "Yesterday 14:20"),
-                CaseTimelineEvent("AI_TRIAGED", "OpenRouter triage preview — illustrative only.", "Yesterday 14:21"),
+                CaseTimelineEvent("AI_TRIAGED", "AI triage preview — illustrative only.", "Yesterday 14:21"),
                 CaseTimelineEvent("WORK_ORDER_ASSIGNED", "Dispatched to Sector 14 electrical maintenance crew.", "Yesterday 15:00"),
                 CaseTimelineEvent("TASK_COMPLETED", "Task 'Inspect line voltage' completed by technician.", "Today 09:30")
             )

@@ -107,7 +107,7 @@ class CommandCenterViewModel(
 
     fun triggerAiTriage(complaintId: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isActionInProgress = true, actionMessage = "Running OpenRouter triage and duplicate checks...") }
+            _uiState.update { it.copy(isActionInProgress = true, actionMessage = "Reviewing the report and checking for similar cases...") }
             val result = triageComplaintUseCase(complaintId)
             result.onSuccess { triage ->
                 _uiState.update {
@@ -127,13 +127,13 @@ class CommandCenterViewModel(
 
     fun triggerTinyFishVerification(complaintId: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isActionInProgress = true, actionMessage = "Deploying TinyFish autonomous web verification agent...") }
+            _uiState.update { it.copy(isActionInProgress = true, actionMessage = "Checking the resolution against available evidence...") }
             val result = verifyResolutionUseCase(complaintId)
             result.onSuccess { verif ->
                 val msg = if (verif.verified && !verif.contradictionDetected) {
-                    "TinyFish Verified Resolution on Municipal Portal!"
+                    "Resolution verified against the available evidence."
                 } else {
-                    "Contradiction Detected by TinyFish! Complaint auto-reopened & escalated."
+                    "Conflicting evidence found. The case was reopened for review."
                 }
                 _uiState.update { it.copy(isActionInProgress = false, actionMessage = msg) }
                 loadAuditLogs(complaintId)

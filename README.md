@@ -120,8 +120,7 @@ Connected to live Supabase project **`TheekHai` (`ffmcurazxvygsifbglwy`)** with 
 
 | Method & Route | Description |
 | --- | --- |
-| `GET /health` | Server health and live configuration status (`supabaseConfigured`, `tinyFishConfigured`, `tavilyConfigured`, `openRouterConfigured`) |
-| `GET /api/v1/providers` | Returns `ProviderStatusDto` for UI integration badges |
+| `GET /health` | Basic server health (`status`, `version`) |
 | `POST /api/v1/auth/login` | Authenticates with Supabase Auth, sets `HttpOnly` session cookie (`theekhai_session`), and returns `accessToken` fallback |
 | `POST /api/v1/auth/register` | Registers a citizen account in Supabase Auth and provisions `public.profiles` |
 | `POST /api/v1/auth/recover` | Sends password recovery email via Supabase Auth |

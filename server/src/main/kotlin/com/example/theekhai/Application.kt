@@ -38,10 +38,12 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
         if (origin == null) return true
         if (origin in allowedOrigins) return true
         val uri = runCatching { java.net.URI(origin) }.getOrNull() ?: return false
-        return uri.scheme in listOf("http", "https") && uri.host in listOf("localhost", "127.0.0.1")
+        val host = uri.host?.lowercase() ?: return false
+        return uri.scheme in listOf("http", "https") && (host in listOf("localhost", "127.0.0.1") || host.endsWith(".ngrok-free.app") || host.endsWith(".ngrok-free.dev") || host.endsWith(".ngrok.app") || host.endsWith(".ngrok.io"))
     }
     install(CORS) {
         allowedOrigins.forEach { val uri = java.net.URI(it); require(uri.scheme in listOf("http","https") && uri.host != null); allowHost(uri.authority, schemes = listOf(uri.scheme)) }
+        allowOrigins { origin -> isAllowedOrigin(origin) }
         allowHeader(HttpHeaders.ContentType); allowHeader(HttpHeaders.Authorization); allowHeader("X-CSRF-Token"); allowHeader("Idempotency-Key")
         allowMethod(HttpMethod.Post); allowMethod(HttpMethod.Delete); allowCredentials = true
     }
@@ -64,34 +66,20 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
     suspend fun identity(call: ApplicationCall): Actor = testIdentity?.invoke(call) ?: auth.authenticate(call)
     routing {
         get("/") { call.respondText("THEEKHAI Smart Cities Backend Server") }
-        get("/health") {
-            val ps = legal.providerStatus(auth.config().configured)
-            call.respond(
-                mapOf(
-                    "status" to "HEALTHY",
-                    "version" to "pilot",
-                    "supabaseConfigured" to ps.supabaseConfigured.toString(),
-                    "tinyFishConfigured" to ps.tinyFishConfigured.toString(),
-                    "tavilyConfigured" to ps.tavilyConfigured.toString(),
-                    "openRouterConfigured" to ps.openRouterConfigured.toString(),
-                )
-            )
-        }
-        get("/api/v1/providers") { safe(call) { call.respond(legal.providerStatus(auth.config().configured)) } }
-        get("/api/v1/auth/config") { safe(call) { call.respond(auth.config()) } }
+        get("/health") { call.respond(mapOf("status" to "HEALTHY", "version" to "pilot")) }
         post("/api/v1/auth/login") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)
             if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")
             val (id, session) = auth.login(call.receive<LoginDto>())
             call.response.cookies.append(Cookie("theekhai_session",id,httpOnly=true,secure=cookieSecure,path="/",extensions=mapOf("SameSite" to "Lax")))
-            call.respond(mapOf("status" to "signed_in", "accessToken" to session.token))
+            call.respond(if (origin != null) mapOf("status" to "signed_in") else mapOf("status" to "signed_in", "accessToken" to session.token))
         } }
         post("/api/v1/auth/register") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)
             if (!isAllowedOrigin(origin)) throw WorkflowFailure("FORBIDDEN","Origin is not allowed.")
             val (id, session) = auth.register(call.receive<RegisterDto>())
             call.response.cookies.append(Cookie("theekhai_session",id,httpOnly=true,secure=cookieSecure,path="/",extensions=mapOf("SameSite" to "Lax")))
-            call.respond(HttpStatusCode.Created, mapOf("status" to "registered", "accessToken" to session.token))
+            call.respond(HttpStatusCode.Created, if (origin != null) mapOf("status" to "registered") else mapOf("status" to "registered", "accessToken" to session.token))
         } }
         post("/api/v1/auth/recover") { safe(call) {
             val origin = call.request.header(HttpHeaders.Origin)

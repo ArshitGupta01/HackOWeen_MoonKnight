@@ -101,7 +101,7 @@ fun HomeScreen() {
                         PromiseStep(
                             number = "03",
                             title = "Independent verified closure",
-                            body = "TinyFish autonomous web agents and field workers corroborate fix photos before case is marked resolved.",
+                            body = "Staff attach repair evidence, and an independent reviewer checks it before a case is closed.",
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -120,7 +120,7 @@ fun HomeScreen() {
                         PromiseStep(
                             number = "03",
                             title = "Independent verified closure",
-                            body = "TinyFish autonomous web agents and field workers corroborate fix photos before case is marked resolved."
+                            body = "Staff attach repair evidence, and an independent reviewer checks it before a case is closed."
                         )
                     }
                 }
