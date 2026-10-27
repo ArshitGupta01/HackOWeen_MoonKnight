@@ -147,8 +147,8 @@ Connected to live Supabase project **`TheekHai` (`ffmcurazxvygsifbglwy`)** with 
 Create a `.env` file in the project root (automatically loaded by `EnvConfig` and ignored by Git):
 
 ```env
-SUPABASE_URL=https://ffmcurazxvygsifbglwy.supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_tmyZa6z3AUsdo82lh9HkRQ_Oet3XWay
+SUPABASE_URL= 
+SUPABASE_PUBLISHABLE_KEY=
 THEEKHAI_COOKIE_SECURE=false
 TINYFISH_API_KEY="your-tinyfish-api-key"
 OPENROUTER_API_KEY="your-openrouter-api-key"
