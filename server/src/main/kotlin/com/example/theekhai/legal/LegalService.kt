@@ -911,6 +911,252 @@ class LegalService(
     private fun sha256(content: String): String =
         MessageDigest.getInstance("SHA-256").digest(content.toByteArray()).joinToString("") { "%02x".format(it) }
 
+    /**
+     * Transcribes or refines a recorded civic voice note using OpenRouter multimodal audio / LLM refinement,
+     * with deterministic fallback when offline or when a raw browser speech transcript hint is provided.
+     */
+    suspend fun transcribeVoice(req: TranscribeRequestDto): TranscribeResponseDto {
+        val hint = req.transcriptHint.trim()
+        if (req.audioBase64.length !in 16..5_000_000 && hint.isBlank()) {
+            throw WorkflowFailure("INVALID_INPUT", "Audio recording is empty or exceeds size limit.")
+        }
+
+        val audioFormat = when {
+            req.mimeType.contains("wav", ignoreCase = true) -> "wav"
+            req.mimeType.contains("mp3", ignoreCase = true) || req.mimeType.contains("mpeg", ignoreCase = true) -> "mp3"
+            req.mimeType.contains("ogg", ignoreCase = true) -> "ogg"
+            else -> "webm"
+        }
+
+        if (openRouterApiKey.isNotBlank()) {
+            // 1. If we have a browser/device live speech hint, ask OpenRouter to clean it up and extract title & category
+            if (hint.isNotBlank()) {
+                val refined = runCatching {
+                    val response = client.post("$openRouterBaseUrl/chat/completions") {
+                        header(HttpHeaders.Authorization, "Bearer $openRouterApiKey")
+                        header("HTTP-Referer", "https://theekhai.in")
+                        header("X-Title", "TheekHai Civic Pilot")
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            buildJsonObject {
+                                put("model", openRouterModel)
+                                put("temperature", 0.1)
+                                put(
+                                    "messages",
+                                    JsonArray(
+                                        listOf(
+                                            buildJsonObject {
+                                                put("role", "system")
+                                                put(
+                                                    "content",
+                                                    "You are TheekHai's civic voice transcription assistant. Clean up the user's raw spoken grievance (preserving English or Hindi as requested) and return ONLY valid JSON with keys: text (cleaned 1-3 sentence description), suggestedTitle (short 4-8 word title), suggestedCategory (one of ROADS, WATER, WASTE, LIGHTING, OTHER)."
+                                                )
+                                            },
+                                            buildJsonObject {
+                                                put("role", "user")
+                                                put("content", "Language: ${req.language}\nRaw spoken transcript: $hint")
+                                            },
+                                        )
+                                    ),
+                                )
+                            }.toString()
+                        )
+                    }
+                    if (response.status.isSuccess()) {
+                        val content = json.parseToJsonElement(response.bodyAsText()).jsonObject["choices"]
+                            ?.let { it as? JsonArray }?.firstOrNull()?.jsonObject?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
+                        if (!content.isNullOrBlank()) {
+                            val cleanJson = content.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                            val parsed = runCatching { json.parseToJsonElement(cleanJson).jsonObject }.getOrNull()
+                            if (parsed != null) {
+                                val text = parsed["text"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: hint
+                                val title = parsed["suggestedTitle"]?.jsonPrimitive?.contentOrNull ?: ""
+                                val cat = parsed["suggestedCategory"]?.jsonPrimitive?.contentOrNull?.uppercase() ?: ""
+                                return TranscribeResponseDto(text, title, if (cat in setOf("ROADS", "WATER", "WASTE", "LIGHTING", "OTHER")) cat else "", "OPENROUTER_AI")
+                            }
+                        }
+                    }
+                    null
+                }.getOrNull()
+                if (refined != null) return refined
+            }
+
+            // 2. Try multimodal input_audio with OpenRouter (Gemini Flash supports audio input)
+            if (req.audioBase64.length >= 32) {
+                val multimodal = runCatching {
+                    val response = client.post("$openRouterBaseUrl/chat/completions") {
+                        header(HttpHeaders.Authorization, "Bearer $openRouterApiKey")
+                        header("HTTP-Referer", "https://theekhai.in")
+                        header("X-Title", "TheekHai Civic Pilot")
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            buildJsonObject {
+                                put("model", openRouterModel)
+                                put("temperature", 0.1)
+                                put(
+                                    "messages",
+                                    JsonArray(
+                                        listOf(
+                                            buildJsonObject {
+                                                put("role", "user")
+                                                put(
+                                                    "content",
+                                                    JsonArray(
+                                                        listOf(
+                                                            buildJsonObject {
+                                                                put("type", "text")
+                                                                put(
+                                                                    "text",
+                                                                    "Transcribe this civic issue voice recording (language: ${req.language}). Return ONLY valid JSON with keys: text (exact transcription of the civic issue), suggestedTitle (short 4-8 word title), suggestedCategory (ROADS, WATER, WASTE, LIGHTING, or OTHER)."
+                                                                )
+                                                            },
+                                                            buildJsonObject {
+                                                                put("type", "input_audio")
+                                                                put(
+                                                                    "input_audio",
+                                                                    buildJsonObject {
+                                                                        put("data", req.audioBase64)
+                                                                        put("format", audioFormat)
+                                                                    },
+                                                                )
+                                                            },
+                                                        )
+                                                    ),
+                                                )
+                                            }
+                                        )
+                                    ),
+                                )
+                            }.toString()
+                        )
+                    }
+                    if (response.status.isSuccess()) {
+                        val content = json.parseToJsonElement(response.bodyAsText()).jsonObject["choices"]
+                            ?.let { it as? JsonArray }?.firstOrNull()?.jsonObject?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
+                        if (!content.isNullOrBlank()) {
+                            val cleanJson = content.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                            val parsed = runCatching { json.parseToJsonElement(cleanJson).jsonObject }.getOrNull()
+                            if (parsed != null) {
+                                val text = parsed["text"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                                val title = parsed["suggestedTitle"]?.jsonPrimitive?.contentOrNull ?: ""
+                                val cat = parsed["suggestedCategory"]?.jsonPrimitive?.contentOrNull?.uppercase() ?: ""
+                                if (text != null) {
+                                    return TranscribeResponseDto(text, title, if (cat in setOf("ROADS", "WATER", "WASTE", "LIGHTING", "OTHER")) cat else "", "OPENROUTER_AUDIO")
+                                }
+                            } else if (content.length in 10..2000) {
+                                return TranscribeResponseDto(content.trim(), "", "", "OPENROUTER_AUDIO")
+                            }
+                        }
+                    }
+                    null
+                }.getOrNull()
+                if (multimodal != null) return multimodal
+            }
+        }
+
+        // 3. Deterministic fallback using live speech hint or localized voice template
+        if (hint.isNotBlank()) {
+            return TranscribeResponseDto(
+                text = hint,
+                suggestedTitle = hint.split(Regex("\\s+")).take(7).joinToString(" ").take(80),
+                suggestedCategory = "",
+                provider = "BROWSER_SPEECH_API",
+            )
+        }
+        val fallbackText = if (req.language == "hi") {
+            "वार्ड 4 में नागरिक समस्या के संबंध में वॉयस नोट दर्ज किया गया (${req.mimeType})। कृपया भेजने से पहले स्थान और विवरण की पुष्टि करें।"
+        } else {
+            "Voice note recorded (${req.mimeType}). Civic issue reported for municipal inspection in Ward 4; please review or add specific landmark details before submitting."
+        }
+        return TranscribeResponseDto(fallbackText, "", "", "VOICE_NOTE_FALLBACK")
+    }
+
+    /**
+     * Reverse-geocodes GPS coordinates into a human-readable street address, ward, and landmark.
+     * Uses OpenStreetMap Nominatim when reachable and falls back to Ward 4 geospatial zone mapping.
+     */
+    suspend fun reverseGeocode(lat: Double, lon: Double, lang: String = "en"): ReverseGeocodeResponseDto {
+        if (lat !in -90.0..90.0 || lon !in -180.0..180.0) {
+            throw WorkflowFailure("INVALID_INPUT", "Invalid latitude or longitude coordinates.")
+        }
+
+        // Known Ward 4 civic zones for instant high-precision landmark matching
+        val wardLandmark = nearestWardLandmark(lat, lon, lang)
+
+        val nominatimResult = runCatching {
+            val acceptLang = if (lang == "hi") "hi,en" else "en"
+            val response = client.get("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lon&zoom=18&addressdetails=1") {
+                header(HttpHeaders.UserAgent, "TheekHai-CivicPilot/1.0 (https://theekhai.in)")
+                header(HttpHeaders.AcceptLanguage, acceptLang)
+            }
+            if (response.status.isSuccess()) {
+                val obj = json.parseToJsonElement(response.bodyAsText()).jsonObject
+                val displayName = obj["display_name"]?.jsonPrimitive?.contentOrNull?.trim()
+                val addrObj = obj["address"] as? JsonObject
+                val road = addrObj?.get("road")?.jsonPrimitive?.contentOrNull
+                    ?: addrObj?.get("neighbourhood")?.jsonPrimitive?.contentOrNull
+                    ?: addrObj?.get("suburb")?.jsonPrimitive?.contentOrNull
+                val suburb = addrObj?.get("suburb")?.jsonPrimitive?.contentOrNull
+                    ?: addrObj?.get("city_district")?.jsonPrimitive?.contentOrNull
+                    ?: "Ward 4"
+                val city = addrObj?.get("city")?.jsonPrimitive?.contentOrNull
+                    ?: addrObj?.get("town")?.jsonPrimitive?.contentOrNull
+                    ?: addrObj?.get("state_district")?.jsonPrimitive?.contentOrNull
+                val conciseAddress = listOfNotNull(road, suburb, city).distinct().joinToString(", ").takeIf { it.length >= 5 }
+                    ?: displayName?.split(",")?.take(4)?.joinToString(",")?.trim()
+                if (!conciseAddress.isNullOrBlank()) {
+                    ReverseGeocodeResponseDto(
+                        latitude = lat,
+                        longitude = lon,
+                        address = conciseAddress,
+                        ward = suburb,
+                        landmark = wardLandmark.first,
+                        source = "NOMINATIM_OSM",
+                    )
+                } else null
+            } else null
+        }.getOrNull()
+
+        if (nominatimResult != null) return nominatimResult
+
+        return ReverseGeocodeResponseDto(
+            latitude = lat,
+            longitude = lon,
+            address = wardLandmark.second,
+            ward = "Ward 4",
+            landmark = wardLandmark.first,
+            source = "WARD_GEOSPATIAL_INDEX",
+        )
+    }
+
+    private fun nearestWardLandmark(lat: Double, lon: Double, lang: String): Pair<String, String> {
+        data class Zone(val lat: Double, val lon: Double, val nameEn: String, val nameHi: String, val addrEn: String, val addrHi: String)
+        val zones = listOf(
+            Zone(28.4595, 77.0266, "Ward 4 Primary School", "वार्ड 4 प्राथमिक विद्यालय", "Main Market Road near Ward 4 Primary School, Ward 4", "मुख्य बाज़ार रोड, वार्ड 4 प्राथमिक विद्यालय के पास"),
+            Zone(28.4612, 77.0289, "Central Community Park", "सेंट्रल कम्युनिटी पार्क", "5th Cross Road near Central Park East Gate, Ward 4", "5वां क्रॉस रोड, सेंट्रल पार्क ईस्ट गेट के पास, वार्ड 4"),
+            Zone(28.4680, 77.0310, "Sector 14 Rotary Crossing", "सेक्टर 14 रोटरी चौराहा", "12th Main Road Junction, Sector 14 Crossing, Ward 4", "12वां मेन रोड जंक्शन, सेक्टर 14 चौराहा, वार्ड 4"),
+            Zone(28.4645, 77.0342, "Sector 14 Main Market", "सेक्टर 14 मुख्य बाज़ार", "Sector 14 Main Market Lane, Commercial Hub, Ward 4", "सेक्टर 14 मुख्य बाज़ार लेन, वार्ड 4"),
+            Zone(28.4560, 77.0335, "Sector 14 Metro Station", "सेक्टर 14 मेट्रो स्टेशन", "Metro Link Avenue near Gate 2, Sector 14, Ward 4", "मेट्रो लिंक एवेन्यू, गेट 2 के पास, सेक्टर 14, वार्ड 4"),
+            Zone(28.4630, 77.0240, "Primary Health Center (PHC)", "प्राथमिक स्वास्थ्य केंद्र (PHC)", "West Colony Road near Primary Health Center, Ward 4", "वेस्ट कॉलोनी रोड, प्राथमिक स्वास्थ्य केंद्र के पास, वार्ड 4"),
+        )
+        val closest = zones.minByOrNull { z ->
+            val dLat = z.lat - lat
+            val dLon = z.lon - lon
+            dLat * dLat + dLon * dLon
+        } ?: zones.first()
+        val distSq = (closest.lat - lat) * (closest.lat - lat) + (closest.lon - lon) * (closest.lon - lon)
+        return if (distSq <= 0.02) {
+            if (lang == "hi") closest.nameHi to closest.addrHi else closest.nameEn to closest.addrEn
+        } else {
+            val coordStr = String.format(java.util.Locale.US, "%.5f° N, %.5f° E", lat, lon)
+            if (lang == "hi") {
+                "वार्ड 4 क्षेत्र ($coordStr)" to "चिह्नित जीपीएस स्थान ($coordStr), वार्ड 4"
+            } else {
+                "Pinned GPS Location ($coordStr)" to "Pinned GPS Location ($coordStr), Ward 4"
+            }
+        }
+    }
+
     private fun com.example.theekhai.data.db.LegalSource.dto() =
         LegalSourceDto(id, title, url, jurisdiction, language, content, hash, retrievedAt, status, supersedes)
 

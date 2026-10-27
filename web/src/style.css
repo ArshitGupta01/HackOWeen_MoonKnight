@@ -87,3 +87,31 @@
 :root[data-theme="dark"] .skip{background:#23614e}
 :root[data-theme="dark"] button:focus-visible,:root[data-theme="dark"] a:focus-visible,:root[data-theme="dark"] input:focus-visible,:root[data-theme="dark"] select:focus-visible,:root[data-theme="dark"] textarea:focus-visible{outline-color:#e9b66d}
 @media(max-width:850px){:root[data-theme="dark"] .sidebar{border-bottom-color:var(--line)}}
+
+/* Audio Mode, Geotagging & Civic Map Styles */
+.hidden{display:none!important}
+.audio-panel{flex-direction:column;border:1px solid #d5ddd0;border-radius:5px;transition:border-color .2s,background .2s}
+.audio-panel.recording{border-color:#c84b31;background:#fdf3ef}
+.audio-top-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.audio-player-wrap{width:100%;margin-top:4px}
+.audio-preview-player{width:100%;height:38px;border-radius:4px}
+.geo-section{margin-bottom:20px;display:flex;flex-direction:column;gap:10px}
+.geo-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.geo-badge{display:inline-flex;align-items:center;padding:7px 12px;border-radius:999px;background:#e5ecdf;border:1px solid #c3d1b8;color:var(--green);font-size:11px;font-weight:600}
+.map-picker-wrap{padding:14px;background:#eef1e8;border:1px solid #CFD7C7;border-radius:5px;display:flex;flex-direction:column;gap:10px}
+.map-picker-canvas{border:1px solid #c6d0be;border-radius:4px;overflow:hidden;cursor:crosshair;background:#eef2e8}
+.ward-picker-svg{display:block;width:100%;height:auto;max-height:260px}
+.geo-quick-zones{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.geo-zone-pill{padding:5px 10px;min-height:30px;background:var(--paper);border:1px solid #cbd3c4;border-radius:999px;font-size:11px}
+.geo-zone-pill:hover{border-color:var(--green);background:#e8ede2}
+.map-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.civic-map-shell{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,1fr);gap:28px;align-items:start}
+.civic-map-card{padding:18px}
+.civic-map-svg{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:5px;cursor:crosshair;margin-bottom:12px}
+.civic-map-detail h2{font-size:24px;margin:10px 0}
+:root[data-theme="dark"] .audio-panel.recording{background:#3a221d;border-color:#d96b52}
+:root[data-theme="dark"] .geo-badge{background:#26392d;border-color:#47634d;color:#bfe6c7}
+:root[data-theme="dark"] .map-picker-wrap{background:#222d27;border-color:#3a4a43}
+:root[data-theme="dark"] .geo-zone-pill{background:#1b2420;border-color:#45564c;color:var(--ink)}
+:root[data-theme="dark"] .geo-zone-pill:hover{background:#293a32;border-color:#72c3a5}
+@media(max-width:900px){.civic-map-shell{grid-template-columns:1fr}}

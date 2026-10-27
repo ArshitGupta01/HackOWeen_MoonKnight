@@ -156,9 +156,14 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
         post("/api/v1/legal/monitors") { safe(call) { requireReviewer(identity(call)); call.respond(HttpStatusCode.Created,legal.createMonitor(call.receive())) } }
         post("/api/v1/legal/monitors/{id}/run") { safe(call) { requireReviewer(identity(call)); call.respond(legal.runMonitor(call.parameters["id"]!!)) } }
         post("/api/v1/voice/transcribe") { safe(call) {
-            val req = call.receive<TranscribeRequestDto>()
-            if (req.audioBase64.length !in 16..5_000_000) throw WorkflowFailure("INVALID_INPUT","Audio recording is empty or exceeds size limit.")
-            call.respond(TranscribeResponseDto("Civic issue reported via voice note (${req.mimeType}); please review and edit details before submitting."))
+            val req = call.receive<TranscribeRequestDto>(); call.respond(legal.transcribeVoice(req))
+            // Voice transcription handled by LegalService.transcribeVoice
+            // Also expose GET /api/v1/geo/reverse below
+        } }
+        get("/api/v1/geo/reverse") { safe(call) {
+            val lat = call.request.queryParameters["lat"]?.toDoubleOrNull() ?: throw WorkflowFailure("INVALID_INPUT", "Missing or invalid 'lat' query parameter.")
+            val lon = call.request.queryParameters["lon"]?.toDoubleOrNull() ?: throw WorkflowFailure("INVALID_INPUT", "Missing or invalid 'lon' query parameter.")
+            call.respond(legal.reverseGeocode(lat, lon, call.request.queryParameters["lang"] ?: "en"))
         } }
     }
 }

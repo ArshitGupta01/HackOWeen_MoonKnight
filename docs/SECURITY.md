@@ -9,6 +9,7 @@ This document adapts the user's security reference to TheekHai. Before public de
 - `public.profiles` and `public.saved_sources` enforce PostgreSQL Row-Level Security (`(select auth.uid()) = user_id`) for `select`, `insert`, `update`, and `delete`. Ktor queries PostgREST using the authenticated user's Supabase JWT Bearer token so RLS is enforced on every query. SQLite has no RLS; Ktor enforces access before querying it.
 - Supabase Auth handles password storage, registration (`/api/v1/auth/register`), sign-in (`/api/v1/auth/login`), and password recovery (`/api/v1/auth/recover`).
 - Browser sessions avoid JavaScript-accessible token storage. Ktor issues an opaque `HttpOnly` cookie (`theekhai_session`, `SameSite=Strict`) and enforces `X-CSRF-Token` on state-changing requests (`POST`, `DELETE`). Sign-out (`POST /api/v1/auth/logout`) invalidates the server session and clears the cookie.
+- Native Android/Desktop clients use the API's Bearer-token path. The current native token holder is process-memory only and is lost on restart; do not persist it in plain preferences. Android cleartext is enabled only for debug emulator access to the local Ktor server and disabled in release manifests. Production clients must use HTTPS.
 
 ## Request and data protection
 

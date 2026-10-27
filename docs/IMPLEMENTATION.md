@@ -45,4 +45,12 @@ Connected live Supabase project `TheekHai` (`ffmcurazxvygsifbglwy`, `https://ffm
 - Android and Desktop Compose scaffolds now expose a dark-mode control while following the device theme by default; the browser theme toggle persists its override.
 - Removed false native success states for sign-in, signup, report submission, draft saving, voice capture, profile sync, and field evidence. Native preview data is empty or explicitly labeled as illustrative so it cannot be mistaken for a live resident case.
 - Verified: web production build and four Playwright checks; `:app:shared:jvmTest`, `:server:test`, Android debug assembly, and Desktop Kotlin compilation pass.
-- Remaining native gaps: Supabase session/auth wiring, actual report persistence, device media/location permissions and uploads, voice recording/transcription integration, profile/source sync, and live case detail loading. These screens now report that those actions are unavailable rather than inventing successful outcomes.
+- At that checkpoint, native sign-in and report submission were still unavailable. Checkpoint 5 records their connection; the remaining native gaps are listed there.
+
+## Checkpoint 5 — Native authentication and report API (2026-10-28)
+
+- Native sign-in and citizen registration now call the Ktor Supabase auth bridge. Native clients attach the returned Supabase access token as a Bearer token, so protected requests are verified by the server and the web cookie/CSRF path remains unchanged.
+- Native report submission calls `POST /api/v1/complaints`, preserves the explicit consent gate, sends an idempotency key, and displays the authoritative case tracking ID/status returned by Ktor.
+- Android debug builds permit local emulator HTTP only; release manifest disables cleartext. Desktop/Android default to the local backend addresses described in the platform data modules.
+- Verified Android debug assembly, shared JVM/Android compilation, desktop compilation, server compilation, and web production build.
+- Remaining native gaps: process-death session restoration/refresh, server-backed workspace and case details, profile/source sync, actual microphone capture and OpenRouter transcription, photo selection/private evidence upload, and runtime location permissions/reverse-geocoding. The current report API supports coordinates, but the native form does not yet capture or attach them.

@@ -12,7 +12,7 @@ Current user instruction: implement the accepted English/Hindi civic pilot, comm
 
 Repository: https://github.com/ArshitGupta01/HackOWeen_MoonKnight
 
-The project is Kotlin Multiplatform + Compose Multiplatform, Clean Architecture + MVVM, Koin, SQLDelight, a Ktor backend (`:server`), and a Vite + TypeScript bilingual (`en`/`hi`) web frontend (`web/`). Android, iOS, and Desktop JVM source sets exist.
+The project is Kotlin Multiplatform + Compose Multiplatform, Clean Architecture + MVVM, Koin, SQLDelight, a Ktor backend (`:server`), and a Vite + TypeScript bilingual (`en`/`hi`) web frontend (`web/`). Android, iOS, and Desktop JVM source sets exist. Native clients authenticate with Supabase through Ktor using a bearer token held in memory for the app process; native account creation/sign-in and citizen report submission use the common `/api/v1` contract.
 
 The connected Supabase project is named `TheekHai` (project ref `ffmcurazxvygsifbglwy`, active in `ap-northeast-1`, URL `https://ffmcurazxvygsifbglwy.supabase.co`). Following the TenderLens architecture (`supabase/schema.sql`), Supabase provides:
 - Authentication (`/auth/v1/token`, `/auth/v1/signup`, `/auth/v1/recover`, `/auth/v1/user`) with 4 pre-confirmed shared pilot demo accounts (`citizen@theekhai.in`, `pwd@theekhai.in`, `reviewer@theekhai.in`, `admin@theekhai.in` — password `TheekHai@2026`) and an automatic confirmation trigger (`auto_confirm_pilot_user_trigger`) for newly registered pilot accounts.
@@ -29,7 +29,7 @@ The project-specific [security](docs/SECURITY.md), [code style](docs/CODE_STYLE.
 
 [Legal channels and integration references](docs/LEGAL_AND_INTEGRATIONS.md) records Haryana AAS as the first government integration to investigate and eCourts as an authorized judicial filing channel requiring appropriate legal review. Internal SLA escalation is separate from an official appeal or court filing.
 
-TinyFish (Agent Mode `/v1/automation/run` and Monitor Mode `/v1/monitors`), Tavily (`/search` restricted to allowlisted official domains), and OpenRouter (`/chat/completions` for source-grounded synthesis and civic complaint intake triage & duplicate detection via `POST /api/v1/complaints/triage`) power official source discovery, scheduled change monitoring, AI complaint intake triage, and source-grounded legal/civic question answering behind the Ktor backend (`TINYFISH_API_KEY`, `TAVILY_API_KEY`, `OPENROUTER_API_KEY`). Local LLM inference (`llama.cpp` / `Qwen3`) has been removed; when external providers are unavailable or ungrounded, `LegalService` falls back deterministically to approved local SQLite source excerpts (`SOURCES_ONLY`) and `LOCAL_RULE_FALLBACK`. Changed or newly discovered sources always enter the `PENDING` review queue rather than overwriting `APPROVED` guidance.
+TinyFish (Agent Mode `/v1/automation/run` and Monitor Mode `/v1/monitors`), Tavily (`/search` restricted to allowlisted official domains), and OpenRouter (`/chat/completions` for source-grounded synthesis, civic complaint intake triage & duplicate detection via `POST /api/v1/complaints/triage`, and voice grievance transcription/refinement via `POST /api/v1/voice/transcribe`) power official source discovery, scheduled change monitoring, AI complaint intake triage, voice-to-text structuring, and source-grounded legal/civic question answering behind the Ktor backend (`TINYFISH_API_KEY`, `TAVILY_API_KEY`, `OPENROUTER_API_KEY`). Geotagging across Web, Android, and Desktop uses `GET /api/v1/geo/reverse` (OpenStreetMap Nominatim + Ward 4 geospatial landmark index) alongside an interactive Ward 4 map pin picker and KMP `expect`/`actual` `PlatformCapabilities`. Local LLM inference (`llama.cpp` / `Qwen3`) has been removed; when external providers are unavailable or ungrounded, `LegalService` falls back deterministically to approved local SQLite source excerpts (`SOURCES_ONLY`) and `LOCAL_RULE_FALLBACK`. Changed or newly discovered sources always enter the `PENDING` review queue rather than overwriting `APPROVED` guidance.
 
 ## Required module boundaries
 
@@ -37,7 +37,7 @@ TinyFish (Agent Mode `/v1/automation/run` and Monitor Mode `/v1/monitors`), Tavi
 | --- | --- | --- |
 | `:core` | Serializable DTOs, API route constants, shared contract utilities | None; serialization is allowed |
 | `:domain` | Entities, repository ports, use cases | None; coroutines are allowed |
-| `:data` | Repository implementations, SQLDelight, Ktor client, data DI modules | `:domain`, `:core` |
+| `:data` | Repository implementations, SQLDelight, Ktor client, native API/session adapters, data DI modules | `:domain`, `:core` |
 | `:app:shared` | Compose presentation, MVVM, client Koin composition root | `:domain`, `:core`, `:data` only from `di/` |
 | Platform apps | Entry points, packaging, platform wiring | `:app:shared` |
 | `:server` | Ktor HTTP layer, server DI and infrastructure wiring | `:domain`, `:data`, `:core` |

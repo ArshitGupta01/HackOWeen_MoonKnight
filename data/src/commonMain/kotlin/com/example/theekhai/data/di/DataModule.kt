@@ -5,6 +5,7 @@ import com.example.theekhai.data.db.AppDatabase
 import com.example.theekhai.data.local.ComplaintLocalDataSource
 import com.example.theekhai.data.remote.ComplaintRemoteDataSource
 import com.example.theekhai.data.remote.KtorComplaintRemoteDataSource
+import com.example.theekhai.data.remote.NativeCivicRemoteRepository
 import com.example.theekhai.data.remote.OpenRouterApiClient
 import com.example.theekhai.data.remote.SarvamApiClient
 import com.example.theekhai.data.remote.TinyFishApiClient
@@ -13,6 +14,8 @@ import com.example.theekhai.data.repository.AuditRepositoryImpl
 import com.example.theekhai.data.repository.ComplaintRepositoryImpl
 import com.example.theekhai.data.repository.VerificationRepositoryImpl
 import com.example.theekhai.data.supabase.SupabaseConfig
+import com.example.theekhai.data.session.NativeSessionToken
+import com.example.theekhai.domain.repository.NativeCivicRepository
 import com.example.theekhai.domain.repository.AuditRepository
 import com.example.theekhai.domain.repository.ComplaintRepository
 import com.example.theekhai.domain.repository.VerificationRepository
@@ -35,11 +38,15 @@ val localDataModule: Module = module {
 }
 
 val remoteDataModule: Module = module {
-    single { createHttpClient() }
+    single { NativeSessionToken() }
+    single { createHttpClient { get<NativeSessionToken>().value } }
     single<ComplaintRemoteDataSource> {
         KtorComplaintRemoteDataSource(client = get(), baseUrl = get<String>(DataQualifiers.BackendBaseUrl))
     }
     single { SupabaseConfig() }
+    single<NativeCivicRepository> {
+        NativeCivicRemoteRepository(get(), get<String>(DataQualifiers.BackendBaseUrl), get())
+    }
     single<TriageAiClient> { OpenRouterApiClient(client = get(), backendBaseUrl = get<String>(DataQualifiers.BackendBaseUrl)) }
     single<VoiceSpeechToTextClient> { SarvamApiClient() }
     single { TinyFishApiClient() }

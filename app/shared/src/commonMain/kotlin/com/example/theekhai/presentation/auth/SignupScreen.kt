@@ -21,12 +21,20 @@ import com.example.theekhai.navigation.Route
 import com.example.theekhai.ui.components.*
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
+import com.example.theekhai.presentation.nativeconnect.NativeConnectViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SignupScreen() {
+    val connectViewModel = koinViewModel<NativeConnectViewModel>()
+    val connectState by connectViewModel.state.collectAsState()
     val navigator = LocalNavigator.current
     val ext = LocalTheekHaiColors.current
     val scrollState = rememberScrollState()
+
+    LaunchedEffect(connectState.user) {
+        if (connectState.user != null) navigator.resetTo(Route.Workspace)
+    }
 
     var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -95,8 +103,8 @@ fun SignupScreen() {
                             passwordStrength = passwordStrength,
                             consentChecked = consentChecked,
                             onConsentChange = { consentChecked = it },
-                            isLoading = isLoading,
-                            errorMessage = errorMessage,
+                            isLoading = connectState.isLoading,
+                            errorMessage = connectState.error ?: errorMessage,
                             onSubmit = {
                                 if (password != confirmPassword) {
                                     errorMessage = "Passwords do not match."
@@ -106,7 +114,7 @@ fun SignupScreen() {
                                     errorMessage = "Please accept the privacy consent to proceed."
                                     return@SignupForm
                                 }
-                                errorMessage = "Account creation is not connected in this native preview. No account was created."
+                                connectViewModel.register(email, password, fullName, ward)
                             },
                             onNavigateLogin = { navigator.navigateTo(Route.Login) },
                             ext = ext
@@ -138,8 +146,8 @@ fun SignupScreen() {
                         passwordStrength = passwordStrength,
                         consentChecked = consentChecked,
                         onConsentChange = { consentChecked = it },
-                        isLoading = isLoading,
-                        errorMessage = errorMessage,
+                        isLoading = connectState.isLoading,
+                        errorMessage = connectState.error ?: errorMessage,
                         onSubmit = {
                             if (password != confirmPassword) {
                                 errorMessage = "Passwords do not match."
@@ -149,7 +157,7 @@ fun SignupScreen() {
                                 errorMessage = "Please accept the privacy consent to proceed."
                                 return@SignupForm
                             }
-                            errorMessage = "Account creation is not connected in this native preview. No account was created."
+                            connectViewModel.register(email, password, fullName, ward)
                         },
                         onNavigateLogin = { navigator.navigateTo(Route.Login) },
                         ext = ext

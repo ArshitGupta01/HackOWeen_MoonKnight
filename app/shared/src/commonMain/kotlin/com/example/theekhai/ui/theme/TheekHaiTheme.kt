@@ -61,12 +61,12 @@ object TheekHaiColors {
     val Rose = Color(0xFFF87171)
 
     // Dark mode overrides
-    val DarkBg = Color(0xFF0F172A)
-    val DarkSurface = Color(0xFF1E293B)
-    val DarkCard = Color(0xFF111827)
-    val DarkBorder = Color(0xFF334155)
-    val DarkMuted = Color(0xFF94A3B8)
-    val DarkText = Color(0xFFE2E8F0)
+    val DarkBg = Color(0xFF151C19)
+    val DarkSurface = Color(0xFF202A26)
+    val DarkCard = Color(0xFF1B2420)
+    val DarkBorder = Color(0xFF3A4A43)
+    val DarkMuted = Color(0xFFA9B8AD)
+    val DarkText = Color(0xFFE4ECE6)
 }
 
 @Immutable
@@ -159,16 +159,16 @@ fun TheekHaiTheme(
         TheekHaiExtendedColors(
             sidebarBg = TheekHaiColors.DarkCard,
             sidebarBorder = TheekHaiColors.DarkBorder,
-            navActive = TheekHaiColors.CyanLight,
+            navActive = Color(0xFF72C3A5),
             navText = TheekHaiColors.DarkMuted,
-            amber = Color(0xFFFBBF24),
+            amber = Color(0xFFE9B66D),
             line = TheekHaiColors.DarkBorder,
             muted = TheekHaiColors.DarkMuted,
             paper = TheekHaiColors.DarkSurface,
             ink = TheekHaiColors.DarkText,
-            green = TheekHaiColors.CyanLight,
-            greenLight = TheekHaiColors.Cyan,
-            greenSurface = Color(0xFF064E3B),
+            green = Color(0xFF72C3A5),
+            greenLight = Color(0xFF23614E),
+            greenSurface = Color(0xFF26392D),
             cardBg = TheekHaiColors.DarkSurface,
         )
     } else {

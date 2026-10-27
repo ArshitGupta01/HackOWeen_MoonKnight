@@ -33,6 +33,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        manifestPlaceholders["allowCleartext"] = "false"
     }
     packaging {
         resources {
@@ -40,7 +41,12 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // The emulator uses the local Ktor server at http://10.0.2.2:8080.
+            manifestPlaceholders["allowCleartext"] = "true"
+        }
         release {
+            manifestPlaceholders["allowCleartext"] = "false"
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

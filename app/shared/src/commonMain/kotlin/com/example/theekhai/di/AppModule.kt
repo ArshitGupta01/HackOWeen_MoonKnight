@@ -11,6 +11,10 @@ import com.example.theekhai.domain.usecase.TriageComplaintUseCase
 import com.example.theekhai.domain.usecase.VerifyResolutionUseCase
 import com.example.theekhai.domain.usecase.VisionEvidenceClient
 import com.example.theekhai.domain.usecase.VoiceIntakeUseCase
+import com.example.theekhai.domain.usecase.SignInUseCase
+import com.example.theekhai.domain.usecase.RegisterCitizenUseCase
+import com.example.theekhai.domain.usecase.SubmitCivicReportUseCase
+import com.example.theekhai.presentation.nativeconnect.NativeConnectViewModel
 import com.example.theekhai.getPlatform
 import com.example.theekhai.presentation.admin.CommandCenterViewModel
 import com.example.theekhai.presentation.fieldworker.FieldWorkerViewModel
@@ -39,6 +43,9 @@ val domainModule: Module = module {
     factory { VoiceIntakeUseCase(get(), get(), get()) }
     factory { CheckEvidenceUseCase(get(), get(), get()) }
     factory { SyncOfflineComplaintsUseCase(get()) }
+    factory { SignInUseCase(get()) }
+    factory { RegisterCitizenUseCase(get()) }
+    factory { SubmitCivicReportUseCase(get()) }
 }
 
 val presentationModule: Module = module {
@@ -46,6 +53,7 @@ val presentationModule: Module = module {
     single { AudioRecorder() }
     viewModelOf(::CommandCenterViewModel)
     viewModelOf(::FieldWorkerViewModel)
+    viewModelOf(::NativeConnectViewModel)
 }
 
 fun appModules(): List<Module> = listOf(dataModule, domainModule, presentationModule)

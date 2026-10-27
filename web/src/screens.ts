@@ -9,7 +9,7 @@ import {
   getSavedSources,
   saveSourceBookmark,
   removeSavedSource,
-  triageComplaint,
+  triageComplaint, transcribeAudio, reverseGeocode,
   CaseRecord,
   CaseDetail,
   LegalAnswer,
@@ -73,13 +73,125 @@ export function report(parent:HTMLElement):()=>void {
   const descriptionLabel=el('label','field');descriptionLabel.append(el('span','field-label',t('What is happening?','क्या हो रहा है?')));const description=el('textarea');description.name='description';description.rows=5;description.required=true;description.minLength=10;description.maxLength=5000;description.placeholder=t('Describe the issue and how it affects the neighbourhood.','समस्या और पड़ोस पर उसका असर बताएँ।');descriptionLabel.append(description);
   const categoryLabel=el('label','field');categoryLabel.append(el('span','field-label',t('Type of issue','समस्या का प्रकार')));const category=el('select');category.name='category';for(const [value,en,hi] of [['ROADS','Roads & footpaths','सड़क और फुटपाथ'],['WATER','Water & drains','पानी और नालियाँ'],['WASTE','Waste & sanitation','कचरा और सफाई'],['LIGHTING','Street lighting','स्ट्रीट लाइट'],['OTHER','Something else','अन्य']]){const option=el('option','',t(en,hi));option.value=value;category.append(option)}categoryLabel.append(category);
   const address=field(t('Address or landmark','पता या पहचान की जगह'),'address');address.input.minLength=3;address.input.maxLength=500;
-  let coords:{latitude:number,longitude:number}|null=null;const geoText=el('p','microcopy',t('Location is optional. You can describe the address instead.','स्थान वैकल्पिक है। आप पता लिख सकते हैं।'));
-  const geo=button(t('Use my location','मेरा स्थान लें'),()=>{if(!navigator.geolocation){notice(alert,t('Location is unavailable. Enter the address.','स्थान उपलब्ध नहीं है। पता लिखें।'),true);return}geo.disabled=true;navigator.geolocation.getCurrentPosition(pos=>{coords={latitude:pos.coords.latitude,longitude:pos.coords.longitude};geoText.textContent=`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)} · ±${Math.round(pos.coords.accuracy)} m`;geo.disabled=false},()=>{geo.disabled=false;notice(alert,t('Location was not shared. Your address is enough to continue.','स्थान साझा नहीं हुआ। पता लिखकर आगे बढ़ें।'),true)},{timeout:10000,maximumAge:60000})},'button secondary');
+  let coords:{latitude:number,longitude:number}|null=null;
+  const geoSection=el('div','geo-section');
+  const geoControls=el('div','geo-controls');
+  const geoBadge=el('div','geo-badge hidden');
+  const geoText=el('p','microcopy',t('Use GPS or click on the Ward Map below to auto-fill your street address and coordinates.','सड़क का पता और निर्देशांक स्वतः भरने के लिए जीपीएस का उपयोग करें या नीचे वार्ड मानचित्र पर क्लिक करें।'));
+  const applyCoordinates=async(lat:number,lon:number,accuracyMeters?:number,prefilledAddr?:string)=>{
+    coords={latitude:Number(lat.toFixed(6)),longitude:Number(lon.toFixed(6))};
+    geoBadge.classList.remove('hidden');
+    geoBadge.textContent=`📍 ${coords.latitude.toFixed(5)}° N, ${coords.longitude.toFixed(5)}° E${accuracyMeters?` · ±${Math.round(accuracyMeters)} m`:''}`;
+    if(prefilledAddr){address.input.value=prefilledAddr;geoText.textContent=`${t('Location locked:','स्थान लॉक किया गया:')} ${prefilledAddr}`;return}
+    geoText.textContent=t('Resolving street & ward address from coordinates…','निर्देशांकों से सड़क और वार्ड का पता खोजा जा रहा है…');
+    try{
+      const rev=await reverseGeocode(coords.latitude,coords.longitude,document.documentElement.lang||'en');
+      if(rev.address){
+        address.input.value=rev.address;
+        geoBadge.textContent=`📍 ${coords.latitude.toFixed(5)}° N, ${coords.longitude.toFixed(5)}° E · ${rev.ward}`;
+        geoText.textContent=`${t('Auto-filled from geotag:','जियोटैग से स्वतः भरा गया:')} ${rev.address}`;
+      }
+    }catch{
+      if(!address.input.value.trim())address.input.value=`Pinned GPS (${coords.latitude.toFixed(4)}° N, ${coords.longitude.toFixed(4)}° E), Ward 4`;
+      geoText.textContent=t('GPS coordinates attached. Review the address field above.','जीपीएस निर्देशांक जुड़ गए हैं। ऊपर पता जाँचें।');
+    }
+  };
+  const mapPickerWrap=el('div','map-picker-wrap hidden');
+  const mapPickerHeader=el('div','map-picker-header');
+  mapPickerHeader.append(el('span','label',t('INTERACTIVE WARD 4 GEOTAG PICKER · CLICK ANYWHERE TO DROP PIN','इंटरैक्टिव वार्ड 4 जियोटैग पिकर · पिन लगाने के लिए कहीं भी क्लिक करें')));
+  const mapSvgWrap=el('div','map-picker-canvas');
+  mapSvgWrap.innerHTML=`<svg viewBox="0 0 600 320" class="ward-picker-svg" role="img" aria-label="Interactive Ward 4 Map Picker">
+    <rect width="600" height="320" fill="#eef2e8"/>
+    <rect x="35" y="25" width="180" height="115" rx="12" fill="#d4e6cd" stroke="#b5cfa8"/>
+    <ellipse cx="95" cy="82" rx="45" ry="26" fill="#bfddf3"/>
+    <rect x="380" y="28" width="175" height="95" rx="10" fill="#e5ede0" stroke="#cad6c3"/>
+    <rect x="370" y="165" width="190" height="125" rx="10" fill="#ede8da" stroke="#d5ccb8"/>
+    <rect x="40" y="185" width="170" height="110" rx="10" fill="#e2ebe0" stroke="#c6d4c3"/>
+    <path d="M 0 150 L 600 150" stroke="#b8c5b2" stroke-width="26"/>
+    <path d="M 0 150 L 600 150" stroke="#fbbf24" stroke-width="2" stroke-dasharray="10 8"/>
+    <path d="M 290 0 L 290 320" stroke="#b8c5b2" stroke-width="26"/>
+    <path d="M 290 0 L 290 320" stroke="#ffffff" stroke-width="2" stroke-dasharray="10 8"/>
+    <circle cx="290" cy="150" r="24" fill="#b8c5b2"/><circle cx="290" cy="150" r="11" fill="#9fb996"/>
+    <text x="52" y="48" font-size="11" font-weight="600" fill="#2b4c3f">Central Park (Ward 4)</text>
+    <text x="395" y="55" font-size="11" font-weight="600" fill="#2b4c3f">Primary Health Center</text>
+    <text x="388" y="192" font-size="11" font-weight="600" fill="#5c4b32">Sector 14 Main Market</text>
+    <text x="55" y="212" font-size="11" font-weight="600" fill="#2b4c3f">Ward 4 Primary School</text>
+    <text x="302" y="140" font-size="10" font-weight="700" fill="#123e39">Sector 14 Rotary</text>
+    <g id="picker-pin-group" transform="translate(290, 150)">
+      <circle r="16" fill="#123e39" opacity="0.22"/>
+      <circle r="9" fill="#123e39" stroke="#ffffff" stroke-width="2.5"/>
+    </g>
+  </svg>`;
+  const quickZones=el('div','geo-quick-zones');
+  const zonePresets:[string,string,number,number][]=[
+    [t('Ward 4 Primary School','वार्ड 4 प्राथमिक विद्यालय'),'Main Market Road near Ward 4 Primary School, Ward 4',28.4595,77.0266],
+    [t('Central Park Gate','सेंट्रल पार्क गेट'),'5th Cross Road near Central Park East Gate, Ward 4',28.4612,77.0289],
+    [t('Sector 14 Crossing','सेक्टर 14 चौराहा'),'12th Main Road Junction, Sector 14 Crossing, Ward 4',28.4680,77.0310],
+    [t('Sector 14 Market','सेक्टर 14 बाज़ार'),'Sector 14 Main Market Lane, Ward 4',28.4645,77.0342],
+  ];
+  for(const [zLabel,zAddr,zLat,zLon] of zonePresets){
+    const zBtn=button(`📍 ${zLabel}`,()=>{void applyCoordinates(zLat,zLon,8,zAddr)},'quiet geo-zone-pill');
+    quickZones.append(zBtn);
+  }
+  mapSvgWrap.addEventListener('click',ev=>{
+    const svg=mapSvgWrap.querySelector('svg')!;
+    const rect=svg.getBoundingClientRect();
+    const relX=Math.max(0,Math.min(1,(ev.clientX-rect.left)/rect.width));
+    const relY=Math.max(0,Math.min(1,(ev.clientY-rect.top)/rect.height));
+    const pinGroup=svg.querySelector('#picker-pin-group');
+    if(pinGroup)pinGroup.setAttribute('transform',`translate(${Math.round(relX*600)}, ${Math.round(relY*320)})`);
+    const lat=28.4720-relY*0.0180;
+    const lon=77.0200+relX*0.0180;
+    void applyCoordinates(lat,lon,5);
+  });
+  mapPickerWrap.append(mapPickerHeader,mapSvgWrap,quickZones);
+  const toggleMapBtn=button(t('🗺️ Pick on Ward Map','🗺️ मानचित्र पर स्थान चुनें'),()=>{
+    const hidden=mapPickerWrap.classList.toggle('hidden');
+    toggleMapBtn.textContent=hidden?t('🗺️ Pick on Ward Map','🗺️ मानचित्र पर स्थान चुनें'):t('Hide Ward Map','मानचित्र छिपाएँ');
+  },'button secondary');
+  const geo=button(t('📍 Use my location','📍 मेरा स्थान लें'),()=>{if(!navigator.geolocation){mapPickerWrap.classList.remove('hidden');notice(alert,t('Browser GPS is unavailable. Pick a spot on the Ward Map below.','जीपीएस उपलब्ध नहीं है। नीचे वार्ड मानचित्र पर स्थान चुनें।'),true);return}geo.disabled=true;geo.textContent=t('Locating…','स्थान खोजा जा रहा है…');navigator.geolocation.getCurrentPosition(pos=>{geo.disabled=false;geo.textContent=t('📍 Use my location','📍 मेरा स्थान लें');void applyCoordinates(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy)},()=>{navigator.geolocation.getCurrentPosition(pos2=>{geo.disabled=false;geo.textContent=t('📍 Use my location','📍 मेरा स्थान लें');void applyCoordinates(pos2.coords.latitude,pos2.coords.longitude,pos2.coords.accuracy)},()=>{geo.disabled=false;geo.textContent=t('📍 Use my location','📍 मेरा स्थान लें');mapPickerWrap.classList.remove('hidden');toggleMapBtn.textContent=t('Hide Ward Map','मानचित्र छिपाएँ');notice(alert,t('Browser GPS timed out or was denied. Click anywhere on the interactive Ward Map below to pin your exact location!','जीपीएस अनुमति नहीं मिली या समय समाप्त हुआ। नीचे वार्ड मानचित्र पर क्लिक करके अपना स्थान चुनें!'))},{enableHighAccuracy:false,timeout:8000,maximumAge:300000})},{enableHighAccuracy:true,timeout:6000,maximumAge:60000})},'button secondary');
+  geoControls.append(geo,toggleMapBtn,geoBadge);
+  geoSection.append(geoControls,geoText,mapPickerWrap);
   const consent=el('label','consent'),check=el('input');check.type='checkbox';check.required=true;consent.append(check,el('span','',t('I agree to share these details with the teams handling this report.','मैं यह विवरण रिपोर्ट पर काम करने वाली टीमों के साथ साझा करने के लिए सहमत हूँ।')));
-  let media:MediaRecorder|null=null,stream:MediaStream|null=null;let chunks:BlobPart[]=[];let audio:Blob|null=null;
-  const audioPanel=el('div','audio-panel'),audioStatus=el('p','microcopy',t('Prefer speaking? Record, then transcribe and edit before submitting.','बोलना पसंद है? रिकॉर्ड करें, फिर लिखित रूप जाँचकर भेजें।'));
-  const record=button(t('Record a voice note','आवाज़ रिकॉर्ड करें'),()=>{void (async()=>{try{if(media?.state==='recording'){media.stop();return}stream=await navigator.mediaDevices.getUserMedia({audio:true});media=new MediaRecorder(stream);chunks=[];media.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};media.onstop=()=>{audio=new Blob(chunks,{type:media!.mimeType});stream?.getTracks().forEach(track=>track.stop());record.textContent=t('Record again','फिर रिकॉर्ड करें');transcribe.disabled=false;audioStatus.textContent=t('Recording ready. Transcribe it or continue with typed text.','रिकॉर्डिंग तैयार है। लिखित रूप लें या टाइप करें।')};media.start();record.textContent=t('Stop recording','रिकॉर्डिंग रोकें');audioStatus.textContent=t('Microphone is recording. Stop when finished.','माइक्रोफोन रिकॉर्ड कर रहा है। पूरा होने पर रोकें।');setTimeout(()=>{if(media?.state==='recording')media.stop()},60000)}catch{notice(alert,t('Microphone unavailable or permission denied. You can type your report.','माइक्रोफोन उपलब्ध नहीं या अनुमति नहीं मिली। रिपोर्ट टाइप करें।'),true)}})()},'button secondary');
-  const transcribe=button(t('Transcribe','लिखित रूप लें'),()=>{void(async()=>{if(!audio)return;transcribe.disabled=true;try{const dataUrl=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=reject;reader.readAsDataURL(audio!)});const result=await api<{text:string}>('/voice/transcribe',{method:'POST',body:JSON.stringify({audioBase64:dataUrl.split(',')[1],mimeType:audio.type})});description.value=result.text;notice(alert,t('Review and edit the transcript before submitting.','भेजने से पहले लिखित रूप जाँचें और सुधारें।'))}catch(error){notice(alert,errorMessage(error),true)}finally{transcribe.disabled=false}})()},'quiet');transcribe.disabled=true;audioPanel.append(record,transcribe,audioStatus);
+  let media:MediaRecorder|null=null,stream:MediaStream|null=null,speechRec:any=null,timerInterval:number|null=null,secondsRecorded=0,liveSpeechTranscript='';let chunks:BlobPart[]=[];let audio:Blob|null=null;
+  const audioPanel=el('div','audio-panel'),audioTopRow=el('div','audio-top-row'),audioPlayerWrap=el('div','audio-player-wrap hidden'),audioStatus=el('p','microcopy',t('Speak in English or Hindi — live speech-to-text & OpenRouter AI will transcribe and structure your report.','अंग्रेज़ी या हिन्दी में बोलें — लाइव स्पीच-टू-टेक्स्ट और OpenRouter AI आपकी रिपोर्ट तैयार करेंगे।'));
+  const runTranscription=async()=>{
+    if(!audio&&!liveSpeechTranscript.trim())return;
+    transcribe.disabled=true;
+    audioStatus.textContent=t('Transcribing & structuring voice note via OpenRouter AI…','OpenRouter AI के माध्यम से आवाज़ को लिखित रूप दिया जा रहा है…');
+    try{
+      let b64='';
+      let mime='audio/webm';
+      if(audio&&audio.size>0){
+        mime=audio.type||'audio/webm';
+        const dataUrl=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=reject;reader.readAsDataURL(audio!)});
+        b64=dataUrl.split(',')[1]||'';
+      }
+      const result=await transcribeAudio({audioBase64:b64,mimeType:mime,language:document.documentElement.lang||'en',transcriptHint:liveSpeechTranscript.trim()});
+      if(result.text){
+        description.value=result.text;
+      }
+      if(!title.input.value.trim()&&result.suggestedTitle){
+        title.input.value=result.suggestedTitle;
+      }
+      if(result.suggestedCategory){
+        category.value=result.suggestedCategory;
+      }
+      audioStatus.textContent=`✓ ${t('Voice note transcribed','आवाज़ का लिखित रूप तैयार')} (${result.provider||'OPENROUTER_AI'}).`;
+      notice(alert,t('Voice note transcribed into the form! Review and edit before submitting.','आवाज़ का लिखित रूप फॉर्म में भर दिया गया है! भेजने से पहले जाँच लें।'));
+    }catch(error){
+      if(liveSpeechTranscript.trim()){
+        description.value=liveSpeechTranscript.trim();
+        audioStatus.textContent=t('Live speech transcript applied to description.','लाइव स्पीच प्रतिलिपि विवरण में जोड़ दी गई है।');
+      }else{
+        notice(alert,errorMessage(error),true);
+      }
+    }finally{
+      transcribe.disabled=false;
+    }
+  };
+  const record=button(t('🎙️ Record a voice note','🎙️ आवाज़ रिकॉर्ड करें'),()=>{void (async()=>{try{if(media?.state==='recording'){media.stop();try{speechRec?.stop()}catch{/* ignore */};return}liveSpeechTranscript='';secondsRecorded=0;const SpeechRecognitionCtor=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;if(SpeechRecognitionCtor){try{speechRec=new SpeechRecognitionCtor();speechRec.lang=(document.documentElement.lang==='hi')?'hi-IN':'en-IN';speechRec.continuous=true;speechRec.interimResults=true;speechRec.onresult=(ev:any)=>{let combined='';for(let i=0;i<ev.results.length;i++){combined+=ev.results[i][0].transcript+' '}liveSpeechTranscript=combined.trim();if(liveSpeechTranscript){description.value=liveSpeechTranscript;audioStatus.textContent=`🎙️ "${liveSpeechTranscript}"`}};speechRec.start()}catch{/* SpeechRecognition optional */}}stream=await navigator.mediaDevices.getUserMedia({audio:true});media=new MediaRecorder(stream);chunks=[];media.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};media.onstop=()=>{if(timerInterval){clearInterval(timerInterval);timerInterval=null}try{speechRec?.stop()}catch{/* ignore */}audioPanel.classList.remove('recording');audio=new Blob(chunks,{type:media!.mimeType||'audio/webm'});stream?.getTracks().forEach(track=>track.stop());record.textContent=t('🎙️ Record again','🎙️ फिर रिकॉर्ड करें');transcribe.disabled=false;audioPlayerWrap.replaceChildren();const player=document.createElement('audio');player.controls=true;player.src=URL.createObjectURL(audio);player.className='audio-preview-player';audioPlayerWrap.append(player);audioPlayerWrap.classList.remove('hidden');void runTranscription()};media.start();audioPanel.classList.add('recording');record.textContent=t('⏹ Stop recording (00:00)','⏹ रिकॉर्डिंग रोकें (00:00)');timerInterval=window.setInterval(()=>{secondsRecorded++;const mm=String(Math.floor(secondsRecorded/60)).padStart(2,'0');const ss=String(secondsRecorded%60).padStart(2,'0');record.textContent=`${t('⏹ Stop recording','⏹ रिकॉर्डिंग रोकें')} (${mm}:${ss})`},1000);audioStatus.textContent=t('Listening… Speak clearly into your microphone. Click Stop when finished.','सुन रहा है… माइक्रोफोन में स्पष्ट बोलें। पूरा होने पर रोकें दबाएँ।');setTimeout(()=>{if(media?.state==='recording')media.stop()},60000)}catch{try{speechRec?.stop()}catch{/* ignore */}notice(alert,t('Microphone unavailable or permission denied. You can type your report or use browser speech dictation.','माइक्रोफोन उपलब्ध नहीं या अनुमति नहीं मिली। रिपोर्ट टाइप करें।'),true)}})()},'button secondary');
+  const transcribe=button(t('✨ Transcribe & Refine with AI','✨ AI से लिखित रूप सुधारें'),()=>{void runTranscription()},'quiet');transcribe.disabled=true;audioTopRow.append(record,transcribe);audioPanel.append(audioTopRow,audioPlayerWrap,audioStatus);
   const submit=el('button','button',t('Review & submit report  ↗','जाँचें और रिपोर्ट भेजें  ↗'));submit.type='submit';const draft=button(t('Save draft on this device','इस डिवाइस पर ड्राफ्ट सहेजें'),()=>{try{localStorage.setItem('theekhai-draft',JSON.stringify({title:title.input.value,description:description.value,address:address.input.value,category:category.value}));notice(alert,t('Draft saved on this device. It has not been submitted.','ड्राफ्ट इस डिवाइस पर सहेजा गया। अभी भेजा नहीं गया है。'))}catch{notice(alert,t('This browser could not save the draft. Copy your text before leaving.','यह ब्राउज़र ड्राफ़्ट नहीं सहेज सका। जाने से पहले अपना पाठ कॉपी करें।'),true)}},'quiet');
   try{const saved=JSON.parse(localStorage.getItem('theekhai-draft')??'null');if(saved){title.input.value=saved.title??'';description.value=saved.description??'';address.input.value=saved.address??'';category.value=saved.category??'ROADS'}}catch{try{localStorage.removeItem('theekhai-draft')}catch{/* Storage may be disabled. */}}
   const triageBox=el('div');
@@ -112,7 +224,11 @@ export function report(parent:HTMLElement):()=>void {
       .catch(err=>notice(triageBox,errorMessage(err),true))
       .finally(()=>{aiTriageBtn.disabled=false});
   },'button secondary');
-  const actions=el('div','actions');actions.append(submit,aiTriageBtn,draft);form.append(title.wrapper,categoryLabel,descriptionLabel,audioPanel,address.wrapper,geo,geoText,triageBox,consent,alert,actions);
+  const params=new URLSearchParams(location.search);
+  const qLat=parseFloat(params.get('lat')||'');const qLon=parseFloat(params.get('lng')||'');const qAddr=params.get('address')||'';const qCat=params.get('category')||'';
+  if(qCat&&['ROADS','WATER','WASTE','LIGHTING','OTHER'].includes(qCat))category.value=qCat;
+  if(Number.isFinite(qLat)&&Number.isFinite(qLon))void applyCoordinates(qLat,qLon,5,qAddr||undefined);
+  const actions=el('div','actions');actions.append(submit,aiTriageBtn,draft);form.append(title.wrapper,categoryLabel,descriptionLabel,audioPanel,address.wrapper,geoSection,triageBox,consent,alert,actions);
   const submissionKey=crypto.randomUUID();form.addEventListener('submit',event=>{event.preventDefault();if(!identity){notice(alert,t('Save your draft, then sign in to submit.','ड्राफ्ट सहेजें, फिर भेजने के लिए साइन इन करें।'),true);return}void(async()=>{submit.disabled=true;try{const record=await api<CaseRecord>('/complaints',{method:'POST',headers:{'Idempotency-Key':submissionKey},body:JSON.stringify({title:title.input.value,description:description.value,category:category.value,address:address.input.value,latitude:coords?.latitude??null,longitude:coords?.longitude??null,consent:check.checked})});localStorage.removeItem('theekhai-draft');navigate(`/cases/${record.id}`)}catch(error){notice(alert,errorMessage(error),true)}finally{submit.disabled=false}})()});
   aside.append(el('p','eyebrow',t('WHAT HAPPENS NEXT','इसके बाद क्या होगा')),el('h2','',t('A report with\na way forward.','एक रिपोर्ट,\nआगे का रास्ता।')),el('p','',t('Your report goes to an accountable department. You can follow tasks, due dates and the final review from your workspace.','आपकी रिपोर्ट जिम्मेदार विभाग तक जाती है। कार्यक्षेत्र में काम, समय-सीमा और अंतिम समीक्षा देखें।')),el('div','aside-note',t('This is a civic pilot. It is not an emergency service.','यह नागरिक पायलट है। यह आपातकालीन सेवा नहीं है।')),link(t('How we use your information','आपकी जानकारी का उपयोग'),'/privacy','text-link'));
   layout.append(form,aside);parent.append(layout);return()=>{if(media?.state==='recording')media.stop();stream?.getTracks().forEach(track=>track.stop())};
@@ -527,3 +643,201 @@ export function information(parent:HTMLElement,path:string){const pages:Record<s
   '/terms':[t('Pilot terms','पायलट शर्तें'),t('This is a development pilot, not an official government filing channel or emergency service. Demonstration service targets are not legal deadlines. Reference excerpts do not establish eligibility or guarantee a legal outcome. Use synthetic information during testing. Public-launch terms remain subject to operator review.','यह विकास पायलट है, आधिकारिक सरकारी आवेदन माध्यम या आपातकालीन सेवा नहीं। प्रदर्शन सेवा लक्ष्य कानूनी समय-सीमा नहीं हैं। संदर्भ अंश पात्रता या कानूनी परिणाम सुनिश्चित नहीं करते। परीक्षण में काल्पनिक जानकारी उपयोग करें। सार्वजनिक लॉन्च की शर्तों की संचालक समीक्षा बाकी है।')],
   '/help':[t('A little guidance.','थोड़ा मार्गदर्शन।'),t('Start with a clear description and an address. Location and recording are optional: deny permission and continue with text. You can revoke permissions in your browser settings. Save a draft explicitly before leaving. A report is submitted only when a case ID is returned. Staff request closure; an independent reviewer decides it.','स्पष्ट विवरण और पते से शुरू करें। स्थान और रिकॉर्डिंग वैकल्पिक हैं: अनुमति न देकर लिखित रूप में आगे बढ़ें। ब्राउज़र सेटिंग्स से अनुमति वापस ले सकते हैं। जाने से पहले ड्राफ्ट सहेजें। मामला ID मिलने पर ही रिपोर्ट जमा मानी जाती है। कर्मचारी बंद करने का अनुरोध करते हैं; स्वतंत्र समीक्षक फैसला करता है।')]
 };const page=pages[path];heading(parent,page?t('THE SMALL PRINT, CLEARLY','स्पष्ट जानकारी'):'404',page?.[0]??t('This street leads elsewhere.','यह रास्ता कहीं और जाता है।'),page?.[1]??t('We could not find that page. Let’s get you back on track.','यह पृष्ठ नहीं मिला। वापस चलते हैं।'));parent.append(link(t('Back to overview','परिचय पर लौटें'),'/','button'));}
+
+interface MapPinItem {
+  id: string;
+  title: string;
+  category: string;
+  status: string;
+  address: string;
+  department: string;
+  latitude: number;
+  longitude: number;
+  x: number;
+  y: number;
+}
+
+export async function civicMap(parent: HTMLElement) {
+  heading(
+    parent,
+    t('CIVIC GEOSPATIAL RADAR · WARD 4', 'नागरिक भू-स्थानिक रडार · वार्ड 4'),
+    t('Your neighbourhood map.', 'आपके पड़ोस का मानचित्र।'),
+    t('Explore active civic reports across Ward 4, filter by issue category, or click anywhere on the map to report an issue with exact GPS coordinates.', 'वार्ड 4 में सक्रिय नागरिक रिपोर्ट देखें, श्रेणी के अनुसार फ़िल्टर करें, या सटीक जीपीएस निर्देशांक के साथ रिपोर्ट करने के लिए मानचित्र पर कहीं भी क्लिक करें।'),
+  );
+
+  const defaultPins: MapPinItem[] = [
+    { id: 'case-pilot-001', title: 'Waterlogged pothole and broken kerb near Ward 4 primary school', category: 'ROADS', status: 'IN_PROGRESS', address: 'Main Market Road near Ward 4 Primary School, Ward 4', department: 'Public works', latitude: 28.4595, longitude: 77.0266, x: 180, y: 260 },
+    { id: 'case-pilot-002', title: 'Three LED streetlights flickering and dark on Lane 2', category: 'LIGHTING', status: 'ASSIGNED', address: 'Community Park Entrance, Lane 2, Ward 4', department: 'Electrical services', latitude: 28.4612, longitude: 77.0289, x: 245, y: 120 },
+    { id: 'case-pilot-003', title: 'Stormwater drain grate dislodged at Sector 14 crossing', category: 'ROADS', status: 'PENDING_VERIFICATION', address: 'Sector 14 Rotary Crossing, Ward 4', department: 'Public works', latitude: 28.4680, longitude: 77.0310, x: 460, y: 215 },
+    { id: 'ward-004', title: 'Sewage drain overflow near Sector 14 Main Market', category: 'WATER', status: 'ASSIGNED', address: 'Sector 14 Main Market Lane, Ward 4', department: 'Water services', latitude: 28.4645, longitude: 77.0342, x: 640, y: 245 },
+    { id: 'ward-005', title: 'Uncollected sanitation waste near Metro Gate 2', category: 'WASTE', status: 'SUBMITTED', address: 'Metro Link Avenue near Gate 2, Sector 14, Ward 4', department: 'Sanitation', latitude: 28.4560, longitude: 77.0335, x: 670, y: 365 },
+  ];
+
+  let allPins: MapPinItem[] = [...defaultPins];
+  if (identity) {
+    try {
+      const live = await api<{ items: CaseRecord[]; total: number }>('/complaints');
+      if (live.items.length) {
+        const mapped: MapPinItem[] = live.items.map((c, idx) => {
+          const lat = c.latitude ?? (28.4680 - (idx % 5) * 0.0025);
+          const lon = c.longitude ?? (77.0245 + (idx % 5) * 0.0025);
+          const relX = Math.max(60, Math.min(840, Math.round(((lon - 77.0200) / 0.0180) * 900)));
+          const relY = Math.max(50, Math.min(410, Math.round(((28.4720 - lat) / 0.0180) * 460)));
+          return {
+            id: c.id,
+            title: c.title,
+            category: c.category,
+            status: c.status,
+            address: c.address,
+            department: c.department,
+            latitude: lat,
+            longitude: lon,
+            x: relX,
+            y: relY,
+          };
+        });
+        const existingIds = new Set(mapped.map(m => m.id));
+        allPins = [...mapped, ...defaultPins.filter(d => !existingIds.has(d.id))];
+      }
+    } catch {
+      // Fallback to default Ward 4 pins when offline
+    }
+  }
+
+  let activeCat = 'ALL';
+  let selectedPin: MapPinItem = allPins[0];
+
+  const filterBar = el('div', 'map-filter-bar');
+  const categories: [string, string][] = [
+    ['ALL', t('All issues', 'सभी समस्याएँ')],
+    ['ROADS', t('Roads & footpaths', 'सड़क और फुटपाथ')],
+    ['WATER', t('Water & drains', 'पानी और नालियाँ')],
+    ['WASTE', t('Waste & sanitation', 'कचरा और सफाई')],
+    ['LIGHTING', t('Street lighting', 'स्ट्रीट लाइट')],
+  ];
+
+  const shell = el('div', 'civic-map-shell');
+  const canvasCard = el('div', 'panel civic-map-card');
+  const detailCard = el('aside', 'panel civic-map-detail');
+
+  function renderDetail() {
+    detailCard.replaceChildren();
+    detailCard.append(
+      el('p', 'eyebrow', `${selectedPin.category} · ${selectedPin.id.slice(0, 14)}`),
+      el('span', `status status-${selectedPin.status.toLowerCase()}`, statusText(selectedPin.status)),
+      el('h2', '', selectedPin.title),
+      el('p', '', `📍 ${selectedPin.address}`),
+      el('p', 'microcopy', `${t('Coordinates:', 'निर्देशांक:')} ${selectedPin.latitude.toFixed(5)}° N, ${selectedPin.longitude.toFixed(5)}° E`),
+      el('p', 'microcopy', `${t('Lead Department:', 'मुख्य विभाग:')} ${selectedPin.department}`),
+    );
+    const btnGroup = el('div', 'actions');
+    const reportHereUrl = `/report?lat=${selectedPin.latitude.toFixed(5)}&lng=${selectedPin.longitude.toFixed(5)}&address=${encodeURIComponent(selectedPin.address)}&category=${encodeURIComponent(selectedPin.category)}`;
+    btnGroup.append(
+      link(t('Report at this location  ↗', 'इस स्थान पर रिपोर्ट करें  ↗'), reportHereUrl, 'button'),
+    );
+    if (!selectedPin.id.startsWith('ward-')) {
+      btnGroup.append(link(t('Open case file  →', 'केस फ़ाइल खोलें  →'), `/cases/${selectedPin.id}`, 'button secondary'));
+    }
+    detailCard.append(btnGroup);
+  }
+
+  function renderMapCanvas() {
+    canvasCard.replaceChildren();
+    const visiblePins = allPins.filter(p => activeCat === 'ALL' || p.category === activeCat);
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 900 460');
+    svg.setAttribute('class', 'civic-map-svg');
+    svg.innerHTML = `
+      <rect width="900" height="460" fill="#eef2e8"/>
+      <rect x="50" y="30" width="270" height="165" rx="16" fill="#d4e6cd" stroke="#b5cfa8" stroke-width="1.5"/>
+      <ellipse cx="145" cy="115" rx="68" ry="38" fill="#bfddf3"/>
+      <rect x="540" y="35" width="280" height="140" rx="14" fill="#e5ede0" stroke="#cad6c3"/>
+      <rect x="550" y="235" width="290" height="180" rx="14" fill="#ede8da" stroke="#d5ccb8"/>
+      <rect x="60" y="260" width="260" height="160" rx="14" fill="#e2ebe0" stroke="#c6d4c3"/>
+      <path d="M 0 215 L 900 215" stroke="#b8c5b2" stroke-width="34"/>
+      <path d="M 0 215 L 900 215" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="14 10"/>
+      <path d="M 460 0 L 460 460" stroke="#b8c5b2" stroke-width="34"/>
+      <path d="M 460 0 L 460 460" stroke="#ffffff" stroke-width="2.5" stroke-dasharray="14 10"/>
+      <circle cx="460" cy="215" r="36" fill="#b8c5b2"/><circle cx="460" cy="215" r="18" fill="#9fb996"/>
+      <text x="75" y="62" font-size="13" font-weight="700" fill="#2b4c3f">Central Community Park</text>
+      <text x="565" y="68" font-size="13" font-weight="700" fill="#2b4c3f">Primary Health Center (PHC)</text>
+      <text x="575" y="268" font-size="13" font-weight="700" fill="#5c4b32">Sector 14 Main Market</text>
+      <text x="85" y="292" font-size="13" font-weight="700" fill="#2b4c3f">Ward 4 Primary School</text>
+      <text x="480" y="198" font-size="12" font-weight="700" fill="#123e39">Sector 14 Rotary Crossing</text>
+    `;
+
+    for (const pin of visiblePins) {
+      const isSel = selectedPin?.id === pin.id;
+      const g = document.createElementNS(svgNS, 'g');
+      g.setAttribute('transform', `translate(${pin.x}, ${pin.y})`);
+      g.style.cursor = 'pointer';
+      const color = pin.status === 'CLOSED' ? '#10b981' : pin.status === 'PENDING_VERIFICATION' ? '#f59e0b' : '#123e39';
+      g.innerHTML = `
+        ${isSel ? `<circle r="24" fill="${color}" opacity="0.22"/>` : ''}
+        <circle r="${isSel ? 15 : 12}" fill="${color}" stroke="#ffffff" stroke-width="2.5"/>
+        <text y="4" text-anchor="middle" font-size="10" fill="#ffffff" font-weight="700">${pin.category.slice(0, 1)}</text>
+      `;
+      g.addEventListener('click', ev => {
+        ev.stopPropagation();
+        selectedPin = pin;
+        renderMapCanvas();
+        renderDetail();
+      });
+      svg.appendChild(g);
+    }
+
+    svg.addEventListener('click', ev => {
+      const rect = svg.getBoundingClientRect();
+      const relX = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+      const relY = Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height));
+      const lat = 28.4720 - relY * 0.0180;
+      const lon = 77.0200 + relX * 0.0180;
+      selectedPin = {
+        id: 'ward-custom',
+        title: t('Custom pinned location in Ward 4', 'वार्ड 4 में चुना गया स्थान'),
+        category: activeCat === 'ALL' ? 'ROADS' : activeCat,
+        status: 'SUBMITTED',
+        address: `Pinned Location (${lat.toFixed(4)}° N, ${lon.toFixed(4)}° E), Ward 4`,
+        department: 'Civic triage',
+        latitude: lat,
+        longitude: lon,
+        x: Math.round(relX * 900),
+        y: Math.round(relY * 460),
+      };
+      void reverseGeocode(lat, lon, document.documentElement.lang || 'en').then(rev => {
+        if (selectedPin.id === 'ward-custom' && rev.address) {
+          selectedPin.address = rev.address;
+          renderDetail();
+        }
+      }).catch(() => {});
+      renderMapCanvas();
+      renderDetail();
+    });
+
+    const caption = el('p', 'microcopy', t('Click any pin to inspect the case, or click any street/park on the map to drop a geotag pin and report an issue there.', 'मामले की जाँच करने के लिए किसी भी पिन पर क्लिक करें, या वहाँ समस्या दर्ज करने के लिए मानचित्र पर किसी भी सड़क/पार्क पर क्लिक करें।'));
+    canvasCard.append(svg, caption);
+  }
+
+  function renderFilters() {
+    filterBar.replaceChildren();
+    for (const [code, label] of categories) {
+      const btn = button(
+        label,
+        () => {
+          activeCat = code;
+          renderFilters();
+          renderMapCanvas();
+        },
+        activeCat === code ? 'button small' : 'button secondary small',
+      );
+      filterBar.append(btn);
+    }
+  }
+
+  renderFilters();
+  renderMapCanvas();
+  renderDetail();
+  shell.append(canvasCard, detailCard);
+  parent.append(filterBar, shell);
+}

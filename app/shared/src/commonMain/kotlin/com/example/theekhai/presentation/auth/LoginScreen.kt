@@ -21,12 +21,20 @@ import com.example.theekhai.navigation.Route
 import com.example.theekhai.ui.components.*
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
 import com.example.theekhai.ui.theme.TheekHaiColors
+import com.example.theekhai.presentation.nativeconnect.NativeConnectViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun LoginScreen() {
+    val connectViewModel = koinViewModel<NativeConnectViewModel>()
+    val connectState by connectViewModel.state.collectAsState()
     val navigator = LocalNavigator.current
     val ext = LocalTheekHaiColors.current
     val scrollState = rememberScrollState()
+
+    LaunchedEffect(connectState.user) {
+        if (connectState.user != null) navigator.resetTo(Route.Workspace)
+    }
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -74,11 +82,9 @@ fun LoginScreen() {
                             onPasswordChange = { password = it },
                             passwordVisible = passwordVisible,
                             onTogglePassword = { passwordVisible = !passwordVisible },
-                            isLoading = isLoading,
-                            errorMessage = errorMessage,
-                            onSubmit = {
-                                errorMessage = "Sign-in is not connected in this native preview. No account was authenticated."
-                            },
+                            isLoading = connectState.isLoading,
+                            errorMessage = connectState.error ?: errorMessage,
+                            onSubmit = { connectViewModel.signIn(email, password) },
                             onNavigateSignup = { navigator.navigateTo(Route.Signup) },
                             onSelectDemo = { _, selectedEmail ->
                                 email = selectedEmail
@@ -104,11 +110,9 @@ fun LoginScreen() {
                         onPasswordChange = { password = it },
                         passwordVisible = passwordVisible,
                         onTogglePassword = { passwordVisible = !passwordVisible },
-                        isLoading = isLoading,
-                        errorMessage = errorMessage,
-                        onSubmit = {
-                            errorMessage = "Sign-in is not connected in this native preview. No account was authenticated."
-                        },
+                        isLoading = connectState.isLoading,
+                        errorMessage = connectState.error ?: errorMessage,
+                        onSubmit = { connectViewModel.signIn(email, password) },
                         onNavigateSignup = { navigator.navigateTo(Route.Signup) },
                         onSelectDemo = { _, selectedEmail ->
                             email = selectedEmail

@@ -29,4 +29,5 @@ The Ktor API is JSON at `/api/v1`, defined by `:core`'s `PilotDto.kt` and mounte
 - `POST /api/v1/legal/discover` -> Reviewer/Admin endpoint using Tavily official-domain discovery and TinyFish Agent extraction to queue `PENDING` sources.
 - `GET /api/v1/legal/monitors`, `POST /api/v1/legal/monitors`, `POST /api/v1/legal/monitors/{id}/run` -> Creates and executes TinyFish Page (`fetch`) and Topic (`search`) monitors.
 - `GET /api/v1/legal/review`, `POST /api/v1/legal/sources`, `POST /api/v1/legal/sources/{id}/review` -> Reviewer approval/rejection queue.
-- `POST /api/v1/voice/transcribe` -> Transcribes recorded voice notes into editable report text.
+- `POST /api/v1/voice/transcribe` -> Transcribes and refines recorded voice notes (`TranscribeRequestDto` with `audioBase64`, `mimeType`, `language`, `transcriptHint`) via OpenRouter AI into structured `TranscribeResponseDto` (`text`, `suggestedTitle`, `suggestedCategory`, `provider`).
+- `GET /api/v1/geo/reverse?lat=...&lon=...&lang=en|hi` -> Reverse-geocodes GPS or map-picked coordinates via OpenStreetMap Nominatim + Ward 4 geospatial landmark index into `ReverseGeocodeResponseDto` (`latitude`, `longitude`, `address`, `ward`, `landmark`, `source`).

@@ -65,6 +65,22 @@ export interface TriageSuggestion {
   provider: string;
 }
 
+export interface TranscribeResponse {
+  text: string;
+  suggestedTitle?: string;
+  suggestedCategory?: string;
+  provider?: string;
+}
+
+export interface ReverseGeocodeResult {
+  latitude: number;
+  longitude: number;
+  address: string;
+  ward: string;
+  landmark: string;
+  source: string;
+}
+
 export let identity: Identity | null = null;
 
 const TOKEN_STORAGE_KEY = 'theekhai_supabase_token';
@@ -171,4 +187,15 @@ export async function triageComplaint(input: { title: string; description: strin
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export async function transcribeAudio(input: { audioBase64: string; mimeType: string; language: string; transcriptHint?: string }) {
+  return api<TranscribeResponse>('/voice/transcribe', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function reverseGeocode(lat: number, lon: number, lang: string = 'en') {
+  return api<ReverseGeocodeResult>(`/geo/reverse?lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lon))}&lang=${encodeURIComponent(lang)}`);
 }

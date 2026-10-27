@@ -1,7 +1,7 @@
 import './style.css';
 import {identity,loadIdentity,signOut} from './api';
 import {el,link,button,t,switchLanguage,language,theme,switchTheme} from './ui';
-import {home,report,workspace,detail,login,signup,account,library,information} from './screens';
+import {home,report,workspace,detail,login,signup,account,library,information,civicMap} from './screens';
 
 function initialsForUser(name?: string | null, email?: string | null): string {
   const source = (name || email || 'TH').trim();
@@ -23,10 +23,11 @@ export async function render() {
     ['/','01',t('Overview','परिचय')],
     ['/report','02',t('Report an issue','समस्या दर्ज करें')],
     ['/workspace','03',t('My workspace','मेरा कार्यक्षेत्र')],
-    ['/library','04',t('Know your options','अपने विकल्प जानें')],
+    ['/map','04',t('Civic Map','नागरिक मानचित्र')],
+    ['/library','05',t('Know your options','अपने विकल्प जानें')],
   ];
   if (identity) {
-    links.push(['/account','05',t('My account','मेरा खाता')]);
+    links.push(['/account','06',t('My account','मेरा खाता')]);
   }
   for(const [path,num,label] of links) { const item=link('',path,`nav-item ${route===path?'active':''}`); item.append(el('span','nav-number',num),el('span','',label)); if(route===path)item.setAttribute('aria-current','page'); nav.append(item); }
   sidebar.append(nav);
@@ -56,6 +57,7 @@ export async function render() {
   else if(route==='/login')login(main);
   else if(route==='/signup')signup(main);
   else if(route==='/account')await account(main);
+  else if(route==='/map') await civicMap(main);
   else if(route==='/library')library(main);
   else information(main,route);
 }
