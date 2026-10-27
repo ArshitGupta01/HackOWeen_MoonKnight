@@ -6,4 +6,4 @@ Read the applicable project guides before changing a feature: [security](docs/SE
 
 Update `agent.md` in the same change whenever module responsibilities, architecture, dependencies, development commands, or established project decisions change. Keep it accurate and concise; do not use it as a transcript or a per-edit activity log.
 
-For government appeals or judicial filing references, read [legal channels and integrations](docs/LEGAL_AND_INTEGRATIONS.md). The user's current scope is source organization and documentation only; application implementation is paused until requested.
+For government appeals or judicial filing references, read [legal channels and integrations](docs/LEGAL_AND_INTEGRATIONS.md). Implementation of the accepted pilot plan is authorized. Keep commits focused and verified on the existing shared branch.
