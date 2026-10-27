@@ -1,6 +1,8 @@
 package com.example.theekhai.data.remote
 
 import com.example.theekhai.contract.ComplaintPriorityDto
+import com.example.theekhai.contract.TriageAssistRequestDto
+import com.example.theekhai.contract.TriageAssistResponseDto
 import com.example.theekhai.contract.TriageResponseDto
 import com.example.theekhai.domain.usecase.TriageAiClient
 import io.ktor.client.HttpClient
@@ -13,6 +15,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -26,12 +29,14 @@ import kotlinx.serialization.json.put
 
 /**
  * OpenRouter AI triage and duplicate clustering client.
- * Calls OpenRouter (`/api/v1/chat/completions`) when configured with an `HttpClient` and `apiKey`,
- * and falls back deterministically to keyword-based municipal ontology classification when offline.
+ * - Uses the common Ktor backend (`/api/v1/complaints/triage`, backed by `OPENROUTER_API_KEY`) when `backendBaseUrl` is provided.
+ * - Or calls OpenRouter (`/api/v1/chat/completions`) directly when `apiKey` is provided.
+ * - Falls back deterministically to keyword-based municipal ontology classification when offline.
  */
 class OpenRouterApiClient(
     private val client: HttpClient? = null,
     private val apiKey: String = "",
+    private val backendBaseUrl: String = "",
     private val baseUrl: String = "https://openrouter.ai/api/v1",
     private val model: String = "openrouter/auto",
 ) : TriageAiClient {
@@ -44,6 +49,44 @@ class OpenRouterApiClient(
         category: String,
         existingClusters: List<Pair<String, String>>,
     ): TriageResponseDto {
+        // 1. Route through Ktor server `/api/v1/complaints/triage` (uses server's OPENROUTER_API_KEY)
+        if (client != null && backendBaseUrl.isNotBlank() && apiKey.isBlank()) {
+            try {
+                val response = client.post("${backendBaseUrl.trimEnd('/')}/api/v1/complaints/triage") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        json.encodeToString(
+                            TriageAssistRequestDto(
+                                title = title,
+                                description = description,
+                                address = "",
+                                language = "en",
+                            )
+                        )
+                    )
+                }
+                if (response.status.isSuccess()) {
+                    val dto = json.decodeFromString<TriageAssistResponseDto>(response.bodyAsText())
+                    val prio = runCatching { ComplaintPriorityDto.valueOf(dto.suggestedPriority.uppercase()) }
+                        .getOrDefault(ComplaintPriorityDto.MEDIUM)
+                    return TriageResponseDto(
+                        complaintId = complaintId,
+                        clusterId = dto.duplicateCaseIds.firstOrNull() ?: "cluster-${dto.suggestedCategory.lowercase()}",
+                        priority = prio,
+                        assignedDepartment = dto.suggestedDepartment,
+                        isDuplicate = dto.duplicateCaseIds.isNotEmpty(),
+                        reasoning = "${dto.summary} [${dto.provider}]",
+                        confidenceScore = 0.95,
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Fall through
+            }
+        }
+
+        // 2. Direct OpenRouter API call when apiKey is explicitly provided
         if (client != null && apiKey.isNotBlank()) {
             try {
                 val clustersText = if (existingClusters.isEmpty()) "None" else existingClusters.joinToString("\n") { "${it.first}: ${it.second}" }
@@ -95,7 +138,8 @@ class OpenRouterApiClient(
                         ?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
                     if (!content.isNullOrBlank()) {
                         val cleanJson = content.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-                        val parsed = json.parseToJsonElement(cleanJson) as? JsonObject
+                        val jsonSubstring = cleanJson.substringAfter('{', "").let { if (it.isNotEmpty()) "{${it.substringBeforeLast('}', "")}}" else cleanJson }
+                        val parsed = json.parseToJsonElement(jsonSubstring) as? JsonObject
                         if (parsed != null) {
                             val prioStr = parsed["priority"]?.jsonPrimitive?.contentOrNull ?: "MEDIUM"
                             val prio = runCatching { ComplaintPriorityDto.valueOf(prioStr.uppercase()) }.getOrDefault(ComplaintPriorityDto.MEDIUM)
@@ -123,6 +167,7 @@ class OpenRouterApiClient(
             }
         }
 
+        // 3. Deterministic local fallback
         val lower = "$title $description".lowercase()
         val priority = when {
             lower.contains("accident") || lower.contains("spark") || lower.contains("danger") || lower.contains("burst") ->

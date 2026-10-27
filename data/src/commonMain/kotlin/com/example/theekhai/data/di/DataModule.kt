@@ -40,7 +40,7 @@ val remoteDataModule: Module = module {
         KtorComplaintRemoteDataSource(client = get(), baseUrl = get<String>(DataQualifiers.BackendBaseUrl))
     }
     single { SupabaseConfig() }
-    single<TriageAiClient> { OpenRouterApiClient() }
+    single<TriageAiClient> { OpenRouterApiClient(client = get(), backendBaseUrl = get<String>(DataQualifiers.BackendBaseUrl)) }
     single<VoiceSpeechToTextClient> { SarvamApiClient() }
     single { TinyFishApiClient() }
 }
