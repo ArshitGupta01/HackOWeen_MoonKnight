@@ -54,4 +54,6 @@ This project follows Clean Architecture + MVVM with Koin DI, SQLite (SQLDelight)
 Ktor backend. Modules: `:core` (shared contract), `:domain`, `:data`, `:app:shared`, `:server`.
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the module rules, DI setup and the new-feature checklist.
 
+Contributor guidance and final checks: [agent.md](./agent.md), [security](./docs/SECURITY.md), [code style](./docs/CODE_STYLE.md), [database](./docs/DATABASE.md), [API](./docs/API.md), and [web design](./docs/DESIGN_SYSTEM.md). The connected Supabase project is named `TheekHai`; its planned role is authentication and private evidence storage, while Ktor remains the case backend.
+
 Extra test commands: `./gradlew :domain:jvmTest`, `./gradlew :data:jvmTest`.
