@@ -10,6 +10,7 @@ The current Ktor API is JSON at `/api/v1`. Today it exposes `GET /api/v1/greetin
 - Use pagination for lists; validate filters and sorting. Use an idempotency key for submissions and conflict detection for concurrent workflow edits.
 - Document actual request/response fields, authentication, rate limits, and examples alongside route implementation, ideally in an OpenAPI document checked against tests.
 - Document Supabase Auth/Storage and Hugging Face integration boundaries, environment variable names, and degraded behavior when they are implemented. Provider secrets remain server-side.
+- TinyFish is an optional future provider for source research and authorized browser assistance. See [integration references](LEGAL_AND_INTEGRATIONS.md). No TinyFish endpoint or adapter exists in TheekHai yet; any future API key belongs in server configuration.
 
 ## Planned resource families
 

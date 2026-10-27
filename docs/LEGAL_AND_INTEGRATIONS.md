@@ -35,8 +35,20 @@ This document records the user's supplied legal-channel requirements and the off
 
 **Project boundary:** a missed department deadline, rejected closure, or contradictory evidence must not automatically initiate judicial proceedings. An internal TheekHai case, a prepared document, an uploaded filing, and a court-accepted filing are distinct states. Record official acknowledgements and identifiers only when actually received.
 
+## 3. TinyFish
+
+**User decision:** include TinyFish as an optional integration candidate. Current scope remains documentation only; no account setup, credentials, paid runs, or automation has been performed.
+
+**Official reference:** [TinyFish developer documentation](https://docs.tinyfish.ai/) describes Search and Fetch for discovering and extracting sources, Research for source-backed reports, Agent for goal-driven web workflows, and Browser for controlled remote browser sessions. This overview was accessible and reviewed on 2026-10-27.
+
+**Potential project use:** research official service information, extract relevant guidance, and investigate authorized portal workflows. A future server-side adapter may support permitted status lookups or assisted navigation after the target portal's access rules and authorization are established. Select the smallest capability needed for the specific task.
+
+**Integration boundary:** TinyFish supplies browser/web tooling; it does not grant permission to access a government system, establish AAS eligibility, or authorize a court filing. Keep the AAS and eCourts restrictions above. Require specific authorization for submissions and the appropriate legal review for judicial filings. Do not treat an agent's success message as an official filing acknowledgement.
+
+**Future implementation notes:** keep any `TINYFISH_API_KEY` in server configuration; expose no key to clients. Limit permitted destinations and actions, minimize personal data sent to the service, and record the source URL, retrieval time, and official acknowledgement where applicable. Review provider data handling, costs, run limits, and failure/retry behavior before enabling it. Ktor remains the workflow authority; TinyFish results are external observations, not authority to change case status.
+
 ## Research evidence and limitations
 
-The official-domain search results reviewed on 2026-10-27 support the broad descriptions above. Direct page-open requests timed out or were inaccessible during this review. The full AAS manual and court-specific filing rules have not been reviewed. Availability of an authorized developer interface remains unverified; absence of a verified public API is not proof that no interface exists.
+The official-domain search results reviewed on 2026-10-27 support the AAS and eCourts descriptions above. Direct page-open requests for those services timed out or were inaccessible during that review. The full AAS manual and court-specific filing rules have not been reviewed. Availability of an authorized government developer interface remains unverified; absence of a verified public API is not proof that no interface exists. TinyFish's documentation overview was read directly; its integration has not been tested.
 
-Before changing either integration from research to implementation, record the specific official documentation/version, eligibility and permitted actions, authorization, handling of personal documents, and a verified test route here. Until then, keep these as source references and pending investigation items.
+Before changing an integration from research to implementation, record the specific official documentation/version, eligibility and permitted actions, authorization, handling of personal documents, and a verified test route here. Until then, keep these as source references and pending investigation items.

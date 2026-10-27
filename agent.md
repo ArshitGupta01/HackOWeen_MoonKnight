@@ -24,6 +24,8 @@ The project-specific [security](docs/SECURITY.md), [code style](docs/CODE_STYLE.
 
 [Legal channels and integration references](docs/LEGAL_AND_INTEGRATIONS.md) records Haryana AAS as the first government integration to investigate and eCourts as an authorized judicial filing channel requiring appropriate legal review. No API access, integration permission, outreach, or filing is established by those references. Internal SLA escalation is separate from an official appeal or court filing.
 
+TinyFish is an optional future integration candidate for source research and authorized browser assistance. Its capabilities and limits are recorded in the same integration reference. No automation is enabled; government access and filing requirements still apply. Any future TinyFish adapter belongs behind the Ktor backend with server-held credentials.
+
 ## Required module boundaries
 
 | Module | Responsibility | Allowed project dependencies |
@@ -84,7 +86,7 @@ Build: persistent complaint intake (description, category, address/location, opt
 
 After the core works: editable voice transcription with text fallback, user-confirmed AI structuring, AI duplicate ranking, in-app updates, and an operational dashboard for overdue work and pending review.
 
-Defer government portal navigation/autofill, unrelated service explorers, autonomous browser agents, predictive maintenance, automatic proof of repair, new iOS features, and legal-compliance simulators. Never invent applicant identity or eligibility data; label synthetic test data clearly.
+Defer unrelated service explorers, predictive maintenance, automatic proof of repair, new iOS features, and legal-compliance simulators. TinyFish-assisted portal navigation or automation is a future candidate requiring a defined authorized workflow before implementation. Never invent applicant identity or eligibility data; label synthetic test data clearly.
 
 ## Adding a feature
 
