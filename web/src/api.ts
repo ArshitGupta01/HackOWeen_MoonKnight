@@ -120,7 +120,7 @@ function setStoredToken(token: string | null) {
   }
 }
 
-export async function api<T>(path:string, options:RequestInit = {}):Promise<T> {
+export async function api<T>(path:string, options:RequestInit & { timeoutMs?: number } = {}):Promise<T> {
   const headers = new Headers(options.headers);
   if(options.body) headers.set('Content-Type','application/json');
   if(identity?.csrf) headers.set('X-CSRF-Token',identity.csrf);
@@ -128,7 +128,9 @@ export async function api<T>(path:string, options:RequestInit = {}):Promise<T> {
   if(bearer && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${bearer}`);
   }
-  const response = await fetch(`/api/v1${path}`,{...options,headers,credentials:'same-origin',signal:options.signal ?? AbortSignal.timeout(25000)});
+  const timeoutMs = options.timeoutMs ?? 45000;
+  const { timeoutMs: _t, ...fetchOptions } = options;
+  const response = await fetch(`/api/v1${path}`,{...fetchOptions,headers,credentials:'same-origin',signal:options.signal ?? AbortSignal.timeout(timeoutMs)});
   const data = await response.json().catch(() => null);
   if(!response.ok) throw new Error(data?.message ?? `Request failed (${response.status}). Please retry.`);
   return data as T;

@@ -9,7 +9,7 @@ import {
   getSavedSources,
   saveSourceBookmark,
   removeSavedSource,
-  triageComplaint, transcribeAudio, reverseGeocode, verifyCaseResolution, importLegalSource, draftComplaintEmail, sendComplaintEmail, instantSignIn, getLeaderboard, getDummyUsers, LeaderboardResponse, LeaderboardEntry,
+  triageComplaint, transcribeAudio, reverseGeocode, verifyCaseResolution, importLegalSource, draftComplaintEmail, sendComplaintEmail, getGmailStatus, instantSignIn, getLeaderboard, getDummyUsers, LeaderboardResponse, LeaderboardEntry,
   CaseRecord,
   CaseDetail,
   LegalAnswer,
@@ -610,6 +610,29 @@ summary.append(el('p','microcopy',t('Pilot service target, not a statutory deadl
     el('p', 'microcopy', t('Send statutory grievance petition directly to the responsible government authority via Gmail.', 'जीमेल के माध्यम से जिम्मेदार सरकारी प्राधिकारी को सीधे वैधानिक शिकायत भेजें।')),
     el('p', 'microcopy', 'Verified Sender: arshitgupta34@gmail.com')
   );
+  const authStatusWrap = el('div', 'gmail-auth-status');
+  authStatusWrap.style.margin = '8px 0 12px';
+  getGmailStatus().then(status => {
+    authStatusWrap.replaceChildren();
+    if (status.connected) {
+      authStatusWrap.append(el('span', 'geo-badge', '🟢 ' + t('Gmail Connected: arshitgupta34@gmail.com', 'जीमेल कनेक्टेड: arshitgupta34@gmail.com')));
+    } else if (status.authUrl && status.configured) {
+      const connectBtn = link(
+        t('🔗 Connect Google Account (arshitgupta34@gmail.com) ↗', '🔗 गूगल अकाउंट कनेक्ट करें (arshitgupta34@gmail.com) ↗'),
+        status.authUrl,
+        'button small secondary'
+      );
+      connectBtn.setAttribute('target', '_blank');
+      connectBtn.style.marginLeft = '8px';
+      authStatusWrap.append(
+        el('span', 'geo-badge', '⚪ ' + t('Gmail Ready for Sign-in', 'जीमेल साइन-इन के लिए तैयार')),
+        connectBtn
+      );
+    } else {
+      authStatusWrap.append(el('span', 'geo-badge', 'ℹ️ ' + t('Direct Delivery & Offline Queue Ready (Sender: arshitgupta34@gmail.com)', 'सीधा वितरण और ऑफ़लाइन कतार तैयार (प्रेषक: arshitgupta34@gmail.com)')));
+    }
+  }).catch(() => {});
+
   const emailAlert = el('div');
   const emailFormWrap = el('div', 'email-form-wrap');
   const draftBtn = button(t('🤖 Discover Authority & Draft Email', '🤖 अधिकारी संपर्क खोजें और ईमेल ड्राफ्ट करें'), async () => {
@@ -628,6 +651,7 @@ summary.append(el('p','microcopy',t('Pilot service target, not a statutory deadl
   function renderEmailComposer(draft: import('./api').EmailDraft) {
     emailFormWrap.replaceChildren();
     emailAlert.replaceChildren();
+    const senderBadge = el('p', 'microcopy', '📤 ' + t('Sender: ', 'प्रेषक: ') + (draft.senderEmail || 'arshitgupta34@gmail.com') + ' · ' + t('Discovery Mode: ', 'खोज मोड: ') + draft.discoveryMode);
     const toField = field(t('Authority Email (Discovered)', 'प्राधिकारी ईमेल (खोजा गया)'), 'toEmail');
     toField.input.value = draft.recipientEmail;
     const authNote = el('p', 'microcopy', `🏢 ${draft.recipientAuthority} (${draft.recipientDepartment}) · Source: ${draft.officialSourceUrl}`);
@@ -647,17 +671,28 @@ summary.append(el('p','microcopy',t('Pilot service target, not a statutory deadl
         const res = await sendComplaintEmail(record.id, toField.input.value, subjField.input.value, bodyText.value);
         notice(emailAlert, `✓ ${res.message}`);
         emailFormWrap.replaceChildren();
-        await render();
+        const newEvent = el('div', 'timeline-event');
+        newEvent.append(
+          el('span', 'label', 'GRIEVANCE EMAILED'),
+          el('p', '', `Official petition sent to ${toField.input.value} via Gmail (${res.messageId})`),
+          el('time', 'microcopy', date(res.sentAt || Date.now()))
+        );
+        const firstEvent = timeline.querySelector('.timeline-event');
+        if (firstEvent) {
+          timeline.insertBefore(newEvent, firstEvent);
+        } else {
+          timeline.append(newEvent);
+        }
       } catch (err) {
         notice(emailAlert, errorMessage(err), true);
         sendBtn.disabled = false;
       }
     });
 
-    emailFormWrap.append(toField.wrapper, authNote, subjField.wrapper, bodyField, sendBtn);
+    emailFormWrap.append(senderBadge, toField.wrapper, authNote, subjField.wrapper, bodyField, sendBtn);
   }
 
-  emailSection.append(draftBtn, emailAlert, emailFormWrap);
+  emailSection.append(authStatusWrap, draftBtn, emailAlert, emailFormWrap);
   timeline.append(el('h2','',t('The complete story','पूरा घटनाक्रम')));
 for(const event of [...data.events].reverse()){const item=el('div','timeline-event');item.append(el('span','label',event.action.replaceAll('_',' ')),el('p','',event.note),el('time','microcopy',date(event.at)));timeline.append(item)}body.append(summary,tasks,emailSection,timeline);
   const actions=el('aside','panel action-panel');actions.append(el('p','eyebrow',t('NEXT ACTION','अगला कदम')),el('h2','',t('Move it forward.','आगे बढ़ाएँ।')));const reason=el('textarea');reason.rows=4;reason.placeholder=t('Explain your action or provide review notes.','अपना निर्णय या समीक्षा टिप्पणी लिखें।');reason.setAttribute('aria-label',reason.placeholder);const alert=el('div');actions.append(reason,alert);

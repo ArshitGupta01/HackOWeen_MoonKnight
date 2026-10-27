@@ -32,7 +32,7 @@ fun main() {
 /** Test identity is injectable only in-process; production has no development login bypass. */
 fun Application.module(databasePath: String? = null, testIdentity: ((ApplicationCall) -> Actor)? = null) {
     install(Koin) { modules(serverModule(databasePath)) }
-    install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true; isLenient = false }) }
+    install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true; isLenient = false; encodeDefaults = true }) }
     val allowedOrigins = EnvConfig.get("THEEKHAI_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080").split(',').map { it.trim() }.filter { it.isNotEmpty() }
     fun isAllowedOrigin(origin: String?): Boolean {
         if (origin == null) return true

@@ -14,6 +14,7 @@ import java.util.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.*
 import java.net.URI
 import java.security.MessageDigest
@@ -1369,10 +1370,18 @@ class LegalService(
         var agentExplanation: String? = null
 
         if (tinyFishApiKey.isNotBlank()) {
-            val extracted = extractViaTinyFishAgent(
-                url = portalUrl,
-                goal = "Verify official municipal service delivery and resolution inspection requirements for category ${record.category} (${record.department}). Return JSON with 'title' and 'content'."
-            )
+            val extracted = withTimeoutOrNull(6000L) {
+                try {
+                    extractViaTinyFishAgent(
+                        url = portalUrl,
+                        goal = "Verify official municipal service delivery and resolution inspection requirements for category ${record.category} (${record.department}). Return JSON with 'title' and 'content'."
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
+                }
+            }
             if (extracted != null) {
                 scrapedSnippet = "${extracted.first}: ${extracted.second.take(300)}"
                 agentExplanation = "TinyFish Agent inspected $portalUrl and cross-checked case #${record.id.take(8)} (${tasks.count { it.complete }}/${tasks.size} tasks complete)."
@@ -1550,7 +1559,15 @@ class LegalService(
 
         if (tinyFishApiKey.isNotBlank()) {
             val goal = "Find the official email address and designation of the government authority or grievance cell responsible for $department in Ward ${ward ?: "4"}, Gurugram / Haryana on this portal. Return the email and officer title."
-            val extracted = extractViaTinyFishAgent(portalUrl, goal)
+            val extracted = withTimeoutOrNull(5000L) {
+                try {
+                    extractViaTinyFishAgent(portalUrl, goal)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
+                }
+            }
             if (extracted != null) {
                 val combinedText = "${extracted.first} ${extracted.second}"
                 val emailRegex = Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.(?:gov\\.in|nic\\.in|org\\.in|in|com)")
@@ -1635,37 +1652,43 @@ class LegalService(
                 - Professional, concise, under 250 words.
             """.trimIndent()
 
-            runCatching {
-                val response = client.post("$openRouterBaseUrl/chat/completions") {
-                    header(io.ktor.http.HttpHeaders.Authorization, "Bearer $openRouterApiKey")
-                    header("HTTP-Referer", "https://theekhai.in")
-                    header("X-Title", "TheekHai Civic Platform")
-                    contentType(io.ktor.http.ContentType.Application.Json)
-                    setBody(
-                        buildJsonObject {
-                            put("model", openRouterModel)
-                            putJsonArray("messages") {
-                                addJsonObject {
-                                    put("role", "system")
-                                    put("content", "You are an administrative civic grievance draft writer for Indian state departments and municipal corporations.")
+            withTimeoutOrNull(6000L) {
+                try {
+                    val response = client.post("$openRouterBaseUrl/chat/completions") {
+                        header(io.ktor.http.HttpHeaders.Authorization, "Bearer $openRouterApiKey")
+                        header("HTTP-Referer", "https://theekhai.in")
+                        header("X-Title", "TheekHai Civic Platform")
+                        contentType(io.ktor.http.ContentType.Application.Json)
+                        setBody(
+                            buildJsonObject {
+                                put("model", openRouterModel)
+                                putJsonArray("messages") {
+                                    addJsonObject {
+                                        put("role", "system")
+                                        put("content", "You are an administrative civic grievance draft writer for Indian state departments and municipal corporations.")
+                                    }
+                                    addJsonObject {
+                                        put("role", "user")
+                                        put("content", prompt)
+                                    }
                                 }
-                                addJsonObject {
-                                    put("role", "user")
-                                    put("content", prompt)
-                                }
-                            }
-                            put("temperature", 0.3)
-                            put("max_tokens", 450)
-                        }.toString()
-                    )
-                }
-                if (response.status.value in 200..299) {
-                    val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
-                    val content = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
-                        ?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
-                    if (!content.isNullOrBlank()) {
-                        emailBody = content.trim()
+                                put("temperature", 0.3)
+                                put("max_tokens", 450)
+                            }.toString()
+                        )
                     }
+                    if (response.status.value in 200..299) {
+                        val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
+                        val content = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+                            ?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
+                        if (!content.isNullOrBlank()) {
+                            emailBody = content.trim()
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Fall back to deterministic statutory grievance letter
                 }
             }
         }
