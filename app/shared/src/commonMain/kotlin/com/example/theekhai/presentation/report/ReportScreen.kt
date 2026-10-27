@@ -1,12 +1,19 @@
 package com.example.theekhai.presentation.report
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +26,7 @@ import com.example.theekhai.navigation.LocalNavigator
 import com.example.theekhai.navigation.Route
 import com.example.theekhai.ui.components.*
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
+import com.example.theekhai.ui.theme.TheekHaiColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,286 +54,429 @@ fun ReportScreen() {
         "OTHER" to "Something else"
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(horizontal = 48.dp, vertical = 32.dp)
-    ) {
-        // Page heading
-        Column(modifier = Modifier.padding(bottom = 30.dp)) {
-            Eyebrow("YOUR VOICE MATTERS")
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(
-                text = "Let's make it right.",
-                style = MaterialTheme.typography.headlineLarge,
-                color = ext.ink,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "A few details help the right team understand the problem.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = ext.muted,
-            )
-        }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isWide = maxWidth >= 850.dp
+        val horizontalPadding = if (isWide) 48.dp else 16.dp
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(60.dp)
-        ) {
-            // Left: Report form
-            Column(modifier = Modifier.weight(1.6f)) {
-                PanelCard {
-                    // Title
-                    Text("Give the issue a short title", style = MaterialTheme.typography.labelMedium, color = ext.ink)
-                    Spacer(modifier = Modifier.height(9.dp))
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        placeholder = { Text("e.g. Streetlight out near the crossing", fontSize = 12.sp, color = Color(0xFF839083)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(3.dp),
-                        singleLine = true,
-                        colors = reportFieldColors(ext)
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Category dropdown
-                    Text("Type of issue", style = MaterialTheme.typography.labelMedium, color = ext.ink)
-                    Spacer(modifier = Modifier.height(9.dp))
-                    var categoryExpanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(
-                        expanded = categoryExpanded,
-                        onExpandedChange = { categoryExpanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = categories.find { it.first == selectedCategory }?.second ?: "",
-                            onValueChange = {},
-                            readOnly = true,
-                            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                            shape = RoundedCornerShape(3.dp),
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
-                            colors = reportFieldColors(ext)
-                        )
-                        ExposedDropdownMenu(
-                            expanded = categoryExpanded,
-                            onDismissRequest = { categoryExpanded = false }
-                        ) {
-                            categories.forEach { (value, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        selectedCategory = value
-                                        categoryExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Description
-                    Text("What is happening?", style = MaterialTheme.typography.labelMedium, color = ext.ink)
-                    Spacer(modifier = Modifier.height(9.dp))
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        placeholder = { Text("Describe the issue and how it affects the neighbourhood.", fontSize = 12.sp, color = Color(0xFF839083)) },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
-                        shape = RoundedCornerShape(3.dp),
-                        maxLines = 8,
-                        colors = reportFieldColors(ext)
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Audio Recording Panel
-                    Surface(
-                        color = Color(0xFFEEF1E9),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(15.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Record button
-                                TheekHaiButton(
-                                    text = if (isRecording) "⏹ Stop recording" else "🎙 Record a voice note",
-                                    onClick = {
-                                        if (isRecording) {
-                                            isRecording = false
-                                            hasRecording = true
-                                        } else {
-                                            isRecording = true
-                                            hasRecording = false
-                                        }
-                                    },
-                                    isSecondary = true,
-                                )
-
-                                if (hasRecording) {
-                                    TextButton(onClick = {
-                                        // TODO: Wire transcription to Groq Whisper
-                                        statusMessage = "Transcription sent to Groq Whisper..."
-                                    }) {
-                                        Text("Transcribe", fontSize = 12.sp, color = ext.green)
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = when {
-                                    isRecording -> "Microphone is recording. Stop when finished."
-                                    hasRecording -> "Recording ready. Transcribe it or continue with typed text."
-                                    else -> "Prefer speaking? Record, then transcribe and edit before submitting."
-                                },
-                                fontSize = 11.sp,
-                                color = ext.muted,
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Address
-                    Text("Address or landmark", style = MaterialTheme.typography.labelMedium, color = ext.ink)
-                    Spacer(modifier = Modifier.height(9.dp))
-                    OutlinedTextField(
-                        value = address,
-                        onValueChange = { address = it },
-                        placeholder = { Text("e.g. MG Road Junction, Near Central Park", fontSize = 12.sp, color = Color(0xFF839083)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(3.dp),
-                        singleLine = true,
-                        colors = reportFieldColors(ext)
-                    )
-
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = horizontalPadding, vertical = 20.dp)
+            ) {
+                // Page Heading
+                Column(modifier = Modifier.padding(bottom = 20.dp)) {
+                    Eyebrow("CITIZEN GRIEVANCE INTAKE")
                     Spacer(modifier = Modifier.height(8.dp))
-
-                    TheekHaiButton(
-                        text = "📍 Use my location",
-                        onClick = { /* TODO: get GPS */ },
-                        isSecondary = true,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Location is optional. You can describe the address instead.",
-                        fontSize = 11.sp,
+                        text = "Report an issue",
+                        style = if (isWide) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ext.ink,
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "A few details help the right municipal team understand and fix the problem.",
+                        style = MaterialTheme.typography.bodyMedium,
                         color = ext.muted,
                     )
+                }
 
-                    Spacer(modifier = Modifier.height(25.dp))
-
-                    // Consent checkbox
+                if (isWide) {
+                    // ── Wide Desktop Layout: 2 Columns ──
                     Row(
-                        verticalAlignment = Alignment.Top,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(40.dp)
                     ) {
-                        Checkbox(
-                            checked = consentGranted,
-                            onCheckedChange = { consentGranted = it },
-                            colors = CheckboxDefaults.colors(checkedColor = ext.green)
-                        )
-                        Text(
-                            text = "I agree to share these details with the teams handling this report.",
-                            fontSize = 12.sp,
-                            lineHeight = 20.sp,
-                            color = ext.ink,
+                        Column(modifier = Modifier.weight(1.5f)) {
+                            ReportForm(
+                                title = title,
+                                onTitleChange = { title = it },
+                                selectedCategory = selectedCategory,
+                                onCategoryChange = { selectedCategory = it },
+                                categories = categories,
+                                description = description,
+                                onDescriptionChange = { description = it },
+                                isRecording = isRecording,
+                                hasRecording = hasRecording,
+                                onToggleRecording = {
+                                    isRecording = !isRecording
+                                    if (!isRecording) hasRecording = true
+                                },
+                                address = address,
+                                onAddressChange = { address = it },
+                                consentGranted = consentGranted,
+                                onConsentChange = { consentGranted = it },
+                                statusMessage = statusMessage,
+                                isError = isError,
+                                isSubmitting = isSubmitting,
+                                onSubmit = {
+                                    if (!consentGranted) {
+                                        statusMessage = "Please consent before submitting."
+                                        isError = true
+                                        return@ReportForm
+                                    }
+                                    isSubmitting = true
+                                    statusMessage = "Submitting report for AI triage..."
+                                    isError = false
+                                    navigator.navigateTo(Route.Workspace)
+                                },
+                                onSaveDraft = {
+                                    statusMessage = "Draft saved on this device."
+                                    isError = false
+                                }
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f).padding(top = 10.dp)) {
+                            WhatHappensNextCard()
+                        }
+                    }
+                } else {
+                    // ── Compact Mobile Layout: 1 Column Full Width ──
+                    ReportForm(
+                        title = title,
+                        onTitleChange = { title = it },
+                        selectedCategory = selectedCategory,
+                        onCategoryChange = { selectedCategory = it },
+                        categories = categories,
+                        description = description,
+                        onDescriptionChange = { description = it },
+                        isRecording = isRecording,
+                        hasRecording = hasRecording,
+                        onToggleRecording = {
+                            isRecording = !isRecording
+                            if (!isRecording) hasRecording = true
+                        },
+                        address = address,
+                        onAddressChange = { address = it },
+                        consentGranted = consentGranted,
+                        onConsentChange = { consentGranted = it },
+                        statusMessage = statusMessage,
+                        isError = isError,
+                        isSubmitting = isSubmitting,
+                        onSubmit = {
+                            if (!consentGranted) {
+                                statusMessage = "Please consent before submitting."
+                                isError = true
+                                return@ReportForm
+                            }
+                            isSubmitting = true
+                            statusMessage = "Submitting report for AI triage..."
+                            isError = false
+                            navigator.navigateTo(Route.Workspace)
+                        },
+                        onSaveDraft = {
+                            statusMessage = "Draft saved on this device."
+                            isError = false
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                    WhatHappensNextCard()
+                    Spacer(modifier = Modifier.height(80.dp)) // padding for floating button
+                }
+            }
+
+            // Mobile Floating Action Button to Submit
+            if (!isWide && title.isNotBlank() && description.isNotBlank()) {
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        if (!consentGranted) {
+                            statusMessage = "Please check the consent box below."
+                            isError = true
+                            return@ExtendedFloatingActionButton
+                        }
+                        isSubmitting = true
+                        statusMessage = "Submitting report..."
+                        isError = false
+                        navigator.navigateTo(Route.Workspace)
+                    },
+                    icon = { Icon(Icons.Default.Send, contentDescription = "Submit") },
+                    text = { Text("Submit Report", fontWeight = FontWeight.Bold) },
+                    containerColor = ext.green,
+                    contentColor = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReportForm(
+    title: String,
+    onTitleChange: (String) -> Unit,
+    selectedCategory: String,
+    onCategoryChange: (String) -> Unit,
+    categories: List<Pair<String, String>>,
+    description: String,
+    onDescriptionChange: (String) -> Unit,
+    isRecording: Boolean,
+    hasRecording: Boolean,
+    onToggleRecording: () -> Unit,
+    address: String,
+    onAddressChange: (String) -> Unit,
+    consentGranted: Boolean,
+    onConsentChange: (Boolean) -> Unit,
+    statusMessage: String?,
+    isError: Boolean,
+    isSubmitting: Boolean,
+    onSubmit: () -> Unit,
+    onSaveDraft: () -> Unit,
+) {
+    val ext = LocalTheekHaiColors.current
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ext.paper,
+        shape = RoundedCornerShape(8.dp),
+        border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Title
+            Text("Issue title", style = MaterialTheme.typography.labelMedium, color = ext.ink, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedTextField(
+                value = title,
+                onValueChange = onTitleChange,
+                placeholder = { Text("e.g. Broken streetlight near park entrance", fontSize = 13.sp, color = ext.muted) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(6.dp),
+                singleLine = true,
+                colors = reportFieldColors(ext)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Category dropdown
+            Text("Type of issue", style = MaterialTheme.typography.labelMedium, color = ext.ink, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(6.dp))
+            var categoryExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = categoryExpanded,
+                onExpandedChange = { categoryExpanded = it },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = categories.find { it.first == selectedCategory }?.second ?: "",
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                    shape = RoundedCornerShape(6.dp),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
+                    colors = reportFieldColors(ext)
+                )
+                ExposedDropdownMenu(
+                    expanded = categoryExpanded,
+                    onDismissRequest = { categoryExpanded = false }
+                ) {
+                    categories.forEach { (value, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label, fontSize = 14.sp) },
+                            onClick = {
+                                onCategoryChange(value)
+                                categoryExpanded = false
+                            }
                         )
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                    // Status message
-                    AnimatedVisibility(visible = statusMessage != null) {
-                        Surface(
-                            color = if (isError) Color(0xFFF9EDE1) else Color(0xFFE7EEE1),
-                            shape = RoundedCornerShape(4.dp),
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 15.dp)
+            // Description
+            Text("What is happening?", style = MaterialTheme.typography.labelMedium, color = ext.ink, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedTextField(
+                value = description,
+                onValueChange = onDescriptionChange,
+                placeholder = { Text("Describe the condition and how it affects the area...", fontSize = 13.sp, color = ext.muted) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+                shape = RoundedCornerShape(6.dp),
+                maxLines = 6,
+                colors = reportFieldColors(ext)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Voice Recording Bar
+            Surface(
+                color = ext.sidebarBg,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledIconButton(
+                            onClick = onToggleRecording,
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = if (isRecording) Color(0xFFEF4444) else ext.green
+                            )
                         ) {
+                            Icon(
+                                imageVector = if (isRecording) Icons.Default.Check else Icons.Default.Mic,
+                                contentDescription = "Record",
+                                tint = Color.White
+                            )
+                        }
+                        Column {
                             Text(
-                                text = statusMessage ?: "",
-                                color = if (isError) Color(0xFF8A3D24) else ext.ink,
-                                fontSize = 13.sp,
-                                lineHeight = 20.sp,
-                                modifier = Modifier.padding(15.dp)
+                                text = if (isRecording) "Recording voice note..." else if (hasRecording) "Voice note recorded" else "Record voice grievance",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ext.ink
+                            )
+                            Text(
+                                text = "Supports 12+ Indian languages",
+                                fontSize = 10.sp,
+                                color = ext.muted
                             )
                         }
                     }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(22.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TheekHaiButton(
-                            text = "Review & submit report  ↗",
-                            onClick = {
-                                if (!consentGranted) {
-                                    statusMessage = "Please consent to sharing before submitting."
-                                    isError = true
-                                    return@TheekHaiButton
-                                }
-                                isSubmitting = true
-                                statusMessage = "Submitting report for AI triage..."
-                                isError = false
-                                // TODO: Wire to API
-                                navigator.navigateTo(Route.Workspace)
-                            },
-                            enabled = title.isNotBlank() && description.isNotBlank() && !isSubmitting,
-                        )
-                        TextButton(onClick = {
-                            statusMessage = "Draft saved on this device."
-                            isError = false
-                        }) {
-                            Text("Save draft on this device", fontSize = 12.sp, color = ext.green)
+                    if (hasRecording) {
+                        Surface(
+                            color = TheekHaiColors.GreenSurface,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "✓ Attached",
+                                fontSize = 10.sp,
+                                color = ext.green,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
                         }
                     }
                 }
             }
 
-            // Right: Aside info
-            Column(modifier = Modifier.weight(1f).padding(top = 30.dp)) {
-                Eyebrow("WHAT HAPPENS NEXT")
-                Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Address / Landmark
+            Text("Address or landmark", style = MaterialTheme.typography.labelMedium, color = ext.ink, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedTextField(
+                value = address,
+                onValueChange = onAddressChange,
+                placeholder = { Text("e.g. 5th Cross Road near Community Park", fontSize = 13.sp, color = ext.muted) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(6.dp),
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = { onAddressChange("Ward 4, MG Road Crossing") }) {
+                        Icon(Icons.Default.LocationOn, contentDescription = "Use location", tint = ext.green)
+                    }
+                },
+                colors = reportFieldColors(ext)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Consent Checkbox
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.clickable { onConsentChange(!consentGranted) }
+            ) {
+                Checkbox(
+                    checked = consentGranted,
+                    onCheckedChange = onConsentChange,
+                    colors = CheckboxDefaults.colors(checkedColor = ext.green)
+                )
                 Text(
-                    text = "A report with\na way forward.",
-                    style = MaterialTheme.typography.headlineLarge,
+                    text = "I consent to sharing this report with municipal teams.",
+                    fontSize = 12.sp,
                     color = ext.ink,
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Your report goes to an accountable department. You can follow tasks, due dates and the final review from your workspace.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ext.muted,
-                    lineHeight = 20.sp,
-                )
-
-                Spacer(modifier = Modifier.height(22.dp))
-                TheekHaiDivider()
-                Spacer(modifier = Modifier.height(22.dp))
-
-                Text(
-                    text = "This is a civic pilot. It is not an emergency service.",
-                    fontSize = 12.sp,
-                    lineHeight = 20.sp,
-                    color = Color(0xFF9A5B18),
-                )
-
-                Spacer(modifier = Modifier.height(22.dp))
-                TheekHaiDivider()
-                Spacer(modifier = Modifier.height(22.dp))
-
-                Text(
-                    text = "How we use your information →",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.W600,
-                    color = ext.green,
-                )
             }
+
+            // Status message
+            AnimatedVisibility(visible = statusMessage != null) {
+                Surface(
+                    color = if (isError) Color(0xFFF9EDE1) else Color(0xFFE7EEE1),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+                ) {
+                    Text(
+                        text = statusMessage ?: "",
+                        color = if (isError) Color(0xFF8A3D24) else ext.ink,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TheekHaiButton(
+                    text = if (isSubmitting) "Submitting..." else "Submit report ↗",
+                    onClick = onSubmit,
+                    enabled = title.isNotBlank() && description.isNotBlank() && !isSubmitting,
+                    modifier = Modifier.weight(1f)
+                )
+
+                OutlinedButton(
+                    onClick = onSaveDraft,
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text("Save draft", fontSize = 12.sp, color = ext.ink)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WhatHappensNextCard() {
+    val ext = LocalTheekHaiColors.current
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ext.sidebarBg,
+        shape = RoundedCornerShape(8.dp),
+        border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Eyebrow("WHAT HAPPENS NEXT")
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Accountable resolution.",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = ext.ink,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Your grievance is assigned to the responsible department with statutory deadlines under public service guarantee laws. Track every status change in your workspace.",
+                style = MaterialTheme.typography.bodySmall,
+                color = ext.muted,
+                lineHeight = 18.sp
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "Civic pilot • Not for active life-safety emergencies",
+                fontSize = 11.sp,
+                color = TheekHaiColors.Amber,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
@@ -333,7 +484,7 @@ fun ReportScreen() {
 @Composable
 private fun reportFieldColors(ext: com.example.theekhai.ui.theme.TheekHaiExtendedColors) =
     OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = Color(0xFFCDD4C9),
+        focusedBorderColor = ext.green,
         unfocusedBorderColor = Color(0xFFCDD4C9),
         focusedContainerColor = Color(0xFFFFFEF9),
         unfocusedContainerColor = Color(0xFFFFFEF9),

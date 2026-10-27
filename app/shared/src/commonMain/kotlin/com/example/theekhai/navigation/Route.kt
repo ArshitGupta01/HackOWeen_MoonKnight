@@ -10,6 +10,7 @@ sealed class Route(val path: String) {
     data object Signup : Route("/signup")
     data object Report : Route("/report")
     data object Workspace : Route("/workspace")
+    data object Map : Route("/map")
     data object Library : Route("/library")
     data object Account : Route("/account")
     data object CommandCenter : Route("/admin")

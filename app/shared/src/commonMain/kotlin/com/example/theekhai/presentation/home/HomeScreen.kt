@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,41 +37,42 @@ fun HomeScreen() {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isWide = maxWidth >= 850.dp
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-        ) {
-            // ── Hero Section ──
-            if (isWide) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 48.dp)
-                        .padding(top = 62.dp, bottom = 46.dp),
-                    horizontalArrangement = Arrangement.spacedBy(42.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1.1f)) {
-                        HeroCopy(navigator = navigator, ext = ext)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                // ── Hero Section ──
+                if (isWide) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 48.dp)
+                            .padding(top = 48.dp, bottom = 36.dp),
+                        horizontalArrangement = Arrangement.spacedBy(42.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1.1f)) {
+                            HeroCopy(navigator = navigator, ext = ext, isWide = true)
+                        }
+                        Box(modifier = Modifier.weight(0.9f)) {
+                            CityIllustration(ext = ext)
+                        }
                     }
-                    Box(modifier = Modifier.weight(0.9f)) {
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp)
+                    ) {
+                        HeroCopy(navigator = navigator, ext = ext, isWide = false)
                         CityIllustration(ext = ext)
                     }
                 }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 32.dp),
-                    verticalArrangement = Arrangement.spacedBy(32.dp)
-                ) {
-                    HeroCopy(navigator = navigator, ext = ext)
-                    CityIllustration(ext = ext)
-                }
-            }
 
-            TheekHaiDivider()
+                TheekHaiDivider()
 
             // ── Promise Strip (Numbered Steps) ──
             val promisePadding = if (isWide) 48.dp else 20.dp
@@ -247,16 +250,35 @@ fun HomeScreen() {
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(40.dp))
+            }
+
+            // Mobile Floating Action Button to Report
+            if (!isWide) {
+                FloatingActionButton(
+                    onClick = { navigator.navigateTo(Route.Report) },
+                    containerColor = ext.green,
+                    contentColor = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Report an issue")
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun HeroCopy(navigator: AppNavigator, ext: com.example.theekhai.ui.theme.TheekHaiExtendedColors) {
+private fun HeroCopy(
+    navigator: AppNavigator,
+    ext: com.example.theekhai.ui.theme.TheekHaiExtendedColors,
+    isWide: Boolean
+) {
     Column {
         Eyebrow("SMALL REPORTS. MEANINGFUL CHANGE.")
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(if (isWide) 16.dp else 10.dp))
 
         Text(
             text = buildAnnotatedString {
@@ -266,21 +288,21 @@ private fun HeroCopy(navigator: AppNavigator, ext: com.example.theekhai.ui.theme
                 }
             },
             style = MaterialTheme.typography.displayLarge.copy(
-                fontSize = 52.sp,
-                lineHeight = 58.sp,
-                letterSpacing = (-1.5).sp,
+                fontSize = if (isWide) 50.sp else 32.sp,
+                lineHeight = if (isWide) 56.sp else 38.sp,
+                letterSpacing = (-1.0).sp,
             ),
             color = ext.ink,
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(if (isWide) 16.dp else 10.dp))
 
         Text(
             text = "The broken streetlight. The overflowing drain. The road that needs care. Report it, follow the work, and help make it right.",
-            style = MaterialTheme.typography.bodyLarge,
+            style = if (isWide) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
             color = ext.muted,
-            lineHeight = 24.sp
+            lineHeight = if (isWide) 24.sp else 20.sp
         )
 
         Spacer(modifier = Modifier.height(28.dp))
