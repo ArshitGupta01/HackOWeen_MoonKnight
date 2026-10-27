@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS LegalMonitor (
+ id TEXT NOT NULL PRIMARY KEY, remoteMonitorId TEXT, name TEXT NOT NULL, monitorType TEXT NOT NULL,
+ target TEXT NOT NULL, jurisdiction TEXT NOT NULL, language TEXT NOT NULL, scheduleCron TEXT NOT NULL,
+ status TEXT NOT NULL, lastCheckedAt INTEGER, lastStatus TEXT
+);

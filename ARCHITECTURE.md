@@ -1,5 +1,7 @@
 # Architecture
 
+The connected Supabase project named `TheekHai` is planned for authentication and private evidence storage. Ktor remains the authority for case workflow; its SQLDelight-backed SQLite database stores case records. Supabase integration and the browser-native frontend are not yet implemented. See [agent.md](agent.md) and the project guides in [docs](docs/) for current decisions and release checks.
+
 Clean Architecture + MVVM, Kotlin Multiplatform, Koin for dependency injection, one SQLite schema
 (SQLDelight) on Android / iOS / Desktop, and a Ktor backend that shares contracts with the apps.
 

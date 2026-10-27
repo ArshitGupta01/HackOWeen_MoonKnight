@@ -1,0 +1,71 @@
+CREATE TABLE PilotCase (
+ id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL, category TEXT NOT NULL,
+ address TEXT NOT NULL, latitude REAL, longitude REAL, citizenId TEXT NOT NULL, department TEXT NOT NULL,
+ priority TEXT NOT NULL, status TEXT NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL,
+ dueAt INTEGER NOT NULL, version INTEGER NOT NULL, escalation INTEGER NOT NULL, closureBy TEXT
+);
+CREATE INDEX PilotCase_owner ON PilotCase(citizenId);
+CREATE INDEX PilotCase_deadline ON PilotCase(status, dueAt);
+CREATE TABLE PilotTask (
+ id TEXT NOT NULL PRIMARY KEY, caseId TEXT NOT NULL REFERENCES PilotCase(id), department TEXT NOT NULL,
+ title TEXT NOT NULL, required INTEGER NOT NULL, complete INTEGER NOT NULL
+);
+CREATE TABLE PilotEvent (
+ id TEXT NOT NULL PRIMARY KEY, caseId TEXT NOT NULL REFERENCES PilotCase(id), actorId TEXT NOT NULL,
+ action TEXT NOT NULL, note TEXT NOT NULL, at INTEGER NOT NULL
+);
+CREATE INDEX PilotEvent_case ON PilotEvent(caseId, at);
+CREATE TABLE PilotReceipt (
+ actorId TEXT NOT NULL, key TEXT NOT NULL, fingerprint TEXT NOT NULL, caseId TEXT NOT NULL REFERENCES PilotCase(id),
+ PRIMARY KEY(actorId, key)
+);
+CREATE TABLE PilotLink (
+ caseId TEXT NOT NULL REFERENCES PilotCase(id), targetId TEXT NOT NULL REFERENCES PilotCase(id), kind TEXT NOT NULL,
+ PRIMARY KEY(caseId, targetId, kind)
+);
+CREATE TABLE LegalSource (
+ id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, url TEXT NOT NULL, jurisdiction TEXT NOT NULL,
+ language TEXT NOT NULL, content TEXT NOT NULL, hash TEXT NOT NULL, retrievedAt INTEGER NOT NULL,
+ status TEXT NOT NULL, reviewedBy TEXT, supersedes TEXT
+);
+CREATE TABLE LegalMonitor (
+ id TEXT NOT NULL PRIMARY KEY, remoteMonitorId TEXT, name TEXT NOT NULL, monitorType TEXT NOT NULL,
+ target TEXT NOT NULL, jurisdiction TEXT NOT NULL, language TEXT NOT NULL, scheduleCron TEXT NOT NULL,
+ status TEXT NOT NULL, lastCheckedAt INTEGER, lastStatus TEXT
+);
+
+allCases:
+SELECT * FROM PilotCase ORDER BY updatedAt DESC;
+caseById:
+SELECT * FROM PilotCase WHERE id = ?;
+saveCase:
+INSERT OR REPLACE INTO PilotCase VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+tasks:
+SELECT * FROM PilotTask WHERE caseId = ?;
+saveTask:
+INSERT OR REPLACE INTO PilotTask VALUES (?, ?, ?, ?, ?, ?);
+events:
+SELECT * FROM PilotEvent WHERE caseId = ? ORDER BY at, rowid;
+appendEvent:
+INSERT INTO PilotEvent VALUES (?, ?, ?, ?, ?, ?);
+receipt:
+SELECT * FROM PilotReceipt WHERE actorId = ? AND key = ?;
+saveReceipt:
+INSERT INTO PilotReceipt VALUES (?, ?, ?, ?);
+link:
+INSERT OR IGNORE INTO PilotLink VALUES (?, ?, ?);
+legalSources:
+SELECT * FROM LegalSource ORDER BY retrievedAt DESC;
+legalSource:
+SELECT * FROM LegalSource WHERE id = ?;
+saveSource:
+INSERT INTO LegalSource VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+reviewSource:
+UPDATE LegalSource SET status = ?, reviewedBy = ? WHERE id = ?;
+legalMonitors:
+SELECT * FROM LegalMonitor ORDER BY rowid DESC;
+legalMonitorById:
+SELECT * FROM LegalMonitor WHERE id = ?;
+saveMonitor:
+INSERT OR REPLACE INTO LegalMonitor VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+

@@ -62,7 +62,7 @@ class BackendAiService(
                 confidence = 0.91,
                 inferredCategory = "Roads & Potholes",
                 proposedPriority = ComplaintPriorityDto.MEDIUM,
-                reasoning = "Whisper transcription processed via local inference."
+                reasoning = "Whisper transcription fallback processed."
             )
         }
     }
