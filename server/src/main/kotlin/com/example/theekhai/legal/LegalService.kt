@@ -7,8 +7,10 @@ import com.example.theekhai.domain.workflow.CaseRecord
 import com.example.theekhai.domain.workflow.WorkflowFailure
 import io.ktor.client.HttpClient
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
+import java.util.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -31,9 +33,13 @@ class LegalService(
     private val tinyFishApiKey: String = EnvConfig.get("TINYFISH_API_KEY"),
     private val tavilyApiKey: String = EnvConfig.get("TAVILY_API_KEY"),
     private val openRouterApiKey: String = EnvConfig.get("OPENROUTER_API_KEY"),
+    private val sarvamApiKey: String = EnvConfig.get("SARVAM_API_KEY"),
+    private val groqApiKey: String = EnvConfig.get("GROQ_API_KEY"),
     private val tinyFishBaseUrl: String = EnvConfig.get("TINYFISH_BASE_URL", "https://agent.tinyfish.ai").trimEnd('/'),
     private val tavilyBaseUrl: String = EnvConfig.get("TAVILY_BASE_URL", "https://api.tavily.com").trimEnd('/'),
     private val openRouterBaseUrl: String = EnvConfig.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").trimEnd('/'),
+    private val sarvamBaseUrl: String = EnvConfig.get("SARVAM_BASE_URL", "https://api.sarvam.ai").trimEnd('/'),
+    private val groqBaseUrl: String = EnvConfig.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1").trimEnd('/'),
     private val openRouterModel: String = EnvConfig.get("OPENROUTER_MODEL", "openrouter/free"),
 ) {
     private val agentSemaphore = Semaphore(1)
@@ -66,6 +72,7 @@ class LegalService(
         tinyFishConfigured = tinyFishApiKey.isNotBlank(),
         tavilyConfigured = tavilyApiKey.isNotBlank(),
         openRouterConfigured = openRouterApiKey.isNotBlank(),
+        sarvamConfigured = sarvamApiKey.isNotBlank(),
     )
 
     private fun seedDefaultApprovedPackIfEmpty() {
@@ -982,8 +989,44 @@ class LegalService(
                 if (refined != null) return refined
             }
 
-            // 2. Try multimodal input_audio. The configured OpenRouter model must support audio input.
+            // 2. Try Groq Whisper (`whisper-large-v3-turbo`) or OpenRouter multimodal input_audio first,
+            //    and fall back to Sarvam AI (`https://api.sarvam.ai/speech-to-text`) when Whisper is unavailable or fails.
             if (req.audioBase64.length >= 32) {
+                val audioBytes = runCatching {
+                    val cleanB64 = req.audioBase64.substringAfter("base64,", req.audioBase64).trim()
+                    Base64.getDecoder().decode(cleanB64)
+                }.getOrNull()
+
+                // 2a. Primary Whisper (`GROQ_API_KEY` if configured)
+                if (audioBytes != null && audioBytes.size >= 44 && groqApiKey.isNotBlank()) {
+                    val whisperTranscript = runCatching {
+                        val response = client.submitFormWithBinaryData(
+                            url = "$groqBaseUrl/audio/transcriptions",
+                            formData = formData {
+                                append("model", "whisper-large-v3-turbo")
+                                append("language", if (req.language.startsWith("hi")) "hi" else "en")
+                                append(
+                                    "file",
+                                    audioBytes,
+                                    Headers.build {
+                                        append(HttpHeaders.ContentType, req.mimeType.ifBlank { "audio/$audioFormat" })
+                                        append(HttpHeaders.ContentDisposition, "filename=\"voice.$audioFormat\"")
+                                    },
+                                )
+                            },
+                        ) {
+                            header(HttpHeaders.Authorization, "Bearer $groqApiKey")
+                        }
+                        if (response.status.isSuccess()) {
+                            json.parseToJsonElement(response.bodyAsText()).jsonObject["text"]?.jsonPrimitive?.contentOrNull?.trim()
+                        } else null
+                    }.getOrNull()
+                    if (!whisperTranscript.isNullOrBlank()) {
+                        return enrichTranscriptWithAiOrRules(whisperTranscript, req.language, "GROQ_WHISPER")
+                    }
+                }
+
+                // 2b. Secondary OpenRouter multimodal input_audio
                 val multimodal = runCatching {
                     val response = client.post("$openRouterBaseUrl/chat/completions") {
                         header(HttpHeaders.Authorization, "Bearer $openRouterApiKey")
@@ -1058,16 +1101,137 @@ class LegalService(
             }
         }
 
-        // 3. Deterministic fallback using live speech hint or localized voice template
+        // 3. Sarvam AI Speech-to-Text (`https://api.sarvam.ai/speech-to-text`) fallback for Whisper / raw audio
+        if (sarvamApiKey.isNotBlank() && req.audioBase64.length >= 32) {
+            val sarvamResult = transcribeViaSarvam(req.audioBase64, req.mimeType, audioFormat, req.language)
+            if (sarvamResult != null) return sarvamResult
+        }
+
+        // 4. Deterministic fallback using live speech hint
         if (hint.isNotBlank()) {
-            return TranscribeResponseDto(
-                text = hint,
-                suggestedTitle = hint.split(Regex("\\s+")).take(7).joinToString(" ").take(80),
-                suggestedCategory = "",
-                provider = "BROWSER_SPEECH_API",
-            )
+            return enrichTranscriptWithAiOrRules(hint, req.language, "BROWSER_SPEECH_API")
         }
         throw WorkflowFailure("UNAVAILABLE", "Voice transcription is unavailable right now. Please retry or enter the report manually.")
+    }
+
+    private suspend fun transcribeViaSarvam(
+        audioBase64: String,
+        mimeType: String,
+        audioFormat: String,
+        language: String,
+    ): TranscribeResponseDto? {
+        return try {
+            val cleanB64 = audioBase64.substringAfter("base64,", audioBase64).trim()
+            val audioBytes = Base64.getDecoder().decode(cleanB64)
+            if (audioBytes.size < 44) return null
+            val langCode = when {
+                language.startsWith("hi", ignoreCase = true) -> "hi-IN"
+                language.startsWith("en", ignoreCase = true) -> "en-IN"
+                else -> "unknown"
+            }
+            val contentMime = mimeType.substringBefore(';').trim().ifBlank { "audio/$audioFormat" }
+            val response = client.submitFormWithBinaryData(
+                url = "$sarvamBaseUrl/speech-to-text",
+                formData = formData {
+                    append("language_code", langCode)
+                    append(
+                        "file",
+                        audioBytes,
+                        Headers.build {
+                            append(HttpHeaders.ContentType, contentMime)
+                            append(HttpHeaders.ContentDisposition, "filename=\"voice.$audioFormat\"")
+                        },
+                    )
+                },
+            ) {
+                header("api-subscription-key", sarvamApiKey)
+            }
+            if (!response.status.isSuccess()) return null
+            val obj = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val transcript = obj["transcript"]?.jsonPrimitive?.contentOrNull?.trim()
+            if (transcript.isNullOrBlank()) return null
+            enrichTranscriptWithAiOrRules(transcript, language, "SARVAM_AI")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private suspend fun enrichTranscriptWithAiOrRules(
+        transcript: String,
+        language: String,
+        baseProvider: String,
+    ): TranscribeResponseDto {
+        if (openRouterApiKey.isNotBlank()) {
+            val enriched = runCatching {
+                val response = client.post("$openRouterBaseUrl/chat/completions") {
+                    header(HttpHeaders.Authorization, "Bearer $openRouterApiKey")
+                    header("HTTP-Referer", "https://theekhai.in")
+                    header("X-Title", "TheekHai Civic Pilot")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        buildJsonObject {
+                            put("model", openRouterModel)
+                            put("temperature", 0.1)
+                            put(
+                                "messages",
+                                JsonArray(
+                                    listOf(
+                                        buildJsonObject {
+                                            put("role", "system")
+                                            put(
+                                                "content",
+                                                "You are TheekHai's civic voice transcription assistant. Clean up the user's raw spoken grievance (preserving English or Hindi as requested) and return ONLY valid JSON with keys: text (cleaned 1-3 sentence description), suggestedTitle (short 4-8 word title), suggestedCategory (one of ROADS, WATER, WASTE, LIGHTING, OTHER)."
+                                            )
+                                        },
+                                        buildJsonObject {
+                                            put("role", "user")
+                                            put("content", "Language: $language\nRaw spoken transcript: $transcript")
+                                        },
+                                    )
+                                ),
+                            )
+                        }.toString()
+                    )
+                }
+                if (response.status.isSuccess()) {
+                    val content = json.parseToJsonElement(response.bodyAsText()).jsonObject["choices"]
+                        ?.let { it as? JsonArray }?.firstOrNull()?.jsonObject?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
+                    if (!content.isNullOrBlank()) {
+                        val cleanJson = content.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                        val parsed = runCatching { json.parseToJsonElement(cleanJson).jsonObject }.getOrNull()
+                        if (parsed != null) {
+                            val text = parsed["text"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: transcript
+                            val title = parsed["suggestedTitle"]?.jsonPrimitive?.contentOrNull ?: ""
+                            val cat = parsed["suggestedCategory"]?.jsonPrimitive?.contentOrNull?.uppercase() ?: ""
+                            TranscribeResponseDto(
+                                text = text,
+                                suggestedTitle = title,
+                                suggestedCategory = if (cat in setOf("ROADS", "WATER", "WASTE", "LIGHTING", "OTHER")) cat else "",
+                                provider = baseProvider,
+                            )
+                        } else null
+                    } else null
+                } else null
+            }.getOrNull()
+            if (enriched != null) return enriched
+        }
+
+        val lower = transcript.lowercase()
+        val inferredCat = when {
+            lower.contains("pothole") || lower.contains("road") || lower.contains("सड़क") || lower.contains("गड्ढ") -> "ROADS"
+            lower.contains("water") || lower.contains("drain") || lower.contains("sewage") || lower.contains("पानी") || lower.contains("नाली") -> "WATER"
+            lower.contains("garbage") || lower.contains("waste") || lower.contains("कचरा") || lower.contains("सफाई") -> "WASTE"
+            lower.contains("light") || lower.contains("lamp") || lower.contains("लाइट") || lower.contains("बत्ती") -> "LIGHTING"
+            else -> ""
+        }
+        return TranscribeResponseDto(
+            text = transcript,
+            suggestedTitle = transcript.split(Regex("\\s+")).take(7).joinToString(" ").take(80),
+            suggestedCategory = inferredCat,
+            provider = baseProvider,
+        )
     }
 
     /**

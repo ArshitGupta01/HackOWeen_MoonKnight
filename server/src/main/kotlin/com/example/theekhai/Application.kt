@@ -76,6 +76,7 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
                     "tinyFishConfigured" to ps.tinyFishConfigured.toString(),
                     "tavilyConfigured" to ps.tavilyConfigured.toString(),
                     "openRouterConfigured" to ps.openRouterConfigured.toString(),
+                    "sarvamConfigured" to ps.sarvamConfigured.toString(),
                 )
             )
         }

@@ -48,7 +48,7 @@ val remoteDataModule: Module = module {
         NativeCivicRemoteRepository(get(), get<String>(DataQualifiers.BackendBaseUrl), get())
     }
     single<TriageAiClient> { OpenRouterApiClient(client = get(), backendBaseUrl = get<String>(DataQualifiers.BackendBaseUrl)) }
-    single<VoiceSpeechToTextClient> { SarvamApiClient() }
+    single<VoiceSpeechToTextClient> { SarvamApiClient(client = get(), backendBaseUrl = get<String>(DataQualifiers.BackendBaseUrl)) }
     single { TinyFishApiClient() }
 }
 
