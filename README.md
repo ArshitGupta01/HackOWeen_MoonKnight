@@ -34,7 +34,7 @@
 | **Mobile & Desktop UI (`:app:shared`, `:app:androidApp`, `:app:desktopApp`, `app/iosApp`)** | Compose Multiplatform (`1.10.3`), Material 3, AndroidX Lifecycle ViewModel, Koin Compose | Shared MVVM presentation (`StateFlow<UiState>`) for Android, Desktop JVM, and iOS |
 | **Web Application (`web/`)** | Vite (`8.x`), TypeScript (`5.9`), Semantic HTML5/CSS3, Playwright | Bilingual (`en`/`hi`) responsive citizen, department, reviewer, and legal library web app |
 | **Backend Server (`:server`)** | Ktor Server (`3.4.2`, Netty), Koin Ktor, SQLDelight JDBC SQLite | Authoritative workflow engine, session & CSRF security, Supabase JWT/PostgREST bridge, and background SLA/Monitor workers |
-| **Authentication & Cloud DB** | **Supabase** (`TheekHai` — `ffmcurazxvygsifbglwy`) | Supabase Auth (`/auth/v1/*`), PostgreSQL with Row-Level Security (`profiles`, `saved_sources`, `complaints`, `case_tasks`, `audit_logs`, `legal_sources`, `legal_monitors`), and private `evidence` Storage bucket |
+| **Authentication & Cloud DB** | **Supabase** (`TheekHai` — `supabaseeee`) | Supabase Auth (`/auth/v1/*`), PostgreSQL with Row-Level Security (`profiles`, `saved_sources`, `complaints`, `case_tasks`, `audit_logs`, `legal_sources`, `legal_monitors`), and private `evidence` Storage bucket |
 | **AI & Official Discovery** | **TinyFish** (`Agent` & `Monitor`), **OpenRouter** (`openrouter/free` by default), **Tavily** (`/search`) | Official source discovery, page/topic change monitoring, source-grounded legal Q&A, and AI complaint intake triage & duplicate detection |
 
 ---
