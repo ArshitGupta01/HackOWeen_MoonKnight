@@ -6,19 +6,94 @@ See [agent.md](agent.md) and the project guides in [docs/](docs/) for detailed s
 
 ---
 
-## 1. Module Graph (Dependencies Point Inward Only)
+## 1. Module Graph (Vertical Inward Dependency Flow)
+
+![TheekHai Architecture](docs/architecture_vertical_diagram.jpg)
 
 ```
- :app:androidApp  :app:desktopApp  app/iosApp     (platform entry points)
-              \        |            /
-               ---->  :app:shared  <----          (Compose MVVM presentation + Koin root)
-                       |      \
-                       |       `----------------> :data   (SQLDelight, Ktor client, repo impls)
-                       v                            |
-                    :domain  <----------------------'     (Workflow engine, entities, ports, use cases)
-                       ^                :server ---> :data (jvm), :domain, :core
-                       |
-                    :core  (Serializable DTOs, ApiRoutes) <-- shared by all modules
+ +-----------------------------------------------------------------------------------+
+ |                             PLATFORMS & WEB CLIENTS                               |
+ |   :app:androidApp       :app:desktopApp         app/iosApp         web/ (Vite+TS) |
+ +-----------+--------------------+--------------------+--------------------+--------+
+             |                    |                    |                    |
+             +--------------------+--------------------+                    |
+                                  |                                         |
+                                  v                                         |
+ +-----------------------------------------------------------------+        |
+ |             :app:shared (Presentation & Compose UI)             |        |
+ |   Compose Multiplatform MVVM • StateFlow<UiState> • Koin 4.2    |        |
+ +------------------+------------------------------+---------------+        |
+                    |                              |                        |
+                    | (calls use cases)            v                        |
+                    |             +--------------------------------+        |
+                    |             |     :data (Local/Remote)       |        |
+                    |             |  SQLDelight SQLite • Ktor Http |        |
+                    |             +----------------+---------------+        |
+                    v                              |                        |
+ +-------------------------------------------------+---------------+        |
+ |                :domain (Domain Core Engine)                     |        |
+ |   Workflow State Machine • Haryana RTSA SLA Timers • Ports      |        |
+ |   *Pure Kotlin — Zero Framework Dependencies (Inward Only)*     |        |
+ +--------------------------------+--------------------------------+        |
+                                  ^                                         |
+                                  |                                         v
+ +--------------------------------+------------------------------------------+
+ |               :server (Backend & AI Agent Ecosystem)                     |
+ |   Ktor 3.6 Netty • Supabase JWT Auth • TinyFish Agent • OpenRouter AI    |
+ +--------------------------------+-----------------------------------------+
+                                  |
+                                  v
+ +--------------------------------------------------------------------------+
+ |                      :core (Base Shared Contracts)                       |
+ |   Kotlinx Serialization DTOs (PilotDto, ComplaintDto) • Typed ApiRoutes  |
+ |   *Shared Universally Across All Modules*                                |
+ +--------------------------------------------------------------------------+
+```
+
+```mermaid
+flowchart TD
+    subgraph Platforms["Platform Entry Points & Web Tier"]
+        Android[":app:androidApp (Android SDK 37)"]
+        Desktop[":app:desktopApp (JVM Desktop)"]
+        iOS["app/iosApp (iOS Native)"]
+        Web["web/ (Vite 8 + TypeScript SPA)"]
+    end
+
+    subgraph SharedPresentation[":app:shared (Presentation Tier)"]
+        SharedUI["Compose Multiplatform 1.12<br/>MVVM ViewModels & StateFlow&lt;UiState&gt;<br/>Koin 4.2 Composition Root"]
+    end
+
+    subgraph DomainLayer[":domain (Domain Core Engine)"]
+        DomainCore["Workflow State Machine<br/>Haryana RTSA Statutory SLA Timers<br/>Entities, Use Cases & Repository Ports<br/>*Pure Kotlin — Zero Framework Dependencies*"]
+    end
+
+    subgraph DataLayer[":data (Data & Persistence)"]
+        DataRepo["SQLDelight 2.3 SQLite Local Cache<br/>Ktor 3.6 Multiplatform HTTP Client<br/>Repository Implementations"]
+    end
+
+    subgraph ServerLayer[":server (Backend & AI Microservice)"]
+        KtorServer["Ktor 3.6 Netty + Supabase JWT Auth<br/>TinyFish Agent & Legal Monitor<br/>OpenRouter AI Triage & Gmail Dispatch<br/>Supabase PostgreSQL with RLS"]
+    end
+
+    subgraph CoreLayer[":core (Base Shared Contracts)"]
+        SharedCore["Serializable DTOs (PilotDto, ComplaintDto)<br/>Typed ApiRoutes & Domain Primitives<br/>*Universal Dependency*"]
+    end
+
+    Android --> SharedUI
+    Desktop --> SharedUI
+    iOS --> SharedUI
+    Web -- "HTTP REST (/api/v1/*)" --> KtorServer
+
+    SharedUI --> DomainLayer
+    SharedUI -.-> DataLayer
+    DataLayer --> DomainLayer
+    ServerLayer --> DomainLayer
+    ServerLayer --> DataLayer
+
+    SharedUI --> CoreLayer
+    DomainLayer --> CoreLayer
+    DataLayer --> CoreLayer
+    ServerLayer --> CoreLayer
 ```
 
 | Module | Layer | May depend on | Must NOT depend on |
