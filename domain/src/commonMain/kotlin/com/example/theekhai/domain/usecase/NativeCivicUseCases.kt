@@ -10,6 +10,14 @@ class RegisterCitizenUseCase(private val repository: NativeCivicRepository) {
         repository.register(email.trim(), password, fullName.trim(), ward.trim())
 }
 class SubmitCivicReportUseCase(private val repository: NativeCivicRepository) {
-    suspend operator fun invoke(title: String, description: String, category: String, address: String, latitude: Double?, longitude: Double?, consent: Boolean) =
-        repository.submitReport(title.trim(), description.trim(), category, address.trim(), latitude, longitude, consent)
+    suspend operator fun invoke(
+        title: String,
+        description: String,
+        category: String,
+        address: String,
+        latitude: Double?,
+        longitude: Double?,
+        consent: Boolean,
+        photoUrl: String? = null
+    ) = repository.submitReport(title.trim(), description.trim(), category, address.trim(), latitude, longitude, consent, photoUrl)
 }

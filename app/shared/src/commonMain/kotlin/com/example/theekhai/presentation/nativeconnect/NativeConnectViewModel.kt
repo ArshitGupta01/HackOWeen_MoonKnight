@@ -118,8 +118,17 @@ class NativeConnectViewModel(
         _state.update { it.copy(message = msg) }
     }
 
-    fun submitReport(title: String, description: String, category: String, address: String, latitude: Double?, longitude: Double?, consent: Boolean) = runRequest {
-        val report = submitReportUseCase(title, description, category, address, latitude, longitude, consent)
+    fun submitReport(
+        title: String,
+        description: String,
+        category: String,
+        address: String,
+        latitude: Double?,
+        longitude: Double?,
+        consent: Boolean,
+        photoUrl: String? = null
+    ) = runRequest {
+        val report = submitReportUseCase(title, description, category, address, latitude, longitude, consent, photoUrl)
         _state.update { it.copy(report = report, message = "Report submitted. Tracking ID: ${report.id}") }
     }
 

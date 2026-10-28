@@ -14,7 +14,7 @@ interface NativeCivicRepository {
     suspend fun register(email: String, password: String, fullName: String, ward: String): SignedInUser
     suspend fun verifyEmail(token: String, email: String? = null): SignedInUser
     suspend fun resendVerification(email: String): String
-    suspend fun submitReport(title: String, description: String, category: String, address: String, latitude: Double?, longitude: Double?, consent: Boolean): SubmittedReport
+    suspend fun submitReport(title: String, description: String, category: String, address: String, latitude: Double?, longitude: Double?, consent: Boolean, photoUrl: String? = null): SubmittedReport
     suspend fun signOut()
     suspend fun getProfile(): CivicProfile
     suspend fun saveProfile(profile: CivicProfile): CivicProfile

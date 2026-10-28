@@ -129,12 +129,12 @@ class NativeCivicRemoteRepository(
     }
 
     override suspend fun submitReport(
-        title: String, description: String, category: String, address: String, latitude: Double?, longitude: Double?, consent: Boolean
+        title: String, description: String, category: String, address: String, latitude: Double?, longitude: Double?, consent: Boolean, photoUrl: String?
     ): SubmittedReport {
         val response = client.post(url("/complaints")) {
             contentType(ContentType.Application.Json)
             header("Idempotency-Key", Uuid.random().toString())
-            setBody(ReportDto(title, description, category, address, latitude, longitude, consent))
+            setBody(ReportDto(title, description, category, address, latitude, longitude, consent, photoUrl = photoUrl))
         }
         requireSuccess(response)
         val created: CaseDto = response.body()
@@ -277,7 +277,7 @@ class NativeCivicRemoteRepository(
     private fun SavedSourceDto.toDomain() = SavedCivicSource(id, title, sourceUrl, jurisdiction, snippet)
     private fun LegalSourceDto.toDomain() = CivicGuidanceSource(id, title, url, jurisdiction, language, content, retrievedAt)
     private fun CaseDetailDto.toDomain() = CivicCaseDetail(case.toDomain(), tasks.map { CivicCaseTask(it.id, it.department, it.title, it.required, it.complete) }, events.map { CivicCaseEvent(it.id, it.actorId, it.action, it.note, it.at) })
-    private fun CaseDto.toDomain() = Complaint(id, title, description, category, runCatching { ComplaintPriority.valueOf(priority) }.getOrDefault(ComplaintPriority.MEDIUM), runCatching { ComplaintStatus.valueOf(status) }.getOrDefault(ComplaintStatus.PENDING), latitude ?: 0.0, longitude ?: 0.0, address, citizenId, zone = department, slaDueEpochMillis = dueAt, createdAtEpochMillis = createdAt, updatedAtEpochMillis = updatedAt, version = version)
+    private fun CaseDto.toDomain() = Complaint(id, title, description, category, runCatching { ComplaintPriority.valueOf(priority) }.getOrDefault(ComplaintPriority.MEDIUM), runCatching { ComplaintStatus.valueOf(status) }.getOrDefault(ComplaintStatus.PENDING), latitude ?: 0.0, longitude ?: 0.0, address, citizenId, zone = department, photoUrl = photoUrl, slaDueEpochMillis = dueAt, createdAtEpochMillis = createdAt, updatedAtEpochMillis = updatedAt, version = version)
 }
 
 private fun String.encodePathSegment(): String = encodeToByteArray().joinToString("") { b ->

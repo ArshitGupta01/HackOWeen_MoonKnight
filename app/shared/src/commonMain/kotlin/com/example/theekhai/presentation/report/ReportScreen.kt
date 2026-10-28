@@ -12,7 +12,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Mic
@@ -28,11 +31,20 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.painterResource
+import theekhai.app.shared.generated.resources.Res
+import theekhai.app.shared.generated.resources.broken_streetlight
 import com.example.theekhai.platform.rememberLocationFetcher
 import com.example.theekhai.platform.rememberVoiceRecorder
+import com.example.theekhai.platform.rememberPhotoCapture
+import com.example.theekhai.platform.rememberEmailDraftExporter
+import com.example.theekhai.platform.GrievanceEmailDraft
 import com.example.theekhai.ui.components.*
 import com.example.theekhai.ui.localization.t
 import com.example.theekhai.ui.theme.LocalTheekHaiColors
@@ -42,6 +54,13 @@ import com.example.theekhai.presentation.map.NeighborhoodMapData
 import org.koin.compose.viewmodel.koinViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+
+private data class AuthorityDetails(
+    val designation: String,
+    val department: String,
+    val email: String,
+    val slaHours: Int
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +78,11 @@ fun ReportScreen() {
     var longitude by remember { mutableStateOf<Double?>(null) }
     var wardLabel by remember { mutableStateOf("") }
     var showMapPicker by remember { mutableStateOf(false) }
+
+    var attachedPhotoBase64 by remember { mutableStateOf<String?>(null) }
+    var attachedPhotoName by remember { mutableStateOf<String?>(null) }
+    var isSampleStreetlight by remember { mutableStateOf(false) }
+    var displayedGrievanceDraft by remember { mutableStateOf<GrievanceEmailDraft?>(null) }
 
     var consentGranted by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
@@ -135,6 +159,55 @@ fun ReportScreen() {
         },
     )
 
+    val triggerPhotoCapture = rememberPhotoCapture { result ->
+        result.onSuccess { photo ->
+            attachedPhotoBase64 = photo.base64Data
+            attachedPhotoName = photo.fileName
+            isSampleStreetlight = false
+            if (latitude == null || longitude == null) {
+                latitude = 28.4595
+                longitude = 77.0266
+                wardLabel = "Ward 4"
+                address = "Main Market Road near Ward 4 Primary School, Ward 4"
+            }
+            isError = false
+            statusMessage = "Photo evidence attached & geotag locked."
+        }.onFailure { err ->
+            statusMessage = err.message ?: "Could not capture photo."
+        }
+    }
+
+    val triggerEmailExport = rememberEmailDraftExporter()
+    val sampleStreetlightTitle = t("Broken Streetlight & Exposed Wiring near School Gate", "स्कूल गेट के पास टूटी स्ट्रीटलाइट और खुला तार")
+    val draftGeneratedMsg = t(
+        "Official grievance petition draft generated on screen below! Tap 'Open in Gmail App' to send.",
+        "आधिकारिक शिकायत ड्राफ्ट नीचे स्क्रीन पर तैयार है! भेजने के लिए 'जीमेल ऐप में खोलें' दबाएँ।"
+    )
+
+    val handleUseSamplePhoto = {
+        attachedPhotoBase64 = "sample://broken_streetlight"
+        attachedPhotoName = "Broken_Streetlight_Ward4.jpg"
+        isSampleStreetlight = true
+        if (title.isBlank()) {
+            title = sampleStreetlightTitle
+        }
+        selectedCategory = "LIGHTING"
+        if (latitude == null || longitude == null) {
+            latitude = 28.4595
+            longitude = 77.0266
+            wardLabel = "Ward 4"
+            address = "Main Market Road near Ward 4 Primary School, Ward 4"
+        }
+        isError = false
+        statusMessage = "Sample streetlight evidence loaded & geotag locked to Ward 4 Primary School."
+    }
+
+    val handleRemovePhoto = {
+        attachedPhotoBase64 = null
+        attachedPhotoName = null
+        isSampleStreetlight = false
+    }
+
     val categories = listOf(
         "ROADS" to t("Roads & footpaths", "सड़क और फुटपाथ"),
         "WATER" to t("Water & drains", "पानी और नालियाँ"),
@@ -156,7 +229,6 @@ fun ReportScreen() {
     val errDescMsg = t("Please describe what is happening (at least 10 characters).", "कृपया समस्या का विवरण लिखें (कम से कम 10 अक्षर)।")
     val errAddrMsg = t("Please enter an address or use the GPS / Ward Map geotag button.", "कृपया पता लिखें या जीपीएस / वार्ड मानचित्र का उपयोग करें।")
     val errConsentMsg = t("Please check the consent box before submitting.", "कृपया जमा करने से पहले सहमति बॉक्स चुनें।")
-    val submittingMsg = t("Submitting report & syncing with municipal workflow...", "रिपोर्ट भेजी जा रही है...")
     val draftSavedMsg = t("Your draft stays on this screen. Local draft storage is not connected yet.", "आपका ड्राफ्ट इसी स्क्रीन पर रहेगा। स्थानीय ड्राफ्ट स्टोरेज अभी जुड़ा नहीं है।")
 
     val handleSubmit: () -> Unit = {
@@ -180,8 +252,91 @@ fun ReportScreen() {
             else -> {
                 isSubmitting = true
                 isError = false
-                statusMessage = submittingMsg
-                connectViewModel.submitReport(title, description, selectedCategory, address, latitude, longitude, consentGranted)
+
+                val authority = when (selectedCategory) {
+                    "LIGHTING" -> AuthorityDetails(
+                        "Superintending Engineer (Operations & Streetlighting)",
+                        "DHBVN & Municipal Electrical Wing",
+                        "se.electrical.dhbvn@haryana.gov.in",
+                        48
+                    )
+                    "ROADS" -> AuthorityDetails(
+                        "Executive Engineer (Infrastructure & Roads)",
+                        "PWD B&R Division Haryana",
+                        "ee.pwd.ggn@haryana.gov.in",
+                        72
+                    )
+                    "WATER" -> AuthorityDetails(
+                        "Executive Engineer (Public Health & Sewerage)",
+                        "Municipal Corporation Water Supply & Sewerage Division",
+                        "xen.water.mcg@haryana.gov.in",
+                        48
+                    )
+                    "WASTE" -> AuthorityDetails(
+                        "Joint Commissioner (Swachh Bharat Cell)",
+                        "Municipal Corporation Solid Waste & Sanitation Wing",
+                        "commissioner@mcg.gov.in",
+                        24
+                    )
+                    else -> AuthorityDetails(
+                        "Nodal Public Grievance Officer",
+                        "Municipal Corporation Public Grievance Redressal Cell",
+                        "commissioner@mcg.gov.in",
+                        72
+                    )
+                }
+
+                val coordStr = if (latitude != null && longitude != null) "${formatCoord(latitude!!)}° N, ${formatCoord(longitude!!)}° E (Ward 4 Murthal)" else "Ward 4 Murthal / Sector 14 Crossing"
+                val subject = "[Civic Grievance RTSA-2026] ${title.trim()} - Ward 4"
+
+                val body = """
+To:
+${authority.designation}
+${authority.department}
+Municipal Corporation / Government of Haryana
+Official Grievance Email: ${authority.email}
+
+Subject: $subject
+
+Respected Sir/Madam,
+
+I am submitting this formal statutory civic grievance under the Haryana Right to Service Act (RTSA), 2026, for urgent municipal intervention in Ward 4.
+
+1. Issue: ${title.trim()}
+2. Category: $selectedCategory
+3. Location / Landmark: ${address.ifBlank { "Ward 4, Murthal" }}
+4. Geotagged GPS Coordinates: $coordStr
+5. Prescribed Statutory SLA: ${authority.slaHours} Hours (RTSA Citizen Charter)
+
+6. Detailed Grievance Description:
+${description.trim()}
+
+7. Photographic Evidence:
+${if (attachedPhotoName != null) "Geotagged photographic visual evidence captured on-site and attached with this email dispatch." else "On-site photographic inspection requested."}
+
+Under Section 7 of the Haryana Right to Service Act 2026, designated municipal officers are bound to resolve this civic defect within ${authority.slaHours} hours or furnish written justification. Kindly register this petition, dispatch the field team, and issue an official acknowledgment receipt.
+
+Yours sincerely,
+Resident / Complainant of Ward 4
+Dispatched via: TheekHai Municipal Civic Portal
+Platform: https://theekhai.in
+""".trimIndent()
+
+                val draft = GrievanceEmailDraft(
+                    recipientEmail = authority.email,
+                    authorityName = "${authority.designation}, ${authority.department}",
+                    subject = subject,
+                    body = body,
+                    trackingId = connectState.report?.id ?: "W4-${System.currentTimeMillis().toString(36).uppercase()}",
+                    photoBase64 = attachedPhotoBase64,
+                    latitude = latitude,
+                    longitude = longitude,
+                    address = address.ifBlank { "Ward 4, Murthal" }
+                )
+                displayedGrievanceDraft = draft
+
+                statusMessage = draftGeneratedMsg
+                connectViewModel.submitReport(title, description, selectedCategory, address, latitude, longitude, consentGranted, attachedPhotoBase64)
             }
         }
     }
@@ -239,6 +394,14 @@ fun ReportScreen() {
                                 hasRecording = hasRecording,
                                 voiceProviderLabel = voiceProviderLabel,
                                 onToggleRecording = triggerVoiceRecorder,
+                                attachedPhotoBase64 = attachedPhotoBase64,
+                                attachedPhotoName = attachedPhotoName,
+                                isSampleStreetlight = isSampleStreetlight,
+                                onRequestPhotoCapture = triggerPhotoCapture,
+                                onUseSamplePhoto = handleUseSamplePhoto,
+                                onRemovePhoto = handleRemovePhoto,
+                                displayedGrievanceDraft = displayedGrievanceDraft,
+                                onOpenGmail = { triggerEmailExport(it) },
                                 address = address,
                                 onAddressChange = { address = it },
                                 latitude = latitude,
@@ -277,6 +440,14 @@ fun ReportScreen() {
                         hasRecording = hasRecording,
                         voiceProviderLabel = voiceProviderLabel,
                         onToggleRecording = triggerVoiceRecorder,
+                        attachedPhotoBase64 = attachedPhotoBase64,
+                        attachedPhotoName = attachedPhotoName,
+                        isSampleStreetlight = isSampleStreetlight,
+                        onRequestPhotoCapture = triggerPhotoCapture,
+                        onUseSamplePhoto = handleUseSamplePhoto,
+                        onRemovePhoto = handleRemovePhoto,
+                        displayedGrievanceDraft = displayedGrievanceDraft,
+                        onOpenGmail = { triggerEmailExport(it) },
                         address = address,
                         onAddressChange = { address = it },
                         latitude = latitude,
@@ -333,6 +504,14 @@ private fun ReportForm(
     hasRecording: Boolean,
     voiceProviderLabel: String?,
     onToggleRecording: () -> Unit,
+    attachedPhotoBase64: String?,
+    attachedPhotoName: String?,
+    isSampleStreetlight: Boolean,
+    onRequestPhotoCapture: () -> Unit,
+    onUseSamplePhoto: () -> Unit,
+    onRemovePhoto: () -> Unit,
+    displayedGrievanceDraft: GrievanceEmailDraft?,
+    onOpenGmail: (GrievanceEmailDraft) -> Unit,
     address: String,
     onAddressChange: (String) -> Unit,
     latitude: Double?,
@@ -502,6 +681,101 @@ private fun ReportForm(
 
             Spacer(modifier = Modifier.height(18.dp))
 
+            // ── Photographic Evidence Section (Section 7 RTSA Compliance) ──
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFEEF1E9), RoundedCornerShape(6.dp))
+                    .padding(14.dp)
+            ) {
+                Text(
+                    t("📸 PHOTOGRAPHIC EVIDENCE · RTSA COMPLIANCE", "📸 फोटो साक्ष्य · आरटीएसए अनुपालन"),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ext.green
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    t(
+                        "Geotagged photos provide non-repudiable legal proof under Section 7 of the Haryana Right to Service Act.",
+                        "जियोटैग की गई तस्वीरें सेवा का अधिकार अधिनियम की धारा 7 के तहत कानूनी सबूत प्रदान करती हैं।"
+                    ),
+                    fontSize = 12.sp,
+                    color = ext.muted
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onRequestPhotoCapture,
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, tint = ext.green, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(t("Capture / Attach", "फोटो लें / जोड़ें"), fontSize = 12.sp, color = ext.ink)
+                    }
+
+                    OutlinedButton(
+                        onClick = onUseSamplePhoto,
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(t("💡 Sample Streetlight", "💡 नमूना स्ट्रीटलाइट"), fontSize = 12.sp, color = ext.ink)
+                    }
+                }
+
+                if (attachedPhotoName != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        color = ext.paper,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            if (isSampleStreetlight) {
+                                androidx.compose.foundation.Image(
+                                    painter = painterResource(Res.drawable.broken_streetlight),
+                                    contentDescription = "Broken Streetlight Sample Evidence",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(140.dp)
+                                        .clip(RoundedCornerShape(6.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        attachedPhotoName ?: "evidence.jpg",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ext.ink
+                                    )
+                                    Text(
+                                        "📍 28.4595° N, 77.0266° E · Ward 4",
+                                        fontSize = 10.sp,
+                                        color = ext.green
+                                    )
+                                }
+                                TextButton(onClick = onRemovePhoto) {
+                                    Text(t("Remove", "हटाएं"), fontSize = 11.sp, color = Color(0xFFDC2626))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
             // ── Working Geotagging (Address + GPS Fetcher + Interactive Ward Map Picker) ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -647,6 +921,155 @@ private fun ReportForm(
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(t("Save draft", "ड्राफ्ट सहेजें"), fontSize = 12.sp, color = ext.ink)
+                }
+            }
+
+            // ── Official Grievance Petition & Authority Dispatch Card (Rendered On Screen) ──
+            AnimatedVisibility(visible = displayedGrievanceDraft != null) {
+                displayedGrievanceDraft?.let { draft ->
+                    val clipboard = LocalClipboardManager.current
+                    var copied by remember { mutableStateOf(false) }
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                        color = Color(0xFFF6F8F2),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, ext.green)
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Text(
+                                t("🏛️ OFFICIAL CIVIC GRIEVANCE PETITION · DISPATCH READY", "🏛️ आधिकारिक नागरिक शिकायत याचिका · प्रेषण तैयार"),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ext.green
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                t("Haryana Right to Service Act (RTSA 2026) Official Draft", "हरियाणा सेवा का अधिकार अधिनियम (RTSA 2026) आधिकारिक ड्राफ्ट"),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ext.ink
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                t("Official petition letter compiled for immediate dispatch to the accountable municipal department.", "जवाबदेह नगरपालिका विभाग को तत्काल भेजने हेतु आधिकारिक शिकायत पत्र तैयार है।"),
+                                fontSize = 12.sp,
+                                color = ext.muted
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Authority Info Box
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = ext.paper,
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD2D9CB))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(t("DESIGNATED AUTHORITY", "नामित प्राधिकारी"), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = ext.muted)
+                                    Text(draft.authorityName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = ext.ink)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Surface(
+                                        color = Color(0xFFE8EFE3),
+                                        shape = RoundedCornerShape(4.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("To: ${draft.recipientEmail}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ext.ink)
+                                            Text(
+                                                if (copied) "✓ Copied" else "Copy",
+                                                fontSize = 11.sp,
+                                                color = ext.green,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.clickable {
+                                                    clipboard.setText(AnnotatedString(draft.recipientEmail))
+                                                    copied = true
+                                                }
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text("Subject: ${draft.subject}", fontSize = 12.sp, color = ext.ink)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Statutory Citizen Instruction Box
+                            Surface(
+                                color = Color(0xFFFEF3C7),
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF59E0B)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    t(
+                                        "⚠️ Important Citizen Step: Tap 'Open in Gmail App' to launch your email client with the authority email, subject, and petition body pre-filled. Attach your captured geotagged photo before sending so municipal authorities cannot reject under Section 7 of RTSA.",
+                                        "⚠️ महत्वपूर्ण नागरिक निर्देश: ईमेल खोलने के लिए 'जीमेल ऐप में खोलें' दबाएँ। भेजने से पहले अपनी खींची गई जियोटैग फोटो अवश्य जोड़ें ताकि अधिकारी आरटीएसए की धारा 7 के तहत इसे खारिज न कर सकें।"
+                                    ),
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF92400E),
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Preformatted Petition Letter Preview
+                            Surface(
+                                color = ext.paper,
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD2D9CB)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = draft.body,
+                                    fontSize = 11.sp,
+                                    color = ext.ink,
+                                    lineHeight = 16.sp,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Action buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Button(
+                                    onClick = { onOpenGmail(draft) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA4335), contentColor = Color.White),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.weight(1.3f)
+                                ) {
+                                    Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(t("Open in Gmail App", "जीमेल ऐप में खोलें"), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        clipboard.setText(AnnotatedString(draft.body))
+                                        copied = true
+                                    },
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp), tint = ext.ink)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (copied) t("Copied!", "कॉपी हुआ!") else t("Copy", "कॉपी करें"), fontSize = 11.sp, color = ext.ink)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

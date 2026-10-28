@@ -2,8 +2,8 @@ package com.example.theekhai.contract
 
 import kotlinx.serialization.Serializable
 
-@Serializable data class CaseDto(val id: String, val title: String, val description: String, val category: String, val address: String, val latitude: Double?, val longitude: Double?, val citizenId: String, val department: String, val priority: String, val status: String, val createdAt: Long, val updatedAt: Long, val dueAt: Long, val version: Long, val escalation: Long, val closureBy: String?)
-@Serializable data class ReportDto(val title: String, val description: String, val category: String, val address: String, val latitude: Double? = null, val longitude: Double? = null, val consent: Boolean = false, val priority: String = "MEDIUM")
+@Serializable data class CaseDto(val id: String, val title: String, val description: String, val category: String, val address: String, val latitude: Double?, val longitude: Double?, val citizenId: String, val department: String, val priority: String, val status: String, val createdAt: Long, val updatedAt: Long, val dueAt: Long, val version: Long, val escalation: Long, val closureBy: String?, val photoUrl: String? = null)
+@Serializable data class ReportDto(val title: String, val description: String, val category: String, val address: String, val latitude: Double? = null, val longitude: Double? = null, val consent: Boolean = false, val priority: String = "MEDIUM", val photoUrl: String? = null)
 @Serializable data class ActionDto(val action: String, val version: Long, val note: String, val target: String = "", val department: String = "")
 @Serializable data class TaskDto(val id: String, val caseId: String, val department: String, val title: String, val required: Boolean, val complete: Boolean)
 @Serializable data class EventDto(val id: String, val caseId: String, val actorId: String, val action: String, val note: String, val at: Long)

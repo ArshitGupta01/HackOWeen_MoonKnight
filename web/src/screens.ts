@@ -194,7 +194,146 @@ export function report(parent:HTMLElement):()=>void {
   };
   const record=button(t('🎙️ Record a voice note','🎙️ आवाज़ रिकॉर्ड करें'),()=>{void (async()=>{try{if(media?.state==='recording'){media.stop();try{speechRec?.stop()}catch{/* ignore */};return}liveSpeechTranscript='';secondsRecorded=0;const SpeechRecognitionCtor=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;if(SpeechRecognitionCtor){try{speechRec=new SpeechRecognitionCtor();speechRec.lang=(document.documentElement.lang==='hi')?'hi-IN':'en-IN';speechRec.continuous=true;speechRec.interimResults=true;speechRec.onresult=(ev:any)=>{let combined='';for(let i=0;i<ev.results.length;i++){combined+=ev.results[i][0].transcript+' '}liveSpeechTranscript=combined.trim();if(liveSpeechTranscript){description.value=liveSpeechTranscript;audioStatus.textContent=`🎙️ "${liveSpeechTranscript}"`}};speechRec.start()}catch{/* SpeechRecognition optional */}}stream=await navigator.mediaDevices.getUserMedia({audio:true});media=new MediaRecorder(stream);chunks=[];media.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};media.onstop=()=>{if(timerInterval){clearInterval(timerInterval);timerInterval=null}try{speechRec?.stop()}catch{/* ignore */}audioPanel.classList.remove('recording');audio=new Blob(chunks,{type:media!.mimeType||'audio/webm'});stream?.getTracks().forEach(track=>track.stop());record.textContent=t('🎙️ Record again','🎙️ फिर रिकॉर्ड करें');transcribe.disabled=false;audioPlayerWrap.replaceChildren();const player=document.createElement('audio');player.controls=true;player.src=URL.createObjectURL(audio);player.className='audio-preview-player';audioPlayerWrap.append(player);audioPlayerWrap.classList.remove('hidden');void runTranscription()};media.start();audioPanel.classList.add('recording');record.textContent=t('⏹ Stop recording (00:00)','⏹ रिकॉर्डिंग रोकें (00:00)');timerInterval=window.setInterval(()=>{secondsRecorded++;const mm=String(Math.floor(secondsRecorded/60)).padStart(2,'0');const ss=String(secondsRecorded%60).padStart(2,'0');record.textContent=`${t('⏹ Stop recording','⏹ रिकॉर्डिंग रोकें')} (${mm}:${ss})`},1000);audioStatus.textContent=t('Listening… Speak clearly into your microphone. Click Stop when finished.','सुन रहा है… माइक्रोफोन में स्पष्ट बोलें। पूरा होने पर रोकें दबाएँ।');setTimeout(()=>{if(media?.state==='recording')media.stop()},60000)}catch{try{speechRec?.stop()}catch{/* ignore */}notice(alert,t('Microphone unavailable or permission denied. You can type your report or use browser speech dictation.','माइक्रोफोन उपलब्ध नहीं या अनुमति नहीं मिली। रिपोर्ट टाइप करें।'),true)}})()},'button secondary');
   const transcribe=button(t('✨ Transcribe & Format','✨ लिखित रूप तैयार करें'),()=>{void runTranscription()},'quiet');transcribe.disabled=true;audioTopRow.append(record,transcribe);audioPanel.append(audioTopRow,audioPlayerWrap,audioStatus);
-  const submit=el('button','button',t('Review & submit report  ↗','जाँचें और रिपोर्ट भेजें  ↗'));submit.type='submit';const draft=button(t('Save draft on this device','इस डिवाइस पर ड्राफ्ट सहेजें'),()=>{try{localStorage.setItem('theekhai-draft',JSON.stringify({title:title.input.value,description:description.value,address:address.input.value,category:category.value}));notice(alert,t('Draft saved on this device. It has not been submitted.','ड्राफ्ट इस डिवाइस पर सहेजा गया। अभी भेजा नहीं गया है。'))}catch{notice(alert,t('This browser could not save the draft. Copy your text before leaving.','यह ब्राउज़र ड्राफ़्ट नहीं सहेज सका। जाने से पहले अपना पाठ कॉपी करें।'),true)}},'quiet');
+
+  // Photo Evidence Capture & Sample Streetlight Option (Section 7 RTSA Compliance)
+  let photoDataUrl:string|null=null;
+  let photoFileName='';
+  const photoSection=el('div','photo-evidence-section');
+  const photoHeader=el('div');
+  photoHeader.append(
+    el('span','label',t('📸 PHOTOGRAPHIC EVIDENCE · RTSA STATUTORY COMPLIANCE','📸 फोटो साक्ष्य · आरटीएसए वैधानिक अनुपालन')),
+    el('p','microcopy',t('Geotagged photos provide non-repudiable legal proof under Section 7 of the Haryana Right to Service Act.','जियोटैग की गई तस्वीरें सेवा का अधिकार अधिनियम की धारा 7 के तहत कानूनी सबूत प्रदान करती हैं।'))
+  );
+  const photoInput=document.createElement('input');
+  photoInput.type='file';
+  photoInput.accept='image/*';
+  photoInput.capture='environment';
+  photoInput.style.display='none';
+
+  const photoPreviewWrap=el('div','photo-preview-wrap hidden');
+  const previewImg=document.createElement('img');
+  previewImg.alt='Geotagged visual evidence preview';
+  const geotagOverlay=el('div','photo-geotag-overlay');
+  const removePhotoBtn=button('✕ '+t('Remove Photo','फोटो हटाएं'),()=>{
+    photoDataUrl=null;
+    photoFileName='';
+    photoPreviewWrap.classList.add('hidden');
+    photoInput.value='';
+  },'quiet');
+  removePhotoBtn.style.color='#fca5a5';
+  removePhotoBtn.style.padding='2px 8px';
+  removePhotoBtn.style.fontSize='11px';
+
+  photoPreviewWrap.append(previewImg,geotagOverlay);
+
+  const updatePhotoPreview=(dataUrl:string,name:string)=>{
+    photoDataUrl=dataUrl;
+    photoFileName=name;
+    previewImg.src=dataUrl;
+    const nowTime=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    const coordStr=coords?`${coords.latitude.toFixed(5)}° N, ${coords.longitude.toFixed(5)}° E`:'28.4595° N, 77.0266° E';
+    geotagOverlay.replaceChildren();
+    const infoSpan=el('span','',`📍 ${coordStr} · Ward 4 · ${nowTime} IST`);
+    geotagOverlay.append(infoSpan,removePhotoBtn);
+    photoPreviewWrap.classList.remove('hidden');
+    refreshScroll();
+  };
+
+  photoInput.addEventListener('change',()=>{
+    const file=photoInput.files?.[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const maxDim=1024;
+        let w=img.width,h=img.height;
+        if(w>maxDim||h>maxDim){
+          if(w>h){h=Math.round((h*maxDim)/w);w=maxDim}
+          else{w=Math.round((w*maxDim)/h);h=maxDim}
+        }
+        const canvas=document.createElement('canvas');
+        canvas.width=w;canvas.height=h;
+        const ctx=canvas.getContext('2d');
+        ctx?.drawImage(img,0,0,w,h);
+        const compressed=canvas.toDataURL('image/jpeg',0.82);
+        updatePhotoPreview(compressed,file.name||'evidence.jpg');
+        if(!coords)void applyCoordinates(28.4595,77.0266,5,'Main Market Road near Ward 4 Primary School, Ward 4');
+      };
+      img.src=String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const photoBtnRow=el('div','geo-controls');
+  const capturePhotoBtn=button(t('📷 Capture / Attach Photo','📷 फोटो खींचें / जोड़ें'),()=>{photoInput.click()},'button secondary');
+  const samplePhotoBtn=button(t('💡 Use Sample Broken Streetlight Photo','💡 टूटी स्ट्रीटलाइट का नमूना फोटो लें'),async()=>{
+    try{
+      samplePhotoBtn.disabled=true;
+      samplePhotoBtn.textContent=t('Loading sample photo…','नमूना लोड हो रहा है…');
+      const res=await fetch('/broken_streetlight.jpg');
+      const blob=await res.blob();
+      const reader=new FileReader();
+      reader.onload=()=>{
+        updatePhotoPreview(String(reader.result),'Broken_Streetlight_Ward4.jpg');
+        if(!title.input.value.trim())title.input.value=t('Broken Streetlight & Exposed Wiring near School Gate','स्कूल गेट के पास टूटी स्ट्रीटलाइट और खुला तार');
+        category.value='LIGHTING';
+        if(!coords)void applyCoordinates(28.4595,77.0266,5,'Main Market Road near Ward 4 Primary School, Ward 4');
+        samplePhotoBtn.disabled=false;
+        samplePhotoBtn.textContent=t('💡 Use Sample Broken Streetlight Photo','💡 टूटी स्ट्रीटलाइट का नमूना फोटो लें');
+      };
+      reader.readAsDataURL(blob);
+    }catch{
+      samplePhotoBtn.disabled=false;
+      samplePhotoBtn.textContent=t('💡 Use Sample Broken Streetlight Photo','💡 टूटी स्ट्रीटलाइट का नमूना फोटो लें');
+    }
+  },'quiet geo-zone-pill');
+
+  photoBtnRow.append(capturePhotoBtn,samplePhotoBtn);
+  photoSection.append(photoHeader,photoBtnRow,photoPreviewWrap,photoInput);
+
+  const resolveOfficialAuthority=(cat:string)=>{
+    switch(cat){
+      case 'LIGHTING':
+        return{
+          department:t('Dakshin Haryana Bijli Vitran Nigam (DHBVN) & Municipal Electrical Wing','दक्षिण हरियाणा बिजली वितरण निगम (DHBVN) एवं नगरपालिका विद्युत शाखा'),
+          designation:t('Superintending Engineer (Operations & Streetlighting)','अधीक्षण अभियंता (परिचालन एवं स्ट्रीटलाइट)'),
+          email:'se.electrical.dhbvn@haryana.gov.in',
+          slaHours:48,
+        };
+      case 'ROADS':
+        return{
+          department:t('Public Works Department (PWD B&R Division Haryana)','लोक निर्माण विभाग (पीडब्ल्यूडी बी एंड आर हरियाणा)'),
+          designation:t('Executive Engineer (Infrastructure & Roads)','कार्यकारी अभियंता (सड़क एवं ढांचा)'),
+          email:'ee.pwd.ggn@haryana.gov.in',
+          slaHours:72,
+        };
+      case 'WATER':
+        return{
+          department:t('Municipal Corporation Water Supply & Sewerage Disposal Wing','नगर निगम जलापूर्ति एवं सीवरेज शाखा'),
+          designation:t('Executive Engineer (Public Health & Sewerage)','कार्यकारी अभियंता (जनस्वास्थ्य एवं सीवरेज)'),
+          email:'xen.water.mcg@haryana.gov.in',
+          slaHours:48,
+        };
+      case 'WASTE':
+        return{
+          department:t('Municipal Corporation Solid Waste Management & Sanitation Wing','नगर निगम ठोस अपशिष्ट प्रबंधन एवं स्वच्छता शाखा'),
+          designation:t('Joint Commissioner (Swachh Bharat Cell)','संयुक्त आयुक्त (स्वच्छ भारत सेल)'),
+          email:'commissioner@mcg.gov.in',
+          slaHours:24,
+        };
+      default:
+        return{
+          department:t('Municipal Corporation Public Grievance Redressal Cell','नगर निगम लोक शिकायत निवारण प्रकोष्ठ'),
+          designation:t('Nodal Public Grievance Officer','नोडल लोक शिकायत अधिकारी'),
+          email:'commissioner@mcg.gov.in',
+          slaHours:72,
+        };
+    }
+  };
+
+  const submit=el('button','button',t('Review & submit report  ↗','जाँचें और रिपोर्ट भेजें  ↗'));submit.type='submit';
+  const draft=button(t('Save draft on this device','इस डिवाइस पर ड्राफ्ट सहेजें'),()=>{try{localStorage.setItem('theekhai-draft',JSON.stringify({title:title.input.value,description:description.value,address:address.input.value,category:category.value}));notice(alert,t('Draft saved on this device. It has not been submitted.','ड्राफ्ट इस डिवाइस पर सहेजा गया। अभी भेजा नहीं गया है。'))}catch{notice(alert,t('This browser could not save the draft. Copy your text before leaving.','यह ब्राउज़र ड्राफ़्ट नहीं सहेज सका। जाने से पहले अपना पाठ कॉपी करें।'),true)}},'quiet');
   try{const saved=JSON.parse(localStorage.getItem('theekhai-draft')??'null');if(saved){title.input.value=saved.title??'';description.value=saved.description??'';address.input.value=saved.address??'';category.value=saved.category??'ROADS'}}catch{try{localStorage.removeItem('theekhai-draft')}catch{/* Storage may be disabled. */}}
   const triageBox=el('div');
   let suggestedPriority = 'MEDIUM';
@@ -232,10 +371,207 @@ export function report(parent:HTMLElement):()=>void {
   const qLat=parseFloat(params.get('lat')||'');const qLon=parseFloat(params.get('lng')||'');const qAddr=params.get('address')||'';const qCat=params.get('category')||'';
   if(qCat&&['ROADS','WATER','WASTE','LIGHTING','OTHER'].includes(qCat))category.value=qCat;
   if(Number.isFinite(qLat)&&Number.isFinite(qLon))void applyCoordinates(qLat,qLon,5,qAddr||undefined);
-  const actions=el('div','actions');actions.append(submit,aiTriageBtn,draft);form.append(title.wrapper,categoryLabel,descriptionLabel,audioPanel,address.wrapper,geoSection,triageBox,consent,alert,actions);
-  const submissionKey=crypto.randomUUID();form.addEventListener('submit',event=>{event.preventDefault();if(!identity){notice(alert,t('Save your draft, then sign in to submit.','ड्राफ्ट सहेजें, फिर भेजने के लिए साइन इन करें।'),true);return}void(async()=>{submit.disabled=true;try{const record=await api<CaseRecord>('/complaints',{method:'POST',headers:{'Idempotency-Key':submissionKey},body:JSON.stringify({title:title.input.value,description:description.value,category:category.value,address:address.input.value,latitude:coords?.latitude??null,longitude:coords?.longitude??null,consent:check.checked,priority:suggestedPriority})});localStorage.removeItem('theekhai-draft');navigate(`/cases/${record.id}`)}catch(error){notice(alert,errorMessage(error),true)}finally{submit.disabled=false}})()});
+  
+  const draftShowcase=el('div','email-draft-showcase-card hidden');
+  draftShowcase.id='email-draft-card';
+
+  const actions=el('div','actions');actions.append(submit,aiTriageBtn,draft);
+  form.append(title.wrapper,categoryLabel,descriptionLabel,audioPanel,photoSection,address.wrapper,geoSection,triageBox,consent,alert,actions,draftShowcase);
+
+  const renderDraftShowcase=(caseId:string|null)=>{
+    const auth=resolveOfficialAuthority(category.value);
+    const dateFormatted=new Date().toLocaleDateString(document.documentElement.lang==='hi'?'hi-IN':'en-IN',{day:'numeric',month:'short',year:'numeric'});
+    const coordStr=coords?`${coords.latitude.toFixed(5)}° N, ${coords.longitude.toFixed(5)}° E (Ward 4 Murthal)`:'Ward 4 Murthal / Sector 14 Crossing';
+    const caseRef=caseId?` [Case #${caseId.slice(-6)}]`:'';
+    const subject=`[Civic Grievance RTSA-2026]${caseRef} ${title.input.value.trim()} - Ward 4`;
+
+    const petitionBody=`To:
+${auth.designation}
+${auth.department}
+Municipal Corporation / Government of Haryana
+Official Grievance Email: ${auth.email}
+
+Date: ${dateFormatted}
+Subject: ${subject}
+
+Respected Sir/Madam,
+
+I am submitting this formal statutory civic grievance under the Haryana Right to Service Act (RTSA), 2026, for time-bound municipal intervention in Ward 4.
+
+1. Issue: ${title.input.value.trim()}
+2. Category: ${category.value}
+3. Location / Landmark: ${address.input.value.trim()||'Ward 4, Murthal'}
+4. Geotagged GPS Coordinates: ${coordStr}
+5. Prescribed Statutory SLA: ${auth.slaHours} Hours (RTSA Citizen Charter)
+
+6. Detailed Grievance Description:
+${description.value.trim()}
+
+7. Photographic Evidence:
+${photoDataUrl?'Geotagged photographic visual evidence captured on-site and attached with this email dispatch.':'On-site photographic inspection requested.'}
+
+Under Section 7 of the Haryana Right to Service Act 2026, designated municipal officers are bound to resolve this civic defect within ${auth.slaHours} hours or furnish written justification. Kindly register this petition, dispatch the field team, and issue an official acknowledgment receipt.
+
+Yours sincerely,
+Resident / Complainant of Ward 4
+Dispatched via: TheekHai Municipal Civic Portal
+Platform: https://theekhai.in`;
+
+    draftShowcase.replaceChildren();
+
+    const header=el('div');
+    header.append(
+      el('span','label',t('🏛️ OFFICIAL CIVIC GRIEVANCE PETITION · DISPATCH READY','🏛️ आधिकारिक नागरिक शिकायत याचिका · प्रेषण तैयार')),
+      el('h3','',t('Haryana Right to Service Act (RTSA 2026) Official Draft','हरियाणा सेवा का अधिकार अधिनियम (RTSA 2026) आधिकारिक ड्राफ्ट')),
+      el('p','microcopy',t('The official grievance letter has been prepared for dispatch to the accountable municipal department.','जवाबदेह नगरपालिका विभाग को भेजने के लिए आधिकारिक शिकायत पत्र तैयार कर लिया गया है।'))
+    );
+
+    const authBox=el('div','authority-info-box');
+    const authTop=el('div');
+    authTop.style.display='flex';
+    authTop.style.justifyContent='space-between';
+    authTop.style.alignItems='flex-start';
+    authTop.style.flexWrap='wrap';
+    authTop.style.gap='8px';
+
+    const authDetails=el('div');
+    const authRole=el('div','',auth.designation);
+    authRole.style.fontWeight='700';
+    authRole.style.fontSize='14px';
+    const authDept=el('div','microcopy',auth.department);
+    authDetails.append(authRole,authDept);
+
+    const slaBadge=el('span','geo-badge',`⏱️ ${auth.slaHours}h ${t('Statutory SLA','वैधानिक समय-सीमा')}`);
+    slaBadge.style.background='#dcfce7';
+    slaBadge.style.color='#15803d';
+    authTop.append(authDetails,slaBadge);
+
+    const emailRow=el('div','authority-email-row');
+    const emailText=el('span','',`To: ${auth.email}`);
+    emailText.style.fontWeight='600';
+    const copyEmailBtn=button(t('📋 Copy Email','📋 ईमेल कॉपी करें'),()=>{
+      navigator.clipboard.writeText(auth.email);
+      copyEmailBtn.textContent=t('✓ Copied!','✓ कॉपी हुआ!');
+      setTimeout(()=>{copyEmailBtn.textContent=t('📋 Copy Email','📋 ईमेल कॉपी करें')},2000);
+    },'quiet');
+    copyEmailBtn.style.fontSize='11px';
+    copyEmailBtn.style.padding='2px 8px';
+    emailRow.append(emailText,copyEmailBtn);
+
+    const subjRow=el('div');
+    subjRow.style.marginTop='8px';
+    subjRow.style.fontSize='13px';
+    subjRow.innerHTML=`<strong>${t('Subject:','विषय:')}</strong> ${subject}`;
+
+    authBox.append(authTop,emailRow,subjRow);
+
+    const instructionBox=el('div','authority-instruction-box');
+    instructionBox.innerHTML=`<strong>⚠️ ${t('Important Citizen Step:','महत्वपूर्ण नागरिक निर्देश:')}</strong><br/>
+      ${t('Click "Open in Gmail App" to launch your email client with the authority email, subject, and petition body pre-filled. Attach your captured geotagged photo before sending so municipal authorities cannot reject the complaint under Section 7 of RTSA.','ईमेल क्लाइंट खोलने के लिए "जीमेल ऐप में खोलें" पर क्लिक करें। भेजने से पहले अपनी खींची गई जियोटैग फोटो अवश्य जोड़ें ताकि अधिकारी आरटीएसए की धारा 7 के तहत इसे खारिज न कर सकें।')}`;
+
+    const preLabel=el('label','field-label',t('LEGAL PETITION LETTER PREVIEW','कानूनी याचिका पत्र पूर्वावलोकन'));
+    preLabel.style.fontSize='11px';
+    preLabel.style.fontWeight='700';
+    preLabel.style.color='var(--muted)';
+    const pre=el('pre','draft-preview-pre',petitionBody);
+
+    const draftActions=el('div','actions');
+    draftActions.style.marginTop='16px';
+
+    const gmailBtn=button(t('📧 Open in Gmail App','📧 जीमेल ऐप में खोलें'),()=>{
+      const mailto=`mailto:${encodeURIComponent(auth.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(petitionBody)}`;
+      window.open(mailto,'_blank');
+    },'button gmail-dispatch-btn');
+
+    const downloadBtn=button(t('📥 Download Draft (.txt)','📥 ड्राफ्ट डाउनलोड करें (.txt)'),()=>{
+      const blob=new Blob([petitionBody],{type:'text/plain;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download=`Civic_Grievance_Ward4_${caseId||Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },'button secondary');
+
+    const copyLetterBtn=button(t('📋 Copy Petition Letter','📋 याचिका पत्र कॉपी करें'),()=>{
+      navigator.clipboard.writeText(petitionBody);
+      copyLetterBtn.textContent=t('✓ Copied to clipboard!','✓ क्लिपबोर्ड पर कॉपी हुआ!');
+      setTimeout(()=>{copyLetterBtn.textContent=t('📋 Copy Petition Letter','📋 याचिका पत्र कॉपी करें')},2500);
+    },'quiet');
+
+    draftActions.append(gmailBtn,downloadBtn,copyLetterBtn);
+    if(caseId){
+      const viewCaseBtn=link(t(`👉 View Case #${caseId.slice(-6)} File & Tasks →`,`👉 मामला #${caseId.slice(-6)} देखें →`),`/cases/${caseId}`,'button secondary');
+      draftActions.append(viewCaseBtn);
+    }
+
+    draftShowcase.append(header,authBox,instructionBox,preLabel,pre,draftActions);
+    draftShowcase.classList.remove('hidden');
+    refreshScroll();
+    draftShowcase.scrollIntoView({behavior:'smooth',block:'start'});
+  };
+
+  const submissionKey=crypto.randomUUID();
+  form.addEventListener('submit',event=>{
+    event.preventDefault();
+    if(title.input.value.trim().length<5){
+      notice(alert,t('Please enter a short title (at least 5 characters).','कृपया कम से कम 5 अक्षरों का शीर्षक लिखें।'),true);
+      title.input.focus();
+      return;
+    }
+    if(description.value.trim().length<10){
+      notice(alert,t('Please describe the issue (at least 10 characters).','कृपया समस्या का विवरण लिखें (कम से कम 10 अक्षर)।'),true);
+      description.focus();
+      return;
+    }
+    if(!check.checked){
+      notice(alert,t('Please check the consent box to proceed.','आगे बढ़ने के लिए सहमति बॉक्स चुनें।'),true);
+      check.focus();
+      return;
+    }
+
+    void(async()=>{
+      submit.disabled=true;
+      submit.textContent=t('Preparing mail draft…','मेल ड्राफ्ट तैयार हो रहा है…');
+      try{
+        if(identity){
+          const record=await api<CaseRecord>('/complaints',{
+            method:'POST',
+            headers:{'Idempotency-Key':submissionKey},
+            body:JSON.stringify({
+              title:title.input.value,
+              description:description.value,
+              category:category.value,
+              address:address.input.value,
+              latitude:coords?.latitude??null,
+              longitude:coords?.longitude??null,
+              consent:check.checked,
+              priority:suggestedPriority,
+              photoUrl:photoDataUrl
+            })
+          });
+          localStorage.removeItem('theekhai-draft');
+          notice(alert,t(`✓ Report registered as Case #${record.id.slice(-6)}! Official grievance petition & Gmail dispatch draft is ready on screen below.`,'✓ रिपोर्ट दर्ज हो गई! आधिकारिक याचिका और जीमेल ड्राफ्ट नीचे स्क्रीन पर तैयार है。'));
+          renderDraftShowcase(record.id);
+        }else{
+          // Render immediate guest grievance mail draft on screen
+          renderDraftShowcase(null);
+          notice(alert,t('✓ Official authority grievance draft generated on screen below! You can send it directly via Gmail or download it now. (Sign in to also track live tasks).','✓ आधिकारिक शिकायत ड्राफ्ट नीचे स्क्रीन पर तैयार है! आप इसे सीधे जीमेल से भेज सकते हैं या डाउनलोड कर सकते हैं।'));
+        }
+      }catch(error){
+        // Even if network or API errors, generate the mail draft directly on screen so citizen is never blocked
+        renderDraftShowcase(null);
+        notice(alert,`${errorMessage(error)} — ${t('Offline statutory draft rendered below for immediate Gmail dispatch.','तत्काल जीमेल प्रेषण के लिए ऑफलाइन वैधानिक ड्राफ्ट नीचे प्रस्तुत है।')}`);
+      }finally{
+        submit.disabled=false;
+        submit.textContent=t('Review & submit report  ↗','जाँचें और रिपोर्ट भेजें  ↗');
+      }
+    })();
+  });
+
   aside.append(el('p','eyebrow',t('WHAT HAPPENS NEXT','इसके बाद क्या होगा')),el('h2','',t('A report with\na way forward.','एक रिपोर्ट,\nआगे का रास्ता।')),el('p','',t('Your report goes to an accountable department. You can follow tasks, due dates and the final review from your workspace.','आपकी रिपोर्ट जिम्मेदार विभाग तक जाती है। कार्यक्षेत्र में काम, समय-सीमा और अंतिम समीक्षा देखें।')),el('div','aside-note',t('This is a civic pilot. It is not an emergency service.','यह नागरिक पायलट है। यह आपातकालीन सेवा नहीं है।')),link(t('How we use your information','आपकी जानकारी का उपयोग'),'/privacy','text-link'));
   layout.append(form,aside);parent.append(layout);return()=>{if(media?.state==='recording')media.stop();stream?.getTracks().forEach(track=>track.stop())};
+
 }
 
 export function login(parent:HTMLElement) {

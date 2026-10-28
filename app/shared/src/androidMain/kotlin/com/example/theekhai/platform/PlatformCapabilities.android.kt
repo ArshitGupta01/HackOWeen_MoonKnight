@@ -14,6 +14,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import androidx.core.content.ContextCompat
 import java.util.Locale
 
@@ -188,3 +197,151 @@ actual fun rememberVoiceRecorder(
         }
     }
 }
+
+@Composable
+actual fun rememberPhotoCapture(
+    onResult: (Result<PhotoCaptureResult>) -> Unit,
+): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri == null) {
+            onResult(Result.failure(IllegalStateException("No image selected.")))
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val originalBitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
+                if (originalBitmap != null) {
+                    val maxDim = 1024
+                    val width = originalBitmap.width
+                    val height = originalBitmap.height
+                    val scaled = if (width > maxDim || height > maxDim) {
+                        val ratio = width.toFloat() / height.toFloat()
+                        val newWidth = if (width > height) maxDim else (maxDim * ratio).toInt()
+                        val newHeight = if (height > width) maxDim else (maxDim / ratio).toInt()
+                        Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+                    } else {
+                        originalBitmap
+                    }
+                    val out = ByteArrayOutputStream()
+                    scaled.compress(Bitmap.CompressFormat.JPEG, 80, out)
+                    val bytes = out.toByteArray()
+                    val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    val dataUrl = "data:image/jpeg;base64,$b64"
+                    withContext(Dispatchers.Main) {
+                        onResult(Result.success(PhotoCaptureResult(dataUrl, "evidence_${System.currentTimeMillis()}.jpg")))
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        onResult(Result.failure(IllegalStateException("Failed to decode selected image.")))
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult(Result.failure(IllegalStateException("Image processing error: ${e.message}", e)))
+                }
+            }
+        }
+    }
+
+    return remember(galleryLauncher) {
+        {
+            try {
+                galleryLauncher.launch("image/*")
+            } catch (e: Exception) {
+                onResult(Result.failure(IllegalStateException("Unable to open photo picker on this device.", e)))
+            }
+        }
+    }
+}
+
+@Composable
+actual fun rememberEmailDraftExporter(): (GrievanceEmailDraft) -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    return remember(context) {
+        { draft ->
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val downloadsDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+                        ?: context.filesDir
+                    val draftFile = java.io.File(downloadsDir, "TheekHai_Grievance_${draft.trackingId.take(8)}.txt")
+                    val draftContent = buildString {
+                        append("=================================================================\n")
+                        append("THEEKHAI CIVIC GRIEVANCE PETITION (HARYANA RIGHT TO SERVICE ACT)\n")
+                        append("=================================================================\n\n")
+                        append("TO OFFICIAL AUTHORITY: ${draft.authorityName}\n")
+                        append("OFFICIAL EMAIL: ${draft.recipientEmail}\n")
+                        append("CASE TRACKING ID: #${draft.trackingId}\n")
+                        append("DATE & TIME: ${java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(java.util.Date())}\n\n")
+                        append("SUBJECT:\n${draft.subject}\n\n")
+                        append("LOCATION DETAILS:\n")
+                        append("Address: ${draft.address}\n")
+                        if (draft.latitude != null && draft.longitude != null) {
+                            append("GPS Coordinates: ${draft.latitude}° N, ${draft.longitude}° E (Ward 4 Murthal)\n")
+                            append("Map Radar Link: https://www.google.com/maps?q=${draft.latitude},${draft.longitude}\n")
+                        }
+                        append("\nPETITION TEXT:\n")
+                        append(draft.body)
+                        append("\n\n-----------------------------------------------------------------\n")
+                        append("INSTRUCTIONS FOR CITIZEN:\n")
+                        append("1. Send this petition to: ${draft.recipientEmail}\n")
+                        append("2. Attach your captured geotagged photo evidence\n")
+                        append("3. Under Haryana Right to Service Act, this enforces time-bound statutory SLA.\n")
+                        append("=================================================================\n")
+                    }
+                    draftFile.writeText(draftContent, Charsets.UTF_8)
+
+                    if (!draft.photoBase64.isNullOrBlank()) {
+                        try {
+                            val cleanB64 = draft.photoBase64.substringAfter("base64,")
+                            val imageBytes = Base64.decode(cleanB64, Base64.DEFAULT)
+                            val photoFile = java.io.File(downloadsDir, "Evidence_${draft.trackingId.take(8)}.jpg")
+                            photoFile.writeBytes(imageBytes)
+                        } catch (_: Exception) {}
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        try {
+                            val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:" + Uri.encode(draft.recipientEmail))
+                                putExtra(Intent.EXTRA_EMAIL, arrayOf(draft.recipientEmail))
+                                putExtra(Intent.EXTRA_SUBJECT, draft.subject)
+                                putExtra(Intent.EXTRA_TEXT, draft.body + "\n\n[GPS Geotag: ${draft.latitude ?: 28.4595}° N, ${draft.longitude ?: 77.0266}° E | Case #${draft.trackingId}]\n(Please attach the captured evidence photo)")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            val chooser = Intent.createChooser(emailIntent, "Send Grievance via Gmail").apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(chooser)
+                            android.widget.Toast.makeText(
+                                context,
+                                "Draft saved to Downloads! Opening Gmail for ${draft.recipientEmail}. Remember to attach your photo.",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        } catch (_: Exception) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Draft saved: ${draftFile.name}. Send to ${draft.recipientEmail}",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "Draft export note: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+}
+
+

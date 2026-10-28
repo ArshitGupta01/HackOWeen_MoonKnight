@@ -315,3 +315,17 @@ html.lenis,html.lenis body{height:auto}
   color: var(--muted, #64736a);
   word-break: break-all;
 }
+
+/* Photo evidence & Email draft showcase card */
+.photo-evidence-section{margin:16px 0 22px;padding:18px;background:#eef1e9;border:1px solid #d2d9cb;border-radius:5px}
+.photo-preview-wrap{position:relative;margin-top:12px;border-radius:6px;overflow:hidden;background:#000;max-height:220px}
+.photo-preview-wrap img{display:block;width:100%;height:100%;max-height:220px;object-fit:cover}
+.photo-geotag-overlay{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.72);color:#fff;padding:6px 12px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.email-draft-showcase-card{margin-top:24px;border:2px solid var(--green);background:#f6f8f2;padding:20px;border-radius:6px}
+.authority-info-box{padding:14px;background:var(--paper);border:1px solid var(--line);border-radius:4px;margin:12px 0}
+.authority-instruction-box{padding:12px 14px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;border-radius:4px;font-size:12px;margin:12px 0;line-height:1.5}
+.draft-preview-pre{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:12px;font-size:12px;line-height:1.5;max-height:220px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;margin:10px 0;color:var(--ink)}
+.authority-email-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(18,62,57,0.06);padding:8px 12px;border-radius:4px;font-family:monospace;font-size:13px;margin-top:10px}
+.gmail-dispatch-btn{background:#ea4335 !important;border-color:#ea4335 !important;color:#ffffff !important;font-weight:700}
+.gmail-dispatch-btn:hover{background:#d93025 !important}
+
