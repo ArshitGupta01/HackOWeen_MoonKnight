@@ -440,17 +440,6 @@ private fun SignupEmailVerificationPending(
             style = MaterialTheme.typography.bodySmall,
             color = ext.muted
         )
-        if (devToken != null) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Surface(color = Color(0xFFE8F5E9), shape = RoundedCornerShape(4.dp)) {
-                Text(
-                    text = "🔑 Dev Token: $devToken",
-                    color = Color(0xFF2E7D32),
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-        }
 
         Spacer(modifier = Modifier.height(18.dp))
         Text("Verification Token", style = MaterialTheme.typography.labelMedium, color = ext.ink)

@@ -11,7 +11,10 @@ actual val platformDataModule: Module = module {
     single(DataQualifiers.BackendBaseUrl) {
         System.getProperty("THEEKHAI_BACKEND_URL")
             ?: System.getenv("THEEKHAI_BACKEND_URL")
-            ?: "http://127.0.0.1:8080"
+            ?: runCatching {
+                File("web/ngrok-url.txt").takeIf { it.exists() }?.readText()?.trim()
+            }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: "https://bless-stinger-plow.ngrok-free.dev"
     }
 }
 

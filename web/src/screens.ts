@@ -243,7 +243,7 @@ export function login(parent:HTMLElement) {
     parent,
     t('CIVIC ACCOUNT ACCESS', 'नागरिक खाता पहुँच'),
     t('Keep the conversation going.', 'बात आगे बढ़ाएँ।'),
-    t('Sign in directly with your email and password, or choose a pre-seeded pilot demo user.', 'अपने ईमेल और पासवर्ड से सीधे साइन इन करें, या पूर्व-कॉन्फ़िगर पायलट डेमो खाता चुनें।'),
+    t('Sign in directly with your email and password, or choose a role-based civic account.', 'अपने ईमेल और पासवर्ड से सीधे साइन इन करें, या भूमिका-आधारित नागरिक खाता चुनें।'),
   );
   const shell = el('div', 'auth-shell');
   const form = el('form', 'panel login-form');
@@ -283,7 +283,7 @@ export function login(parent:HTMLElement) {
   // Shared Demo Accounts (1-Click Instant Sign-In)
   const demoBox = el('div', 'demo-credential-card');
   demoBox.append(
-    el('span', 'label', t('10 PILOT DEMO ACCOUNTS · 1-CLICK INSTANT SIGN-IN', '10 पायलट डेमो खाते · 1-क्लिक त्वरित साइन-इन')),
+    el('span', 'label', t('ROLE-BASED CIVIC ACCESS · 1-CLICK INSTANT SIGN-IN', 'भूमिका-आधारित नागरिक पहुँच · 1-क्लिक त्वरित साइन-इन')),
     el('p', 'microcopy', t('Click any account below to sign in instantly without entering password:', 'बिना पासवर्ड दर्ज किए तुरंत साइन इन करने के लिए नीचे किसी भी खाते पर क्लिक करें:')),
   );
   const demoGrid = el('div', 'demo-grid demo-grid-10');
@@ -447,21 +447,8 @@ export function signup(parent:HTMLElement) {
       el('p', 'microcopy', t('Dispatched via Gmail API from arshitgupta34@gmail.com · Valid for 24 hours', 'arshitgupta34@gmail.com से प्रेषित · 24 घंटे के लिए मान्य'))
     );
 
-    if (res.devVerificationLink) {
-      const devCard = el('div', 'geo-badge');
-      devCard.style.margin = '12px 0 16px';
-      devCard.style.display = 'block';
-      devCard.append(
-        el('strong', '', '🔑 Development Verification Fast-Track:'),
-        el('p', 'microcopy', 'Click below to verify this email address directly without opening inbox:'),
-        link(t('⚡ Verify Email Now (Dev Link)  →', '⚡ ईमेल अभी सत्यापित करें (डेव लिंक)  →'), res.devVerificationLink, 'button small'),
-      );
-      card.append(devCard);
-    }
-
-    const tokenField = field(t('Or enter verification token from email:', 'या ईमेल से प्राप्त सत्यापन टोकन दर्ज करें:'), 'tokenInput', 'text');
+    const tokenField = field(t('Enter verification token from email:', 'ईमेल से प्राप्त सत्यापन टोकन दर्ज करें:'), 'tokenInput', 'text');
     tokenField.input.placeholder = 'Paste verification token here';
-    if (res.devToken) tokenField.input.value = res.devToken;
 
     const verifyBtn = el('button', 'button', t('Verify Email & Activate Account  →', 'ईमेल सत्यापित करें और खाता सक्रिय करें  →'));
     verifyBtn.type = 'button';
@@ -470,9 +457,8 @@ export function signup(parent:HTMLElement) {
       resendBtn.disabled = true;
       notice(alert, t('Resending verification email to ', 'सत्यापन ईमेल पुनः भेजा जा रहा है: ') + res.email);
       try {
-        const fresh = await resendVerification(res.email);
+        await resendVerification(res.email);
         notice(alert, t('✓ A new verification link has been sent to your email.', '✓ नया सत्यापन लिंक आपके ईमेल पर भेज दिया गया है।'));
-        if (fresh.devToken) tokenField.input.value = fresh.devToken;
       } catch (err) {
         notice(alert, errorMessage(err), true);
       } finally {

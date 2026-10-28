@@ -21,6 +21,6 @@ actual val platformDataModule: Module = module {
             ?.trim()
             ?.trimEnd('/')
             ?.takeIf(String::isNotBlank)
-            ?: error("Backend URL is missing. Set THEEKHAI_BACKEND_URL when building the Android app.")
+            ?: "https://bless-stinger-plow.ngrok-free.dev"
     }
 }

@@ -186,7 +186,7 @@ class SupabaseJwtAuth(
             }
         }
 
-        val devCode = if (EnvConfig.get("THEEKHAI_DEV_AUTH", "true") != "false") code else null
+        val devCode = if (EnvConfig.get("THEEKHAI_DEV_AUTH", "false") == "true") code else null
         return RequestLoginCodeResponseDto(
             status = "code_sent",
             email = cleanEmail,
@@ -446,7 +446,7 @@ class SupabaseJwtAuth(
             }
         }
 
-        val isDev = EnvConfig.get("THEEKHAI_DEV_AUTH", "true") != "false"
+        val isDev = EnvConfig.get("THEEKHAI_DEV_AUTH", "false") == "true"
         return RegisterResponseDto(
             status = "verification_sent",
             email = cleanEmail,
@@ -553,7 +553,7 @@ class SupabaseJwtAuth(
             }
         }
 
-        val isDev = EnvConfig.get("THEEKHAI_DEV_AUTH", "true") != "false"
+        val isDev = EnvConfig.get("THEEKHAI_DEV_AUTH", "false") == "true"
         return RegisterResponseDto(
             status = "verification_sent",
             email = cleanEmail,

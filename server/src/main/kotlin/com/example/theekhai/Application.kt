@@ -30,7 +30,7 @@ fun main() {
 }
 
 /** Test identity is injectable only in-process; production has no development login bypass. */
-fun Application.module(databasePath: String? = null, testIdentity: ((ApplicationCall) -> Actor)? = null) {
+fun Application.module(databasePath: String? = EnvConfig.get("THEEKHAI_DB_PATH", "theekhai-server.db"), testIdentity: ((ApplicationCall) -> Actor)? = null) {
     install(Koin) { modules(serverModule(databasePath)) }
     install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true; isLenient = false; encodeDefaults = true }) }
     val allowedOrigins = EnvConfig.get("THEEKHAI_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080").split(',').map { it.trim() }.filter { it.isNotEmpty() }
@@ -177,7 +177,7 @@ fun Application.module(databasePath: String? = null, testIdentity: ((Application
             call.respond(
                 mapOf(
                     "status" to "HEALTHY",
-                    "version" to "pilot",
+                    "version" to "1.0.0.8",
                     "supabaseConfigured" to ps.supabaseConfigured.toString(),
                     "tinyFishConfigured" to ps.tinyFishConfigured.toString(),
                     "tavilyConfigured" to ps.tavilyConfigured.toString(),

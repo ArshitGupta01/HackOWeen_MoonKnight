@@ -39,7 +39,7 @@ export async function render() {
     nav.append(item);
   }
   sidebar.append(nav);
-  const sideFoot=el('div','side-foot');sideFoot.append(el('span','pilot-dot'),el('strong','',t('Community civic pilot','समुदाय-केंद्रित नागरिक पायलट')),el('p','',t('City-neutral. Community-focused.','हर शहर के लिए। समुदाय के साथ।')),link(t('Help & permissions','सहायता और अनुमतियाँ'),'/help'));sidebar.append(sideFoot);
+  const sideFoot=el('div','side-foot');sideFoot.append(el('span','pilot-dot'),el('strong','',t('Municipal Civic Portal','नगरपालिका नागरिक पोर्टल')),el('p','',t('City-neutral. Community-focused.','हर शहर के लिए। समुदाय के साथ।')),link(t('Help & permissions','सहायता और अनुमतियाँ'),'/help'));sidebar.append(sideFoot);
   const page=el('div','page');const header=el('header','topbar');header.append(el('span','location-label',t('YOUR NEIGHBOURHOOD, BETTER TOGETHER','आपका पड़ोस, मिलकर बेहतर')));
   const tools=el('div','header-tools');
   const themeButton=button(theme==='dark'?t('☀ Light mode','☀ हल्का मोड'):t('☾ Dark mode','☾ डार्क मोड'),()=>{switchTheme();void render()},'language theme-toggle');themeButton.setAttribute('aria-label',theme==='dark'?t('Switch to light mode','लाइट मोड चालू करें'):t('Switch to dark mode','डार्क मोड चालू करें'));themeButton.setAttribute('aria-pressed',String(theme==='dark'));tools.append(themeButton,button(language==='en'?'हिन्दी':'English',()=>{switchLanguage();void render()},'language'));
@@ -58,7 +58,7 @@ export async function render() {
   const main=el('main');main.id='main';main.tabIndex=-1;
   const footer=el('footer','footer');
   const topBtn=button(t('↑ Top','↑ ऊपर'),()=>scrollToTop(false),'quiet footer-top-btn');
-  footer.append(el('span','','TheekHai · Civic pilot'),link(t('Privacy','गोपनीयता'),'/privacy'),link(t('Terms','शर्तें'),'/terms'),link(t('Civic Map','नागरिक मानचित्र'),'/map'),el('span','footer-note',t('Built around accountability.','जवाबदेही के लिए बनाया गया।')),topBtn);
+  footer.append(el('span','','TheekHai · Municipal Civic Portal'),link(t('Privacy','गोपनीयता'),'/privacy'),link(t('Terms','शर्तें'),'/terms'),link(t('Civic Map','नागरिक मानचित्र'),'/map'),el('span','footer-note',t('Built around accountability.','जवाबदेही के लिए बनाया गया।')),topBtn);
   page.append(header,main,footer);root.replaceChildren(sidebar,page);
   if(route==='/') home(main);
   else if(route==='/report') cleanup=report(main);
