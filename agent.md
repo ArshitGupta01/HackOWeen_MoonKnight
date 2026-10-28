@@ -6,7 +6,7 @@ Last reviewed: 2026-10-28
 
 Read this guide before changing the project. Maintain a clean repository and Clean Architecture throughout development. Update this file in the same change when architecture, module ownership, setup, dependencies, validation, or established decisions change. Record decisions and current facts, not a transcript or per-edit log. Preserve user changes and keep work scoped.
 
-Current user instruction: deploy web frontend live on Vercel (`https://web-alpha-tawny-78.vercel.app`), containerize Ktor backend in Docker (`Dockerfile`, `docker-compose.yml`), integrate in-app backend URL switching in Compose native clients (`AccountScreen`, `NativeConnectViewModel`), remove interactive Google OAuth from Gmail dispatch while preserving automated delivery from `arshitgupta34@gmail.com`, and elevate the TinyFish Civic Intelligence Hub in the Reference Library and Case Workflow. Commit verified increments on the unified `main` branch with incremental tag `v1.0.0.9`. See `docs/IMPLEMENTATION.md` for current verification and remaining release gates.
+Current user instruction: pull and merge latest remote commits into `main` without conflicts, ensuring end-to-end build verification across Android (`:app:androidApp:assembleDebug`), JVM multiplatform test suites, and web client. Commit `64656c9` (tag `v1.0.0.10`) introduces official municipal grievance drafting on screen with photo geotagging metadata and direct Gmail export across both Compose Multiplatform (`ReportScreen`) and Web (`screens.ts`), fully synced with Vercel (`https://web-alpha-tawny-78.vercel.app`) and local/ngrok Ktor backend. See `docs/IMPLEMENTATION.md` for current verification and remaining release gates.
 
 ## Current implementation
 
