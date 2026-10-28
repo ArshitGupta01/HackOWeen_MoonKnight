@@ -42,7 +42,8 @@ data class NativeConnectState(
     val signupVerificationSent: Boolean = false,
     val pendingSignupEmail: String? = null,
     val signupDevToken: String? = null,
-    val signupDevLink: String? = null
+    val signupDevLink: String? = null,
+    val backendUrl: String = "https://bless-stinger-plow.ngrok-free.dev"
 )
 
 class NativeConnectViewModel(
@@ -51,8 +52,13 @@ class NativeConnectViewModel(
     private val submitReportUseCase: SubmitCivicReportUseCase,
     private val backend: CivicBackendUseCases
 ) : ViewModel() {
-    private val _state = MutableStateFlow(NativeConnectState())
+    private val _state = MutableStateFlow(NativeConnectState(backendUrl = backend.getBackendUrl()))
     val state = _state.asStateFlow()
+
+    fun updateBackendUrl(newUrl: String) {
+        backend.setBackendUrl(newUrl)
+        _state.update { it.copy(backendUrl = backend.getBackendUrl(), message = "Connected to $newUrl") }
+    }
 
     fun signIn(email: String, password: String) = runRequest {
         val user = signInUseCase(email, password)

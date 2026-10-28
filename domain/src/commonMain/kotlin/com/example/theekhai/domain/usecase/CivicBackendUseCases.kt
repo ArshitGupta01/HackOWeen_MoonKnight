@@ -34,6 +34,8 @@ class CivicBackendUseCases(private val repository: NativeCivicRepository) {
     suspend fun reviewSource(id: String, approve: Boolean) = repository.reviewSource(id, approve)
     suspend fun draftComplaintEmail(caseId: String) = repository.draftComplaintEmail(caseId)
     suspend fun sendComplaintEmail(caseId: String, recipient: String, subject: String, body: String) = repository.sendComplaintEmail(caseId, recipient, subject, body)
+    fun setBackendUrl(url: String) = repository.setBackendUrl(url)
+    fun getBackendUrl(): String = repository.getBackendUrl()
 }
 class DraftComplaintEmailUseCase(private val repository: NativeCivicRepository) {
     suspend operator fun invoke(caseId: String) = repository.draftComplaintEmail(caseId)

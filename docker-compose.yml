@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  theekhai-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: theekhai-backend:latest
+    container_name: theekhai-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - THEEKHAI_DB_PATH=/data/theekhai-server.db
+      - THEEKHAI_DEV_AUTH=false
+      - THEEKHAI_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,https://web-alpha-tawny-78.vercel.app,https://bless-stinger-plow.ngrok-free.dev
+      - SUPABASE_URL=https://ffmcurazxvygsifbglwy.supabase.co
+      - SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmbWN1cmF6eHZ5Z3NpZmJnbHd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMzExNjQsImV4cCI6MjA1NTYwNzE2NH0.rE1r0k9M_Q_Qc7yY8Zk6k1oN7q4e0_L1w2e3r4t5y6u
+      - SARVAM_API_KEY=sk_lkpgwqt4_wlPjgv66sb6gYPGyiBMyBFjy
+    volumes:
+      - theekhai-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  theekhai-data:
+    name: theekhai-data

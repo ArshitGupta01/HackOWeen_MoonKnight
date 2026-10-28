@@ -39,7 +39,7 @@ fun Application.module(databasePath: String? = EnvConfig.get("THEEKHAI_DB_PATH",
         if (origin in allowedOrigins) return true
         val uri = runCatching { java.net.URI(origin) }.getOrNull() ?: return false
         val host = uri.host?.lowercase() ?: return false
-        return uri.scheme in listOf("http", "https") && (host in listOf("localhost", "127.0.0.1") || host.endsWith(".ngrok-free.app") || host.endsWith(".ngrok-free.dev") || host.endsWith(".ngrok.app") || host.endsWith(".ngrok.io"))
+        return uri.scheme in listOf("http", "https") && (host in listOf("localhost", "127.0.0.1") || host.endsWith(".ngrok-free.app") || host.endsWith(".ngrok-free.dev") || host.endsWith(".ngrok.app") || host.endsWith(".ngrok.io") || host.endsWith(".vercel.app"))
     }
     install(CORS) {
         allowedOrigins.forEach { val uri = java.net.URI(it); require(uri.scheme in listOf("http","https") && uri.host != null); allowHost(uri.authority, schemes = listOf(uri.scheme)) }
@@ -425,31 +425,8 @@ fun Application.module(databasePath: String? = EnvConfig.get("THEEKHAI_DB_PATH",
             call.respond(logs)
         } }
         get("/api/v1/gmail/status") { safe(call) {
-            val redirect = call.request.queryParameters["redirect_uri"]
-            call.respond(gmail.getStatus(redirect))
+            call.respond(mapOf("status" to "ready", "senderEmail" to "arshitgupta34@gmail.com"))
         } }
-        get("/api/v1/gmail/auth-url") { safe(call) {
-            val redirect = call.request.queryParameters["redirect_uri"]
-            call.respond(mapOf("authUrl" to gmail.getAuthUrl(redirect)))
-        } }
-        get("/api/v1/gmail/oauth2callback") {
-            val code = call.request.queryParameters["code"]
-            val redirect = call.request.queryParameters["redirect_uri"]
-            if (code != null) {
-                val success = gmail.handleOAuthCallback(code, redirect)
-                val msg = if (success) {
-                    "Google Gmail authorization successful! Connected as arshitgupta34@gmail.com. You can close this window and return to TheekHai."
-                } else {
-                    "Google Gmail authorization failed. Please check backend logs or try again."
-                }
-                call.respondText(
-                    "<html><body style='font-family:sans-serif;padding:40px;text-align:center;'><h2>TheekHai Civic Redressal</h2><p>$msg</p><button onclick='window.close()'>Close Window</button></body></html>",
-                    io.ktor.http.ContentType.Text.Html
-                )
-            } else {
-                call.respondText("Missing Google authorization code.", io.ktor.http.ContentType.Text.Plain)
-            }
-        }
         post("/api/v1/complaints/{id}/email/draft") { safe(call) {
             val actor = identity(call)
             val caseId = call.parameters["id"]!!

@@ -37,4 +37,6 @@ interface NativeCivicRepository {
     suspend fun reviewSource(id: String, approve: Boolean)
     suspend fun draftComplaintEmail(caseId: String): com.example.theekhai.contract.EmailDraftDto
     suspend fun sendComplaintEmail(caseId: String, recipientEmail: String, subject: String, body: String): com.example.theekhai.contract.SendEmailResponseDto
+    fun setBackendUrl(url: String) {}
+    fun getBackendUrl(): String = "https://bless-stinger-plow.ngrok-free.dev"
 }

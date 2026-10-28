@@ -130,7 +130,8 @@ export async function api<T>(path:string, options:RequestInit & { timeoutMs?: nu
   }
   const timeoutMs = options.timeoutMs ?? 45000;
   const { timeoutMs: _t, ...fetchOptions } = options;
-  const response = await fetch(`/api/v1${path}`,{...fetchOptions,headers,credentials:'same-origin',signal:options.signal ?? AbortSignal.timeout(timeoutMs)});
+  const apiBase = (import.meta.env.VITE_BACKEND_URL ? String(import.meta.env.VITE_BACKEND_URL).replace(/\/+$/, '') : '') + '/api/v1';
+  const response = await fetch(`${apiBase}${path}`,{...fetchOptions,headers,credentials:'same-origin',signal:options.signal ?? AbortSignal.timeout(timeoutMs)});
   const data = await response.json().catch(() => null);
   if(!response.ok) throw new Error(data?.message ?? `Request failed (${response.status}). Please retry.`);
   return data as T;
@@ -323,19 +324,13 @@ export interface SendEmailResponse {
   message: string;
 }
 
-export interface GmailOAuthStatus {
-  configured: boolean;
-  connected: boolean;
+export interface GmailDeliveryStatus {
+  status: string;
   senderEmail: string;
-  authUrl?: string;
 }
 
 export function getGmailStatus() {
-  return api<GmailOAuthStatus>('/gmail/status');
-}
-
-export function getGmailAuthUrl() {
-  return api<{ authUrl: string }>('/gmail/auth-url');
+  return api<GmailDeliveryStatus>('/gmail/status');
 }
 
 export function draftComplaintEmail(caseId: string) {

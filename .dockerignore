@@ -1,0 +1,10 @@
+.git
+.gradle
+build
+**/build
+app
+web
+node_modules
+.idea
+*.log
+theekhai-server.db

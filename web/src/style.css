@@ -220,3 +220,98 @@ html.lenis,html.lenis body{height:auto}
   font-size: 15px;
   font-weight: 700;
 }
+.tinyfish-hub {
+  margin-top: 32px;
+  border-radius: 8px;
+  border: 1px solid #10b98144;
+  background: var(--paper, #fcfbf6);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.tinyfish-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #10b98118;
+  color: #047857;
+  border: 1px solid #10b98144;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.tinyfish-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 20px;
+  border-bottom: 1px solid var(--line, #dddeda);
+  padding-bottom: 10px;
+  overflow-x: auto;
+}
+.tinyfish-tab-btn {
+  background: transparent;
+  border: none;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted, #64736a);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tinyfish-tab-btn.active {
+  background: var(--green, #123e39);
+  color: #fff;
+}
+.tinyfish-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 16px;
+}
+.tinyfish-pill {
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 12px;
+  background: #f0f4ee;
+  border: 1px solid #d4ded0;
+  color: var(--green, #123e39);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tinyfish-pill:hover {
+  background: var(--green, #123e39);
+  color: #fff;
+}
+.tinyfish-monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+.tinyfish-monitor-card {
+  border: 1px solid var(--line, #dddeda);
+  border-radius: 6px;
+  padding: 16px;
+  background: var(--paper, #fcfbf6);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tinyfish-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tinyfish-card-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin: 0;
+}
+.tinyfish-card-target {
+  font-size: 12px;
+  color: var(--muted, #64736a);
+  word-break: break-all;
+}

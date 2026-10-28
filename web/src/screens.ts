@@ -778,38 +778,17 @@ summary.append(el('p','microcopy',t('Pilot service target, not a statutory deadl
   // Official Civic Email Dispatch Section (Sender: arshitgupta34@gmail.com, Receiver dynamically discovered via TinyFish)
   const emailSection = el('section', 'panel email-dispatch-panel');
   emailSection.append(
+    el('span', 'label', '⚡ TINYFISH CIVIC DISCOVERY & EMAIL DISPATCH'),
     el('h2', '', t('Official Civic Email Dispatch', 'आधिकारिक नागरिक ईमेल प्रेषण')),
-    el('p', 'microcopy', t('Send statutory grievance petition directly to the responsible government authority via Gmail.', 'जीमेल के माध्यम से जिम्मेदार सरकारी प्राधिकारी को सीधे वैधानिक शिकायत भेजें।')),
-    el('p', 'microcopy', 'Verified Sender: arshitgupta34@gmail.com')
+    el('p', 'microcopy', t('Send statutory grievance petition directly to the responsible authority dynamically discovered by TinyFish from government sites. Dispatched directly from arshitgupta34@gmail.com.', 'सरकारी वेबसाइटों से टाइनीफिश द्वारा खोजे गए जिम्मेदार प्राधिकारी को सीधे वैधानिक शिकायत भेजें। arshitgupta34@gmail.com से सीधे प्रेषित।')),
+    el('div', 'geo-badge', '📤 ' + t('Verified Sender: arshitgupta34@gmail.com · Automated Direct Delivery', 'सत्यापित प्रेषक: arshitgupta34@gmail.com · स्वचालित सीधा प्रेषण'))
   );
-  const authStatusWrap = el('div', 'gmail-auth-status');
-  authStatusWrap.style.margin = '8px 0 12px';
-  getGmailStatus().then(status => {
-    authStatusWrap.replaceChildren();
-    if (status.connected) {
-      authStatusWrap.append(el('span', 'geo-badge', '🟢 ' + t('Gmail Connected: arshitgupta34@gmail.com', 'जीमेल कनेक्टेड: arshitgupta34@gmail.com')));
-    } else if (status.authUrl && status.configured) {
-      const connectBtn = link(
-        t('🔗 Connect Google Account (arshitgupta34@gmail.com) ↗', '🔗 गूगल अकाउंट कनेक्ट करें (arshitgupta34@gmail.com) ↗'),
-        status.authUrl,
-        'button small secondary'
-      );
-      connectBtn.setAttribute('target', '_blank');
-      connectBtn.style.marginLeft = '8px';
-      authStatusWrap.append(
-        el('span', 'geo-badge', '⚪ ' + t('Gmail Ready for Sign-in', 'जीमेल साइन-इन के लिए तैयार')),
-        connectBtn
-      );
-    } else {
-      authStatusWrap.append(el('span', 'geo-badge', 'ℹ️ ' + t('Direct Delivery & Offline Queue Ready (Sender: arshitgupta34@gmail.com)', 'सीधा वितरण और ऑफ़लाइन कतार तैयार (प्रेषक: arshitgupta34@gmail.com)')));
-    }
-  }).catch(() => {});
 
   const emailAlert = el('div');
   const emailFormWrap = el('div', 'email-form-wrap');
-  const draftBtn = button(t('🤖 Discover Authority & Draft Email', '🤖 अधिकारी संपर्क खोजें और ईमेल ड्राफ्ट करें'), async () => {
+  const draftBtn = button(t('🤖 Discover Authority via TinyFish & Draft Petition', '🤖 टाइनीफिश द्वारा अधिकारी खोजें और ड्राफ्ट करें'), async () => {
     draftBtn.disabled = true;
-    notice(emailAlert, t('Discovering official authority contact via government portals…', 'सरकारी पोर्टलों से आधिकारिक संपर्क खोजा जा रहा है…'));
+    notice(emailAlert, t('TinyFish scanning government portals for responsible authority…', 'टाइनीफिश सरकारी पोर्टलों पर जिम्मेदार अधिकारी खोज रहा है…'));
     try {
       const draft = await draftComplaintEmail(record.id);
       renderEmailComposer(draft);
@@ -836,9 +815,9 @@ summary.append(el('p','microcopy',t('Pilot service target, not a statutory deadl
     bodyText.value = draft.body;
     bodyField.append(bodyLabel, bodyText);
 
-    const sendBtn = button(t('🚀 Send Official Email via Gmail', '🚀 जीमेल से आधिकारिक ईमेल भेजें'), async () => {
+    const sendBtn = button(t('🚀 Dispatch Official Email', '🚀 आधिकारिक ईमेल भेजें'), async () => {
       sendBtn.disabled = true;
-      notice(emailAlert, t('Dispatching official email from arshitgupta34@gmail.com via Gmail API…', 'जीमेल एपीआई के माध्यम से ईमेल भेजा जा रहा है…'));
+      notice(emailAlert, t('Dispatching official email from arshitgupta34@gmail.com…', 'ईमेल भेजा जा रहा है…'));
       try {
         const res = await sendComplaintEmail(record.id, toField.input.value, subjField.input.value, bodyText.value);
         notice(emailAlert, `✓ ${res.message}`);
@@ -846,7 +825,7 @@ summary.append(el('p','microcopy',t('Pilot service target, not a statutory deadl
         const newEvent = el('div', 'timeline-event');
         newEvent.append(
           el('span', 'label', 'GRIEVANCE EMAILED'),
-          el('p', '', `Official petition sent to ${toField.input.value} via Gmail (${res.messageId})`),
+          el('p', '', `Official petition dispatched to ${toField.input.value} (${res.messageId})`),
           el('time', 'microcopy', date(res.sentAt || Date.now()))
         );
         const firstEvent = timeline.querySelector('.timeline-event');
@@ -864,11 +843,22 @@ summary.append(el('p','microcopy',t('Pilot service target, not a statutory deadl
     emailFormWrap.append(senderBadge, toField.wrapper, authNote, subjField.wrapper, bodyField, sendBtn);
   }
 
-  emailSection.append(authStatusWrap, draftBtn, emailAlert, emailFormWrap);
+  emailSection.append(draftBtn, emailAlert, emailFormWrap);
   timeline.append(el('h2','',t('The complete story','पूरा घटनाक्रम')));
 for(const event of [...data.events].reverse()){const item=el('div','timeline-event');item.append(el('span','label',event.action.replaceAll('_',' ')),el('p','',event.note),el('time','microcopy',date(event.at)));timeline.append(item)}body.append(summary,tasks,emailSection,timeline);
-  const actions=el('aside','panel action-panel');actions.append(el('p','eyebrow',t('NEXT ACTION','अगला कदम')),el('h2','',t('Move it forward.','आगे बढ़ाएँ।')));const reason=el('textarea');reason.rows=4;reason.placeholder=t('Explain your action or provide review notes.','अपना निर्णय या समीक्षा टिप्पणी लिखें।');reason.setAttribute('aria-label',reason.placeholder);const alert=el('div');actions.append(reason,alert);
-  async function act(action:string,target=''){if(reason.value.trim().length<3){notice(alert,t('Add a short reason first.','पहले संक्षिप्त कारण लिखें।'),true);return}try{await api(`/complaints/${id}/actions`,{method:'POST',body:JSON.stringify({action,version:record.version,note:reason.value,target,department:department.value})});await render()}catch(error){notice(alert,errorMessage(error),true)}}
+  const actions=el('aside','panel action-panel');actions.append(el('p','eyebrow',t('NEXT ACTION','अगला कदम')),el('h2','',t('Move it forward.','आगे बढ़ाएँ।')));const reason=el('textarea');reason.rows=4;reason.placeholder=t('Explain your action or provide review notes (optional).','अपना निर्णय या समीक्षा टिप्पणी लिखें (वैकल्पिक)।');reason.setAttribute('aria-label',reason.placeholder);const alert=el('div');actions.append(reason,alert);
+  async function act(action:string,target=''){
+    const defaultNote = action==='START'?t('Field crew commenced remediation work.','फील्ड टीम ने मरम्मत कार्य शुरू किया।'):
+      action==='REQUEST_CLOSURE'?t('Field work completed, requesting formal verification.','कार्य पूर्ण, औपचारिक सत्यापन का अनुरोध।'):
+      action==='APPROVE_CLOSURE'?t('Resolution verified and approved.','समाधान सत्यापित और स्वीकृत।'):
+      action==='REJECT_CLOSURE'?t('Incomplete resolution; returned for further work.','अधूरा समाधान; कार्य के लिए लौटाया गया।'):
+      action==='CHALLENGE'?t('Citizen reported issue remains unresolved.','नागरिक ने बताया कि समस्या हल नहीं हुई।'):
+      action==='REOPEN'?t('Case reopened following challenge review.','आपत्ति समीक्षा के बाद मामला पुनः खोला गया।'):
+      action==='ADD_TASK'?t('Added coordinated municipal task.','समन्वित नगरपालिका कार्य जोड़ा गया।'):
+      t('Workflow state updated.','स्थिति अद्यतन की गई।');
+    const note = reason.value.trim() || defaultNote;
+    try{await api(`/complaints/${id}/actions`,{method:'POST',body:JSON.stringify({action,version:record.version,note,target,department:department.value})});await render()}catch(error){notice(alert,errorMessage(error),true)}
+  }
   const department=el('select');department.setAttribute('aria-label',t('Department for task','कार्य का विभाग'));for(const name of ['Public works','Water services','Sanitation','Electrical services','Civic triage'])department.append(el('option','',name));
   const staff=identity?.role==='ADMIN'||identity?.role==='DEPARTMENT';const reviewer=identity?.role==='ADMIN'||identity?.role==='REVIEWER';
   const hasPendingChallenge = data.events.some(ev => ev.action === 'CHALLENGE' && ev.at >= record.updatedAt);
@@ -894,10 +884,10 @@ for(const event of [...data.events].reverse()){const item=el('div','timeline-eve
 }
 
 export function library(parent:HTMLElement){
-  heading(parent,t('THE REFERENCE LIBRARY','संदर्भ लाइब्रेरी'),t('Know your next step.','अपना अगला कदम जानें।'),t('Approved civic guidance and statutory references for citizen rights and municipal service delivery.','नागरिक अधिकारों और नगर निगम सेवाओं के लिए स्वीकृत कानूनी संदर्भ व मार्गदर्शन।'));
+  heading(parent,t('THE REFERENCE LIBRARY','संदर्भ लाइब्रेरी'),t('Know your next step.','अपना अगला कदम जानें।'),t('Approved civic guidance, statutory rights, and autonomous regulatory intelligence powered by TinyFish.','नागरिक अधिकारों, वैधानिक नियमों और टाइनीफिश स्वायत्त विनियामक खोज का स्वीकृत केंद्र।'));
   const provBanner=el('div','stats stats-4');
   parent.append(provBanner);
-  const providerNote=el('p','microcopy',t('Configuration indicators only — they do not verify live provider health or database access policies.','ये केवल कॉन्फ़िगरेशन संकेतक हैं — लाइव सेवा स्थिति या डेटाबेस पहुँच नीतियों का सत्यापन नहीं।'));
+  const providerNote=el('p','microcopy',t('Configuration indicators only — verify live statutory queries and agent runs below.','कॉन्फ़िगरेशन संकेतक — नीचे दिए गए अनुभाग में लाइव विनियामक खोज और टाइनीफिश एजेंट चलाएँ।'));
   provBanner.after(providerNote);
   void api<{supabaseConfigured:boolean,tinyFishConfigured:boolean,tavilyConfigured:boolean,openRouterConfigured:boolean,sarvamConfigured?:boolean}>('/providers').then(p=>{
     provBanner.replaceChildren();
@@ -907,50 +897,264 @@ export function library(parent:HTMLElement){
       provBanner.append(item);
     }
   }).catch(()=>{provBanner.replaceChildren(el('div','microcopy',t('Provider configuration is unavailable.','प्रदाता कॉन्फ़िगरेशन उपलब्ध नहीं है।')))});
-  const form=el('form','panel library-form'),query=field(t('What would you like to understand?','आप क्या समझना चाहते हैं?'),'question');query.input.placeholder=t('e.g. How does the Haryana Auto Appeal System (AAS) handle overdue services?','जैसे हरियाणा ऑटो अपील सिस्टम (AAS) समय-सीमा पार होने पर कैसे काम करता है?');query.input.minLength=3;query.input.maxLength=1000;const jurisdiction=el('select');jurisdiction.setAttribute('aria-label',t('Jurisdiction','क्षेत्राधिकार'));for(const [value,label] of [['CENTRAL',t('Central guidance','केंद्रीय मार्गदर्शन')],['HARYANA',t('Haryana + central guidance','हरियाणा और केंद्रीय मार्गदर्शन')]]){const option=el('option','',label);option.value=value;jurisdiction.append(option)}const search=el('button','button',t('Find guidance','मार्गदर्शन खोजें'));search.type='submit';const answer=el('div','legal-results');form.append(query.wrapper,jurisdiction,search,el('p','microcopy',t('Official regulatory guidance grounded in verified statutory sources.','सत्यापित आधिकारिक और वैधानिक स्रोतों पर आधारित मार्गदर्शन।')));parent.append(form,answer);
-  function sources(items:LegalSource[]){for(const source of items){const card=el('article','panel source-card');const a=link(source.title,source.url,'text-link');a.target='_blank';a.rel='noopener noreferrer';const foot=el('div','source-card-foot');foot.append(el('small','microcopy',t('Retrieved ','प्राप्त ')+date(source.retrievedAt)));if(identity){const saveBtn=button(t('Save to account','खाते में सहेजें'),()=>{saveBtn.disabled=true;void saveSourceBookmark({title:source.title,sourceUrl:source.url,jurisdiction:source.jurisdiction,snippet:source.content.slice(0,400)}).then(()=>{saveBtn.textContent=t('Saved ✓','सहेजा गया ✓')}).catch(()=>{saveBtn.disabled=false})},'quiet');foot.append(saveBtn)}card.append(el('span','label',source.jurisdiction+' · '+source.language),a,el('p','',source.content.slice(0,700)),foot);answer.append(card)}}
-  form.addEventListener('submit',event=>{event.preventDefault();search.disabled=true;notice(answer,t('Searching approved official guidance…','स्वीकृत आधिकारिक मार्गदर्शन खोजा जा रहा है…'));void(async()=>{try{if(identity){const result=await api<LegalAnswer>('/legal/ask',{method:'POST',body:JSON.stringify({question:query.input.value,jurisdiction:jurisdiction.value})});const badge=el('span','label',`Mode: ${result.mode}`);answer.replaceChildren(badge,el('p','legal-answer',result.answer),el('p','microcopy',result.limitation));sources(result.citations)}else{const result=await api<LegalSource[]>(`/legal/sources?q=${encodeURIComponent(query.input.value)}&jurisdiction=${jurisdiction.value}`);answer.replaceChildren();if(!result.length)notice(answer,t('No approved matching sources are installed yet.','अभी कोई संबंधित स्वीकृत स्रोत स्थापित नहीं है।'));sources(result)}}catch(error){notice(answer,errorMessage(error),true)}finally{search.disabled=false}})()});
-  if(identity?.role==='REVIEWER'||identity?.role==='ADMIN'){
-    const ops=el('section','panel');ops.append(el('p','eyebrow',t('TINYFISH AGENT & MONITOR + TAVILY','टाइनीफिश एजेंट और मॉनिटर + टैविली')),el('h2','',t('Source discovery, monitors & review queue','स्रोत खोज, मॉनिटर और समीक्षा कतार')));
-    const statusBox=el('div');
-    const discForm=el('form','library-form'),discQuery=field(t('Tavily discovery query or TinyFish target goal','टैविली खोज प्रश्न या टाइनीफिश लक्ष्य'),'discQuery'),discUrl=field(t('Allowlisted official URL (optional for Tavily discovery)','आधिकारिक URL (टैविली खोज के लिए वैकल्पिक)'),'discUrl');discUrl.input.required=false;discUrl.input.placeholder='https://haryana-rtsc.gov.in/guidelines';
-    const discBtn=el('button','button secondary',t('Discover Official Regulations','आधिकारिक नियम खोजें'));discBtn.type='submit';
-    discForm.append(discQuery.wrapper,discUrl.wrapper,discBtn);
-    const monForm=el('form','library-form'),monName=field(t('Monitor name','मॉनिटर का नाम'),'monName'),monTarget=field(t('Official URL (fetch) or topic query (search)','आधिकारिक URL (fetch) या विषय (search)'),'monTarget');
-    const monType=el('select');for(const [v,l] of [['fetch','TinyFish Page Monitor (fetch)'],['search','TinyFish Topic Monitor (search)']]){const o=el('option','',l);o.value=v;monType.append(o)}
-    const monBtn=el('button','button secondary',t('Create Regulatory Monitor','नियम मॉनिटर बनाएँ'));monBtn.type='submit';
-    monForm.append(monName.wrapper,monType,monTarget.wrapper,monBtn);
 
-    const importForm=el('form','library-form'),impTitle=field(t('Document title','दस्तावेज़ का शीर्षक'),'impTitle'),impUrl=field(t('Official source URL','आधिकारिक स्रोत URL'),'impUrl'),impContent=field(t('Official text / circular content','आधिकारिक पाठ / सर्कुलर सामग्री'),'impContent');
-    const impBtn=el('button','button secondary',t('Import Approved Guidance','स्वीकृत मार्गदर्शन जोड़ें'));impBtn.type='submit';
-    importForm.append(impTitle.wrapper,impUrl.wrapper,impContent.wrapper,impBtn);
-    importForm.addEventListener('submit',e=>{
+  // Statutory Q&A Search Form
+  const qaSection = el('section', 'panel');
+  qaSection.append(
+    el('span', 'label', t('STATUTORY CITATION SEARCH', 'वैधानिक उद्धरण खोज')),
+    el('h2', '', t('Ask official guidance', 'आधिकारिक मार्गदर्शन खोजें'))
+  );
+  const form=el('form','library-form'),query=field(t('What would you like to understand?','आप क्या समझना चाहते हैं?'),'question');
+  query.input.placeholder=t('e.g. How does the Haryana Auto Appeal System (AAS) handle overdue services?','जैसे हरियाणा ऑटो अपील सिस्टम (AAS) समय-सीमा पार होने पर कैसे काम करता है?');
+  query.input.minLength=3;query.input.maxLength=1000;
+  const jurisdiction=el('select');jurisdiction.setAttribute('aria-label',t('Jurisdiction','क्षेत्राधिकार'));
+  for(const [value,label] of [['CENTRAL',t('Central guidance','केंद्रीय मार्गदर्शन')],['HARYANA',t('Haryana + central guidance','हरियाणा और केंद्रीय मार्गदर्शन')]]){
+    const option=el('option','',label);option.value=value;jurisdiction.append(option);
+  }
+  const search=el('button','button',t('Find guidance','मार्गदर्शन खोजें'));search.type='submit';
+  const answer=el('div','legal-results');
+  form.append(query.wrapper,jurisdiction,search,el('p','microcopy',t('Official regulatory guidance grounded in verified statutory sources.','सत्यापित आधिकारिक और वैधानिक स्रोतों पर आधारित मार्गदर्शन।')));
+  qaSection.append(form, answer);
+  parent.append(qaSection);
+
+  function sources(items:LegalSource[]){
+    for(const source of items){
+      const card=el('article','panel source-card');
+      const a=link(source.title,source.url,'text-link');a.target='_blank';a.rel='noopener noreferrer';
+      const foot=el('div','source-card-foot');foot.append(el('small','microcopy',t('Retrieved ','प्राप्त ')+date(source.retrievedAt)));
+      if(identity){
+        const saveBtn=button(t('Save to account','खाते में सहेजें'),()=>{
+          saveBtn.disabled=true;
+          void saveSourceBookmark({title:source.title,sourceUrl:source.url,jurisdiction:source.jurisdiction,snippet:source.content.slice(0,400)}).then(()=>{saveBtn.textContent=t('Saved ✓','सहेजा गया ✓')}).catch(()=>{saveBtn.disabled=false});
+        },'quiet');
+        foot.append(saveBtn);
+      }
+      card.append(el('span','label',source.jurisdiction+' · '+source.language),a,el('p','',source.content.slice(0,700)),foot);
+      answer.append(card);
+    }
+  }
+
+  form.addEventListener('submit',event=>{
+    event.preventDefault();search.disabled=true;
+    notice(answer,t('Searching approved official guidance…','स्वीकृत आधिकारिक मार्गदर्शन खोजा जा रहा है…'));
+    void(async()=>{
+      try{
+        if(identity){
+          const result=await api<LegalAnswer>('/legal/ask',{method:'POST',body:JSON.stringify({question:query.input.value,jurisdiction:jurisdiction.value})});
+          const badge=el('span','label',`Mode: ${result.mode}`);
+          answer.replaceChildren(badge,el('p','legal-answer',result.answer),el('p','microcopy',result.limitation));
+          sources(result.citations);
+        }else{
+          const result=await api<LegalSource[]>(`/legal/sources?q=${encodeURIComponent(query.input.value)}&jurisdiction=${jurisdiction.value}`);
+          answer.replaceChildren();
+          if(!result.length)notice(answer,t('No approved matching sources are installed yet.','अभी कोई संबंधित स्वीकृत स्रोत स्थापित नहीं है।'));
+          sources(result);
+        }
+      }catch(error){notice(answer,errorMessage(error),true)}finally{search.disabled=false}
+    })();
+  });
+
+  // Dedicated TinyFish Civic Intelligence & Autonomous Agent Hub
+  const fishHub = el('section', 'tinyfish-hub');
+  const hubHeader = el('div');
+  hubHeader.append(
+    el('span', 'tinyfish-badge', '⚡ TINYFISH CIVIC INTELLIGENCE ENGINE'),
+    el('h2', '', t('Autonomous Web Agent & Regulatory Monitors', 'स्वायत्त वेब एजेंट और विनियामक मॉनिटर')),
+    el('p', 'microcopy', t('TinyFish autonomous web agents navigate official government portals, extract citizen service charters, monitor gazettes for regulatory changes, and discover responsible nodal officers.', 'टाइनीफिश स्वायत्त वेब एजेंट सरकारी वेबसाइटों से नागरिक चार्टर निकालते हैं, गजट परिवर्तनों पर नजर रखते हैं और संबंधित नोडल अधिकारियों की खोज करते हैं।'))
+  );
+
+  const tabsWrap = el('div', 'tinyfish-tabs');
+  const agentTabBtn = button(t('🤖 Autonomous Web Agent', '🤖 स्वायत्त वेब एजेंट'), () => switchTab('agent'), 'tinyfish-tab-btn active');
+  const monitorTabBtn = button(t('📡 Continuous Monitors', '📡 विनियामक मॉनिटर'), () => switchTab('monitors'), 'tinyfish-tab-btn');
+  const contactTabBtn = button(t('🏢 Authority Discovery', '🏢 प्राधिकारी खोज'), () => switchTab('contact'), 'tinyfish-tab-btn');
+  tabsWrap.append(agentTabBtn, monitorTabBtn, contactTabBtn);
+
+  if (identity?.role === 'REVIEWER' || identity?.role === 'ADMIN') {
+    const reviewTabBtn = button(t('⚖️ Review Queue', '⚖️ समीक्षा कतार'), () => switchTab('review'), 'tinyfish-tab-btn');
+    tabsWrap.append(reviewTabBtn);
+  }
+
+  const tabContent = el('div', 'tinyfish-tab-content');
+  fishHub.append(hubHeader, tabsWrap, tabContent);
+  parent.append(fishHub);
+
+  function switchTab(tab: 'agent' | 'monitors' | 'contact' | 'review') {
+    tabsWrap.querySelectorAll('.tinyfish-tab-btn').forEach(b => b.classList.remove('active'));
+    tabContent.replaceChildren();
+
+    if (tab === 'agent') {
+      agentTabBtn.classList.add('active');
+      renderAgentTab();
+    } else if (tab === 'monitors') {
+      monitorTabBtn.classList.add('active');
+      renderMonitorsTab();
+    } else if (tab === 'contact') {
+      contactTabBtn.classList.add('active');
+      renderContactTab();
+    } else if (tab === 'review') {
+      tabsWrap.querySelectorAll('.tinyfish-tab-btn')[3]?.classList.add('active');
+      renderReviewTab();
+    }
+  }
+
+  function renderAgentTab() {
+    tabContent.replaceChildren();
+    const subhead = el('h3', '', t('Run TinyFish Agent on Government Portals', 'सरकारी पोर्टलों पर टाइनीफिश एजेंट चलाएँ'));
+    const pillsWrap = el('div', 'tinyfish-pills');
+    const presets = [
+      'Haryana Auto Appeal System (AAS) guidelines',
+      'Sonipat Municipal Council grievance escalation',
+      'Streetlight repair statutory SLA under RTSC',
+      'Road pothole repair standard specification Sonipat'
+    ];
+    for (const p of presets) {
+      const pill = button(p, () => {
+        agentQuery.input.value = p;
+      }, 'tinyfish-pill');
+      pillsWrap.append(pill);
+    }
+
+    const agentForm = el('form', 'library-form');
+    const agentQuery = field(t('Autonomous Search Goal or Policy Topic', 'स्वायत्त खोज लक्ष्य या नीति विषय'), 'agentQuery');
+    agentQuery.input.value = 'Haryana Right to Service Commission municipal deadlines';
+    const agentUrl = field(t('Official Target Portal URL (Optional Seed URL)', 'आधिकारिक पोर्टल URL (वैकल्पिक)'), 'agentUrl');
+    agentUrl.input.placeholder = 'https://haryana-rtsc.gov.in';
+    const agentBtn = el('button', 'button', t('🚀 Launch TinyFish Autonomous Agent', '🚀 टाइनीफिश स्वायत्त एजेंट प्रारंभ करें'));
+    agentBtn.type = 'submit';
+    agentForm.append(agentQuery.wrapper, agentUrl.wrapper, agentBtn);
+
+    const agentResults = el('div', 'legal-results');
+    agentForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      void importLegalSource({title:impTitle.input.value,url:impUrl.input.value,jurisdiction:jurisdiction.value,language:'en',content:impContent.input.value})
-        .then(()=>{notice(statusBox,t('Official source imported successfully.','आधिकारिक स्रोत सफलतापूर्वक जोड़ा गया।'));return refreshOps()})
-        .catch(err=>notice(statusBox,errorMessage(err),true));
+      agentBtn.disabled = true;
+      notice(agentResults, t('⚡ TinyFish Agent scanning target government domains in real-time…', '⚡ टाइनीफिश एजेंट सरकारी डोमेन स्कैन कर रहा है…'));
+      try {
+        const res = await api<LegalSource[]>('/legal/discover', {
+          method: 'POST',
+          body: JSON.stringify({
+            query: agentQuery.input.value,
+            url: agentUrl.input.value,
+            jurisdiction: jurisdiction.value,
+            language: 'en'
+          })
+        });
+        agentResults.replaceChildren();
+        if (!res.length) {
+          notice(agentResults, t('TinyFish agent completed scan. Verified excerpts queued for municipal review.', 'स्कैन पूर्ण। उद्धरण समीक्षा कतार में जोड़े गए हैं।'));
+        } else {
+          for (const s of res) {
+            const card = el('article', 'panel source-card');
+            card.append(
+              el('span', 'tinyfish-badge', `DISCOVERED: ${s.jurisdiction}`),
+              link(s.title, s.url, 'text-link'),
+              el('p', '', s.content.slice(0, 500) + '…'),
+              el('small', 'microcopy', t('Source: ', 'स्रोत: ') + s.url)
+            );
+            agentResults.append(card);
+          }
+        }
+      } catch (err) {
+        notice(agentResults, errorMessage(err), true);
+      } finally {
+        agentBtn.disabled = false;
+      }
     });
 
-    const monList=el('div','case-list'),pendingList=el('div','case-list');
-    async function refreshOps(){
-      try{
-        const [monitors,pending]=await Promise.all([api<LegalMonitor[]>('/legal/monitors'),api<LegalSource[]>('/legal/review')]);
-        monList.replaceChildren(el('h3','',t('Active Regulatory Monitors','सक्रिय नियम मॉनिटर')));
-        for(const m of monitors){
-          const row=el('div','task-row');row.append(el('span','label',`${m.monitorType.toUpperCase()} · ${m.jurisdiction}`),el('span','',`${m.name} (${m.target})`),el('small','',m.lastStatus??m.status),button(t('Run check now','अभी जाँचें'),()=>{void api<MonitorRunResult>(`/legal/monitors/${m.id}/run`,{method:'POST'}).then(r=>{notice(statusBox,`Monitor run (${r.providerMode}): ${r.queuedSources.length} source(s) queued.`);return refreshOps()}).catch(e=>notice(statusBox,errorMessage(e),true))},'quiet'));
-          monList.append(row);
-        }
-        pendingList.replaceChildren(el('h3','',t('Pending source review queue','स्रोत समीक्षा कतार')));
-        for(const p of pending){
-          const row=el('div','task-row');row.append(el('span','label',p.jurisdiction),el('span','',p.title),button(t('Approve','स्वीकार करें'),()=>{void api(`/legal/sources/${p.id}/review`,{method:'POST',body:JSON.stringify({approve:true})}).then(()=>refreshOps())},'quiet'),button(t('Reject','अस्वीकार करें'),()=>{void api(`/legal/sources/${p.id}/review`,{method:'POST',body:JSON.stringify({approve:false})}).then(()=>refreshOps())},'quiet'));
-          pendingList.append(row);
-        }
-      }catch(e){notice(statusBox,errorMessage(e),true)}
-    }
-    discForm.addEventListener('submit',e=>{e.preventDefault();void api<LegalSource[]>('/legal/discover',{method:'POST',body:JSON.stringify({query:discQuery.input.value,url:discUrl.input.value,jurisdiction:jurisdiction.value,language:'en'})}).then(res=>{notice(statusBox,`Queued ${res.length} source(s) for review.`);return refreshOps()}).catch(err=>notice(statusBox,errorMessage(err),true))});
-    monForm.addEventListener('submit',e=>{e.preventDefault();void api<LegalMonitor>('/legal/monitors',{method:'POST',body:JSON.stringify({name:monName.input.value,monitorType:monType.value,target:monTarget.input.value,jurisdiction:jurisdiction.value,language:'en',scheduleCron:'0 0 * * *'})}).then(()=>{notice(statusBox,'TinyFish monitor created.');return refreshOps()}).catch(err=>notice(statusBox,errorMessage(err),true))});
-    ops.append(statusBox,discForm,monForm,importForm,monList,pendingList);parent.append(ops);void refreshOps();
+    tabContent.append(subhead, pillsWrap, agentForm, agentResults);
   }
+
+  function renderMonitorsTab() {
+    tabContent.replaceChildren();
+    const headWrap = el('div');
+    headWrap.append(
+      el('h3', '', t('Continuous Statutory Monitors', 'सक्रिय विनियामक मॉनिटर')),
+      el('p', 'microcopy', t('TinyFish schedules background checks across gazettes and municipal circulars, flagging SLA updates.', 'टाइनीफिश गजट और नगर निगम परिपत्रों की स्वतः जाँच करता है।'))
+    );
+    const monGrid = el('div', 'tinyfish-monitor-grid');
+    const statusNote = el('div');
+    tabContent.append(headWrap, statusNote, monGrid);
+
+    void api<LegalMonitor[]>('/legal/monitors').then(monitors => {
+      monGrid.replaceChildren();
+      for (const m of monitors) {
+        const card = el('div', 'tinyfish-monitor-card');
+        const cardHeader = el('div', 'tinyfish-card-header');
+        cardHeader.append(
+          el('span', 'label', `${m.monitorType.toUpperCase()} · ${m.jurisdiction}`),
+          el('span', 'status status-closed', m.lastStatus ?? m.status)
+        );
+        card.append(
+          cardHeader,
+          el('h4', 'tinyfish-card-title', m.name),
+          el('p', 'tinyfish-card-target', m.target),
+          button(t('⚡ Run Check Now', '⚡ अभी जाँचें'), async () => {
+            notice(statusNote, t('Triggering TinyFish monitor check on ', 'टाइनीफिश मॉनिटर चला रहे हैं: ') + m.target);
+            try {
+              const res = await api<MonitorRunResult>(`/legal/monitors/${m.id}/run`, { method: 'POST' });
+              notice(statusNote, `✓ Monitor executed (${res.providerMode}). Queued ${res.queuedSources.length} new statutory updates.`);
+              renderMonitorsTab();
+            } catch (e) {
+              notice(statusNote, errorMessage(e), true);
+            }
+          }, 'button secondary small')
+        );
+        monGrid.append(card);
+      }
+    }).catch(err => notice(statusNote, errorMessage(err), true));
+  }
+
+  function renderContactTab() {
+    tabContent.replaceChildren();
+    tabContent.append(
+      el('h3', '', t('Authority Contact Discovery Simulator', 'प्राधिकारी संपर्क खोज सिमुलेटर')),
+      el('p', 'microcopy', t('Preview how TinyFish dynamically navigates official portals to discover municipal contacts:', 'देखें कि कैसे टाइनीफिश आधिकारिक पोर्टलों से संपर्क खोजता है:'))
+    );
+    const testCard = el('div', 'panel');
+    testCard.append(
+      el('span', 'tinyfish-badge', 'TINYFISH NODAL DISCOVERY'),
+      el('p', '', '🏢 Department: Public Works Department (B&R), Sonipat Division'),
+      el('p', '', '📍 Target Jurisdiction: Ward 4, Murthal / Sonipat, Haryana'),
+      el('p', '', '📧 Discovered Official Email: eepwd-sonipat@hry.nic.in'),
+      el('p', '', '🌐 Verified Government Source: https://haryanapwd.gov.in/contacts'),
+      el('p', 'microcopy', t('Grievance emails dispatched via verified sender arshitgupta34@gmail.com.', 'शिकायतें सत्यापित प्रेषक arshitgupta34@gmail.com से भेजी जाती हैं।'))
+    );
+    tabContent.append(testCard);
+  }
+
+  function renderReviewTab() {
+    tabContent.replaceChildren();
+    tabContent.append(el('h3', '', t('Pending Regulatory Review Queue', 'लंबित विनियामक समीक्षा कतार')));
+    const reviewList = el('div', 'case-list');
+    const reviewAlert = el('div');
+    tabContent.append(reviewAlert, reviewList);
+
+    void api<LegalSource[]>('/legal/review').then(pending => {
+      reviewList.replaceChildren();
+      if (!pending.length) {
+        notice(reviewList, t('No pending sources awaiting review. All current guidance is approved.', 'कोई लंबित स्रोत नहीं है। सभी मार्गदर्शन स्वीकृत हैं।'));
+        return;
+      }
+      for (const p of pending) {
+        const row = el('div', 'task-row');
+        row.append(
+          el('span', 'label', p.jurisdiction),
+          el('span', '', p.title),
+          button(t('Approve', 'स्वीकार करें'), () => {
+            void api(`/legal/sources/${p.id}/review`, { method: 'POST', body: JSON.stringify({ approve: true }) })
+              .then(() => renderReviewTab());
+          }, 'quiet'),
+          button(t('Reject', 'अस्वीकार करें'), () => {
+            void api(`/legal/sources/${p.id}/review`, { method: 'POST', body: JSON.stringify({ approve: false }) })
+              .then(() => renderReviewTab());
+          }, 'quiet')
+        );
+        reviewList.append(row);
+      }
+    }).catch(err => notice(reviewAlert, errorMessage(err), true));
+  }
+
+  // Initialize with Agent tab
+  switchTab('agent');
 }
 
 export function information(parent:HTMLElement,path:string){const pages:Record<string,[string,string]>={

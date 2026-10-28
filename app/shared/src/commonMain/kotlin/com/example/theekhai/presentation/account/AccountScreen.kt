@@ -160,12 +160,73 @@ fun AccountScreen() {
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
+            ServerEndpointPanel(
+                currentUrl = state.backendUrl,
+                onUpdateUrl = viewModel::updateBackendUrl,
+                ext = ext
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
             TheekHaiButton(
                 text = if (state.isLoading) "Working…" else "Sign out",
                 onClick = { viewModel.signOut(); navigator.resetTo(Route.Login) },
                 enabled = !state.isLoading,
                 isSecondary = true
             )
+        }
+    }
+}
+
+@Composable
+private fun ServerEndpointPanel(
+    currentUrl: String,
+    onUpdateUrl: (String) -> Unit,
+    ext: com.example.theekhai.ui.theme.TheekHaiExtendedColors
+) {
+    var customUrl by remember(currentUrl) { mutableStateOf(currentUrl) }
+
+    PanelCard(modifier = Modifier.fillMaxWidth()) {
+        Eyebrow("BACKEND SERVER INTEGRATION")
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Municipal API Endpoint", style = MaterialTheme.typography.titleMedium, color = ext.ink, fontWeight = FontWeight.Bold)
+        Text("Switch connection between Docker, local development, and live cloud backend:", style = MaterialTheme.typography.bodySmall, color = ext.muted)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = customUrl,
+            onValueChange = { customUrl = it },
+            label = { Text("API Base URL") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(4.dp),
+            singleLine = true
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = {
+                    customUrl = "https://bless-stinger-plow.ngrok-free.dev"
+                    onUpdateUrl(customUrl)
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("🌐 Cloud Ngrok", fontSize = 11.sp)
+            }
+            OutlinedButton(
+                onClick = {
+                    customUrl = "http://10.0.2.2:8080"
+                    onUpdateUrl(customUrl)
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("🐳 Docker/Emulator", fontSize = 11.sp)
+            }
+            Button(
+                onClick = { onUpdateUrl(customUrl) },
+                colors = ButtonDefaults.buttonColors(containerColor = ext.green)
+            ) {
+                Text("Connect", fontSize = 12.sp)
+            }
         }
     }
 }

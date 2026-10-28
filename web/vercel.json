@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/v1/:path*",
+      "destination": "https://bless-stinger-plow.ngrok-free.dev/api/v1/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://bless-stinger-plow.ngrok-free.dev/health"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -42,7 +42,18 @@ class NativeCivicRemoteRepository(
     private val baseUrl: String,
     private val session: NativeSessionToken
 ) : NativeCivicRepository {
-    private fun url(path: String) = "${baseUrl.trimEnd('/')}/api/v1$path"
+    private var currentBaseUrl: String = baseUrl
+
+    override fun setBackendUrl(url: String) {
+        val clean = url.trim().trimEnd('/')
+        if (clean.isNotBlank()) {
+            currentBaseUrl = clean
+        }
+    }
+
+    override fun getBackendUrl(): String = currentBaseUrl
+
+    private fun url(path: String) = "${currentBaseUrl.trimEnd('/')}/api/v1$path"
 
     override suspend fun signIn(email: String, password: String): SignedInUser {
         val httpResponse = client.post(url("/auth/login")) {
